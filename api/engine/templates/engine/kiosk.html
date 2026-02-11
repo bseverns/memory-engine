@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Room Memory — Confessional Kiosk</title>
+  <link rel="stylesheet" href="/static/engine/kiosk.css"/>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Room Memory</h1>
+      <p class="sub">Leave a sound for the room. The room keeps it briefly. Each listen changes it a little.</p>
+    </header>
+
+    <section class="panel">
+      <h2>1) Record</h2>
+      <div class="row">
+        <button id="btnStart" class="btn">Start recording</button>
+        <button id="btnStop" class="btn secondary" disabled>Stop</button>
+        <span id="recStatus" class="status">Idle</span>
+      </div>
+      <div class="hint">Please avoid names or identifying details.</div>
+      <audio id="preview" controls class="preview" hidden></audio>
+    </section>
+
+    <section class="panel">
+      <h2>2) Choose how this room remembers</h2>
+      <div class="choices">
+        <button class="choice" data-mode="ROOM">
+          <strong>Room Memory</strong>
+          <span>Stored on this device. Deleted in ~48 hours. Played in the room. Light decay per play.</span>
+        </button>
+        <button class="choice" data-mode="FOSSIL">
+          <strong>Fossil Only</strong>
+          <span>Raw deleted in ~48 hours. A spectrogram image may remain locally for ~1 year.</span>
+        </button>
+        <button class="choice" data-mode="NOSAVE">
+          <strong>Don’t Save</strong>
+          <span>Play once immediately, then discard.</span>
+        </button>
+      </div>
+      <div class="row">
+        <button id="btnSubmit" class="btn" disabled>Submit</button>
+        <span id="submitStatus" class="status"></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>3) Receipt</h2>
+      <div id="receipt" class="receipt muted">No receipt yet.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Ambient playback</h2>
+      <div class="row">
+        <button id="btnLoop" class="btn secondary">Start room loop</button>
+        <button id="btnLoopStop" class="btn secondary" disabled>Stop loop</button>
+        <span id="loopStatus" class="status">Stopped</span>
+      </div>
+      <div class="hint">Loop fetches from the room pool. Each playback increments “wear” slightly.</div>
+    </section>
+
+    <footer>
+      <small>Local-first node. Nothing is published. Revocation works only on this node’s network.</small>
+    </footer>
+  </div>
+
+  <script src="/static/engine/kiosk.js"></script>
+</body>
+</html>

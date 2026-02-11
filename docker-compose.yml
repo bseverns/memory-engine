@@ -1,0 +1,83 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+  minio_init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set local ${MINIO_ENDPOINT} ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}) do sleep 1; done;
+      /usr/bin/mc mb -p local/${MINIO_BUCKET} || true;
+      echo 'MinIO bucket ensured.';
+      "
+    restart: "no"
+
+  api:
+    build:
+      context: ./api
+    env_file: .env
+    depends_on:
+      - db
+      - redis
+      - minio
+      - minio_init
+    ports:
+      - "8000:8000"
+    volumes:
+      - api_logs:/var/log/memory_engine
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./api
+    env_file: .env
+    depends_on:
+      - api
+      - redis
+      - db
+      - minio
+    command: celery -A memory_engine worker -l info
+    restart: unless-stopped
+
+  beat:
+    build:
+      context: ./api
+    env_file: .env
+    depends_on:
+      - api
+      - redis
+      - db
+      - minio
+    command: celery -A memory_engine beat -l info
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  minio_data:
+  api_logs:
