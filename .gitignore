@@ -1,2 +1,6 @@
+.env
+backups/
+__pycache__/
+*.pyc
 .DS_Store
 api/.DS_Store

@@ -22,10 +22,20 @@ until python -c "import os, urllib.request; urllib.request.urlopen(os.getenv('MI
 done
 
 python manage.py migrate --noinput
+python manage.py collectstatic --noinput
 python manage.py ensure_default_node
 
 # Dev convenience: create a superuser if requested and none exists
 python manage.py ensure_dev_superuser
 
-echo "Running Django dev server on 0.0.0.0:8000"
-python manage.py runserver 0.0.0.0:8000
+GUNICORN_BIND="${GUNICORN_BIND:-0.0.0.0:8000}"
+GUNICORN_WORKERS="${GUNICORN_WORKERS:-2}"
+GUNICORN_TIMEOUT="${GUNICORN_TIMEOUT:-120}"
+
+echo "Running Gunicorn on ${GUNICORN_BIND}"
+exec gunicorn memory_engine.wsgi:application \
+  --bind "${GUNICORN_BIND}" \
+  --workers "${GUNICORN_WORKERS}" \
+  --timeout "${GUNICORN_TIMEOUT}" \
+  --access-logfile - \
+  --error-logfile -

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Room Memory — Operator Dashboard</title>
+  <link rel="stylesheet" href="/static/engine/kiosk.css"/>
+</head>
+<body>
+  <div class="shell dashboard-shell">
+    <header class="hero">
+      <p class="eyebrow">Operator dashboard</p>
+      <h1>Room Memory Status</h1>
+      <p class="sub">This page shows whether the node is healthy enough to operate, what the room currently holds, and when the last refresh happened.</p>
+    </header>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">System state</p>
+          <h3 id="opsStateLabel">Checking...</h3>
+        </div>
+        <span id="opsStateBadge" class="ops-state degraded">checking</span>
+      </div>
+      <p id="opsSummary" class="stage-copy">Waiting for the node to report its current state.</p>
+      <div class="status-grid">
+        <article class="status-card">
+          <p class="section-kicker">Active sounds</p>
+          <div id="opsActive" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Expired</p>
+          <div id="opsExpired" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Revoked</p>
+          <div id="opsRevoked" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Fresh lane</p>
+          <div id="opsFresh" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Mid lane</p>
+          <div id="opsMid" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Worn lane</p>
+          <div id="opsWorn" class="status-number">-</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">Dependencies</p>
+          <h3>Readiness checks</h3>
+        </div>
+      </div>
+      <div id="opsComponents" class="component-list"></div>
+      <div class="shortcut-row">
+        <span id="opsRefreshed" class="shortcut">Waiting for first refresh</span>
+        <a class="btn secondary link-btn" href="/healthz">Raw health JSON</a>
+      </div>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">Shortcuts</p>
+          <h3>Operator links</h3>
+        </div>
+      </div>
+      <div class="shortcut-row">
+        <a class="btn secondary link-btn" href="/kiosk/">Open kiosk</a>
+        <a class="btn secondary link-btn" href="/admin/">Open admin</a>
+        <a class="btn secondary link-btn" href="/api/v1/node/status">Raw node status</a>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const opsStateBadge = document.getElementById("opsStateBadge");
+    const opsStateLabel = document.getElementById("opsStateLabel");
+    const opsSummary = document.getElementById("opsSummary");
+    const opsActive = document.getElementById("opsActive");
+    const opsExpired = document.getElementById("opsExpired");
+    const opsRevoked = document.getElementById("opsRevoked");
+    const opsFresh = document.getElementById("opsFresh");
+    const opsMid = document.getElementById("opsMid");
+    const opsWorn = document.getElementById("opsWorn");
+    const opsComponents = document.getElementById("opsComponents");
+    const opsRefreshed = document.getElementById("opsRefreshed");
+
+    function classifyState(payload) {
+      const components = payload.components || {};
+      const failedNames = Object.entries(components).filter(([, value]) => !value.ok).map(([name]) => name);
+      if (failedNames.length === 0) {
+        return {
+          state: "ready",
+          title: "Ready",
+          summary: "All tracked dependencies are healthy. The node should be ready for capture and playback.",
+        };
+      }
+      if (failedNames.includes("database")) {
+        return {
+          state: "broken",
+          title: "Broken",
+          summary: `The database check failed (${failedNames.join(", ")}). Operator intervention is required.`,
+        };
+      }
+      return {
+        state: "degraded",
+        title: "Degraded",
+        summary: `Some dependencies need attention (${failedNames.join(", ")}), but the node may still be partially usable.`,
+      };
+    }
+
+    function renderComponents(components) {
+      const entries = Object.entries(components || {});
+      if (!entries.length) {
+        opsComponents.innerHTML = '<div class="component-card degraded">No dependency data returned.</div>';
+        return;
+      }
+
+      opsComponents.innerHTML = entries.map(([name, value]) => `
+        <article class="component-card ${value.ok ? "ready" : "broken"}">
+          <strong>${name}</strong>
+          <span>${value.ok ? "ok" : (value.error || "error")}</span>
+        </article>
+      `).join("");
+    }
+
+    async function refreshStatus() {
+      try {
+        const response = await fetch("/api/v1/node/status", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`Status fetch failed (${response.status})`);
+        }
+        const payload = await response.json();
+        const state = classifyState(payload);
+
+        opsStateBadge.textContent = state.state;
+        opsStateBadge.className = `ops-state ${state.state}`;
+        opsStateLabel.textContent = state.title;
+        opsSummary.textContent = state.summary;
+        opsActive.textContent = String(payload.active ?? "-");
+        opsExpired.textContent = String(payload.expired ?? "-");
+        opsRevoked.textContent = String(payload.revoked ?? "-");
+        opsFresh.textContent = String(payload.lanes?.fresh ?? "-");
+        opsMid.textContent = String(payload.lanes?.mid ?? "-");
+        opsWorn.textContent = String(payload.lanes?.worn ?? "-");
+        renderComponents(payload.components || {});
+        opsRefreshed.textContent = `Last refreshed ${new Date().toLocaleTimeString()}`;
+      } catch (error) {
+        opsStateBadge.textContent = "broken";
+        opsStateBadge.className = "ops-state broken";
+        opsStateLabel.textContent = "Broken";
+        opsSummary.textContent = error.message || "Status refresh failed.";
+        opsComponents.innerHTML = '<div class="component-card broken">Unable to reach /api/v1/node/status</div>';
+        opsRefreshed.textContent = "Last refresh failed";
+      }
+    }
+
+    refreshStatus();
+    window.setInterval(refreshStatus, 10000);
+  </script>
+</body>
+</html>

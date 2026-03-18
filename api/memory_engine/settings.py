@@ -3,9 +3,33 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+def env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return int(value.strip())
+
+def env_float(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return float(value.strip())
+
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
-DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
+DEBUG = env_bool("DJANGO_DEBUG", False)
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost,http://127.0.0.1").split(",") if o.strip()]
+USE_X_FORWARDED_HOST = env_bool("DJANGO_USE_X_FORWARDED_HOST", True)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
+SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", False)
+CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", False)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -20,6 +44,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -61,6 +86,14 @@ DATABASES = {
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Celery
@@ -86,6 +119,14 @@ MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
 
 # Decay tuning
 WEAR_EPSILON_PER_PLAY = float(os.getenv("WEAR_EPSILON_PER_PLAY", "0.005"))
+POOL_PLAY_COOLDOWN_SECONDS = env_int("POOL_PLAY_COOLDOWN_SECONDS", 90)
+POOL_CANDIDATE_LIMIT = env_int("POOL_CANDIDATE_LIMIT", 40)
+POOL_FRESH_MAX_AGE_HOURS = env_float("POOL_FRESH_MAX_AGE_HOURS", 8.0)
+POOL_FRESH_MAX_WEAR = env_float("POOL_FRESH_MAX_WEAR", 0.18)
+POOL_FRESH_MAX_PLAY_COUNT = env_int("POOL_FRESH_MAX_PLAY_COUNT", 2)
+POOL_WORN_MIN_AGE_HOURS = env_float("POOL_WORN_MIN_AGE_HOURS", 18.0)
+POOL_WORN_MIN_WEAR = env_float("POOL_WORN_MIN_WEAR", 0.38)
+POOL_WORN_MIN_PLAY_COUNT = env_int("POOL_WORN_MIN_PLAY_COUNT", 5)
 RAW_TTL_HOURS_ROOM = int(os.getenv("RAW_TTL_HOURS_ROOM", "48"))
 RAW_TTL_HOURS_FOSSIL = int(os.getenv("RAW_TTL_HOURS_FOSSIL", "48"))
 DERIVATIVE_TTL_DAYS_FOSSIL = int(os.getenv("DERIVATIVE_TTL_DAYS_FOSSIL", "365"))

@@ -1,4 +1,19 @@
 services:
+  proxy:
+    image: caddy:2
+    env_file: .env
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
   db:
     image: postgres:16
     environment:
@@ -7,10 +22,22 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
 
   redis:
     image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     restart: unless-stopped
 
   minio:
@@ -20,8 +47,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
     restart: unless-stopped
@@ -43,14 +70,24 @@ services:
       context: ./api
     env_file: .env
     depends_on:
-      - db
-      - redis
-      - minio
-      - minio_init
-    ports:
-      - "8000:8000"
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      minio_init:
+        condition: service_completed_successfully
+    expose:
+      - "8000"
     volumes:
       - api_logs:/var/log/memory_engine
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   worker:
@@ -58,10 +95,14 @@ services:
       context: ./api
     env_file: .env
     depends_on:
-      - api
-      - redis
-      - db
-      - minio
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
     command: celery -A memory_engine worker -l info
     restart: unless-stopped
 
@@ -70,14 +111,20 @@ services:
       context: ./api
     env_file: .env
     depends_on:
-      - api
-      - redis
-      - db
-      - minio
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
     command: celery -A memory_engine beat -l info
     restart: unless-stopped
 
 volumes:
+  caddy_data:
+  caddy_config:
   db_data:
   minio_data:
   api_logs:

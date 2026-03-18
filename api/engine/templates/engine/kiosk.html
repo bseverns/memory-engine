@@ -7,58 +7,125 @@
   <link rel="stylesheet" href="/static/engine/kiosk.css"/>
 </head>
 <body>
-  <div class="wrap">
-    <header>
+  <div class="shell">
+    <header class="hero">
+      <p class="eyebrow">Local-first confessional kiosk</p>
       <h1>Room Memory</h1>
-      <p class="sub">Leave a sound for the room. The room keeps it briefly. Each listen changes it a little.</p>
+      <p class="sub">Leave a short sound for the room. The microphone stays asleep until you arm it, and the whole flow works with touch, mouse, or keyboard.</p>
     </header>
 
-    <section class="panel">
-      <h2>1) Record</h2>
-      <div class="row">
-        <button id="btnStart" class="btn">Start recording</button>
-        <button id="btnStop" class="btn secondary" disabled>Stop</button>
-        <span id="recStatus" class="status">Idle</span>
+    <nav class="stepper" aria-label="Recording steps">
+      <div class="step active" data-step="prepare"><span>1</span> Prepare</div>
+      <div class="step" data-step="record"><span>2</span> Record</div>
+      <div class="step" data-step="choose"><span>3</span> Choose</div>
+      <div class="step" data-step="done"><span>4</span> Done</div>
+    </nav>
+
+    <section class="stage">
+      <div class="stage-meta">
+        <span id="stageBadge" class="badge">Not armed</span>
+        <span id="micStatus" class="mic-chip">Microphone asleep</span>
       </div>
+      <h2 id="stageTitle">Settle in before you begin.</h2>
+      <p id="stageCopy" class="stage-copy">Arm the microphone when you are ready. Once it is live, you can check the level meter, take a breath, and begin when it feels right.</p>
+
+      <div class="meter-card">
+        <div class="meter-head">
+          <span>Mic level</span>
+          <span id="meterText">Waiting for microphone</span>
+        </div>
+        <div class="meter" aria-hidden="true">
+          <div id="meterFill" class="meter-fill"></div>
+        </div>
+        <div class="meter-foot">
+          <span id="micCheckStatus" class="mic-check quiet">Mic check unavailable</span>
+          <span id="maxDurationHint" class="shortcut">Max 02:00</span>
+        </div>
+      </div>
+
+      <div class="recording-strip">
+        <span id="recStatus" class="status">Microphone not armed</span>
+        <div class="timer-cluster">
+          <span class="timer-label">Elapsed</span>
+          <span id="recTimer" class="timer">00:00</span>
+        </div>
+        <div class="timer-cluster">
+          <span class="timer-label">Remaining</span>
+          <span id="remainingTimer" class="timer alt">02:00</span>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button id="btnPrimary" class="btn">Arm microphone</button>
+        <button id="btnSecondary" class="btn secondary" disabled>Start over</button>
+      </div>
+
+      <div class="shortcut-row">
+        <span id="shortcutHint" class="shortcut">Space or Enter: arm microphone</span>
+        <span class="shortcut">Esc: reset</span>
+      </div>
+
       <div class="hint">Please avoid names or identifying details.</div>
       <audio id="preview" controls class="preview" hidden></audio>
+      <div id="countdownOverlay" class="countdown-overlay" hidden>
+        <div class="countdown-card">
+          <p class="section-kicker">Get ready</p>
+          <div id="countdownValue" class="countdown-value">3</div>
+          <p id="countdownLabel" class="countdown-label">Recording starts in a moment.</p>
+        </div>
+      </div>
     </section>
 
-    <section class="panel">
-      <h2>2) Choose how this room remembers</h2>
+    <section id="modePanel" class="panel mode-panel locked">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">How the room remembers</p>
+          <h3>Choose what happens to this take</h3>
+        </div>
+        <span id="selectionHint" class="selection-hint">Unlocked after recording</span>
+      </div>
       <div class="choices">
-        <button class="choice" data-mode="ROOM">
+        <button class="choice" data-mode="ROOM" data-key="1" aria-keyshortcuts="1">
+          <span class="choice-key">1</span>
           <strong>Room Memory</strong>
           <span>Stored on this device. Deleted in ~48 hours. Played in the room. Light decay per play.</span>
         </button>
-        <button class="choice" data-mode="FOSSIL">
+        <button class="choice" data-mode="FOSSIL" data-key="2" aria-keyshortcuts="2">
+          <span class="choice-key">2</span>
           <strong>Fossil Only</strong>
           <span>Raw deleted in ~48 hours. A spectrogram image may remain locally for ~1 year.</span>
         </button>
-        <button class="choice" data-mode="NOSAVE">
+        <button class="choice" data-mode="NOSAVE" data-key="3" aria-keyshortcuts="3">
+          <span class="choice-key">3</span>
           <strong>Don’t Save</strong>
           <span>Play once immediately, then discard.</span>
         </button>
       </div>
       <div class="row">
-        <button id="btnSubmit" class="btn" disabled>Submit</button>
+        <button id="btnSubmit" class="btn" disabled>Submit selection</button>
         <span id="submitStatus" class="status"></span>
       </div>
     </section>
 
-    <section class="panel">
-      <h2>3) Receipt</h2>
+    <section class="panel receipt-panel">
+      <p class="section-kicker">Receipt</p>
+      <h3>What to keep</h3>
       <div id="receipt" class="receipt muted">No receipt yet.</div>
     </section>
 
-    <section class="panel">
-      <h2>Ambient playback</h2>
+    <section class="panel utility-panel">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">Room loop</p>
+          <h3>Ambient playback</h3>
+        </div>
+      </div>
       <div class="row">
         <button id="btnLoop" class="btn secondary">Start room loop</button>
         <button id="btnLoopStop" class="btn secondary" disabled>Stop loop</button>
         <span id="loopStatus" class="status">Stopped</span>
       </div>
-      <div class="hint">Loop fetches from the room pool. Each playback increments “wear” slightly.</div>
+      <div class="hint">The room loop now drifts between fresher and more worn memories, with a quiet room-tone bed between sounds. Arming the microphone pauses it so the next speaker gets a quiet start.</div>
     </section>
 
     <footer>

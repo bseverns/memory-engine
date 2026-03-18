@@ -1,0 +1,144 @@
+# Roadmap
+
+## Landed In This Pass
+
+### Operator / deployment
+- Reverse-proxy deployment path with `caddy` + `gunicorn`
+- `/healthz` endpoint for readiness checks
+- Docker healthchecks for core services that have reliable built-in probes
+- `/ops/` operator dashboard with `ready`, `degraded`, and `broken` states
+- `scripts/first_boot.sh` to stamp out development defaults and set node identity
+- `scripts/deploy.sh` for public-IP-now / domain-later rollout
+- `scripts/backup.sh` and `scripts/restore.sh` for Postgres + MinIO recovery
+- Shared shell helpers to keep operator scripts consistent
+- `scripts/check.sh` and `scripts/status.sh` for quicker maintenance passes
+- `docs/maintenance.md` as the steward runbook
+- `README.md` pointers for operator maintenance and recovery flows
+
+### Recording experience
+- Short pre-roll countdown before recording begins
+- Soft pre-roll tone paired with the visual countdown
+- Explicit mic-check feedback using the live meter
+- Visible max-duration countdown with auto-stop
+- Browser-side trimming of quiet leading/trailing edges
+- Light peak normalization before the WAV is uploaded
+- Small fades on recorded takes to avoid clicks at the edges
+
+### Audience playback
+- Weighted pool selection with cooldown to reduce obvious repetition
+- Selection weighting that also accounts for age and recentness, so the room favors settled material without locking into the oldest memories
+- Separate "fresh" and "worn" playback lanes so the room has more temporal depth
+- Gentle room-tone bedding behind sparse or empty playback moments
+- Stronger scene composition in the pool
+  - weighted clustering by density
+  - occasional longer silences
+  - lane-aware sequencing across fresh, mid, and worn material
+- Richer mood shaping across the room loop
+  - mood-aware artifact requests from the browser
+  - clustering by mood as well as density
+  - movement-based counterbalance between clear, hushed, suspended, gathering, and weathered material
+- More deliberate macro-pacing across a longer span
+  - movement phases for arrival, gathering, weathering, and release
+  - movement-specific gap pacing instead of one steady room tempo
+- Playback loudness smoothing so contributions land closer together
+- Fade-in / fade-out and a short gap between room-loop items
+- Code comments around playback selection, scene composition, room tone, and wear processing
+- `README.md` audience-experience notes describing the intended listening effect
+
+## Now
+
+### User / speaker
+- Support a hands-free control path
+  - USB button
+  - footswitch
+- Add an attract loop for idle mode that teaches how to begin without needing steward intervention
+- Add a quiet-take warning after recording, with a clear keep-or-retake choice
+- Add a visible idle timeout so abandoned review screens reset themselves cleanly
+
+### Audience / room effect
+- Add intensity profiles such as `quiet`, `balanced`, and `active` so pacing can be tuned without code edits
+- Add a scarcity mode for low-pool situations that leans harder on silence and room tone
+- Add a persistent anti-repetition window so repetition control survives browser refreshes and restarts
+- Add adaptive gap timing based on total pool size so a sparse archive feels spacious and a deep archive feels alive
+- Add steward-tunable movement presets so one installation can feel meditative while another feels more active
+
+### Operator / stewardship
+- Add a "doctor" script that checks `.env`, ports, storage, MinIO reachability, and HTTPS/browser constraints
+- Add disk-space and storage-pressure warnings to `/ops/`
+- Add pool-health warnings to `/ops/` when the room is nearly empty or heavily imbalanced by lane or mood
+- Add simple steward controls for pausing intake, pausing playback, or switching to a quieter mode
+- Add an installation checklist for kiosk hardware, browser kiosk mode, audio device selection, and auto-start on boot
+
+## Next
+
+### User / speaker
+- Add multilingual kiosk copy so the full guided flow can be swapped per installation
+- Add a larger-type / higher-contrast accessibility mode for difficult rooms
+- Add reduced-motion handling for the countdown and kiosk transitions
+- Add a steward-configurable max recording duration instead of keeping it browser-only
+- Add optional headphone or monitor-check mode for setup and microphone testing
+
+### Audience / room effect
+- Push beyond metadata-derived mood shaping into a room state that responds to context
+  - learn from time-of-day or room activity patterns
+  - explore whether semantic or transcript-aware grouping is worth the complexity
+- Add daypart scheduling so movement pacing and density can vary across morning, afternoon, and evening
+- Add steward-tunable room-tone options, including the ability to swap the synthetic bed for site-specific ambience
+- Add rare overlap or layering events so the room can occasionally feel accumulative instead of strictly sequential
+- Add more explicit density balancing so long or heavy material does not cluster too often by accident
+- Add a "featured return" mechanism for older material that should occasionally re-enter the room after long absence
+- Add audience-facing fossil visuals or ambient spectrogram display if the installation benefits from a visual layer
+- Add a quiet-hours mode for spaces that need softer pacing or lower overall playback intensity
+- Add a way to pin or bias certain moods temporarily during performances or steward-led sessions
+
+### Operator / stewardship
+- Add export bundles for backup, migration, or archival handoff
+- Add one-command firewall / restart-on-boot setup for a specific server OS target
+- Add a safer restore flow with pre-restore snapshots and confirmation prompts
+- Decide whether production MinIO should keep using the default root-backed app credentials or switch to a separately provisioned service identity
+- Add rotation notes and helper steps for Postgres, Django, and MinIO credential changes
+- Add audit logging for revocation, restore, export, and stewardship actions
+- Add a way to mark a node as maintenance-only so audience playback and intake can be suspended cleanly
+- Add remote-friendly log bundling for support without handing over full server access
+- Add a retention dashboard that shows expected raw-audio expiry and fossil retention windows
+- Add a documented migration path for moving from compose-managed MinIO to an external S3-compatible backend
+- Add a decision and notes for whether MinIO bucket versioning or object locking is worth enabling in production
+
+## Later
+
+### User / speaker
+- Add participant-facing revocation guidance that can be shown without exposing full steward controls
+- Add installation-specific speaker prompts or writing prompts that can shift the emotional tone of the room
+- Add optional steward-authored session themes that influence idle copy and submission framing
+- Add alternate kiosk layouts for seated booths, standing kiosks, and wall-mounted enclosures
+
+### Audience / room effect
+- Add audience-presence or ambient-volume sensing so the room can react to actual occupancy
+- Add installation-specific "personalities" that package movement, tone, gap, and wear behavior together
+- Add shared-pool or federated-pool options for multi-room installations
+- Add richer visual layers such as projected fossils, spectrogram drift, or low-light companion displays
+- Add semantic or transcript-aware grouping if metadata-only composition plateaus
+- Add room-state transitions driven by recent recording activity, not just playback history
+- Add crossfaded movement transitions instead of hard scene-to-scene pacing changes
+- Add optional performance mode for steward-led events where certain moods or movements can be emphasized live
+
+### Operator / stewardship
+- Add structured export bundles with manifests, checksums, and import instructions for archival handoff
+- Add multi-node stewardship tooling if more than one installation is deployed
+- Add role-based steward access if the installation grows beyond one trusted operator
+- Add long-term retention policy controls that can differ by consent mode or installation
+- Add a documented disaster-recovery rehearsal flow rather than only backup and restore commands
+- Add a fuller external-storage migration story for moving beyond MinIO if scale or policy changes
+
+## Later Research Questions
+- Whether browser-side normalization is sufficient, or if server-side loudness analysis is worth the added complexity
+- Whether the pool should learn from time-of-day or room activity patterns
+- Whether the kiosk should expose revocation and moderation tools directly, or keep those fully steward-side
+- Whether transcripts, embeddings, or other semantic grouping would meaningfully improve scene composition
+- Whether the audience experience should remain audio-only or eventually include light, projection, or fossil visuals
+- Whether multiple kiosks should share a pool or remain strictly room-local
+- Whether revocation should stay steward-mediated or gain a participant-facing path using the receipt code
+- Whether the room should ever adapt to audience presence sensing, ambient volume, or time since last recording
+- Whether wear should remain global per artifact or vary by room, node, or playback context
+- Whether the system should support installation-specific "personalities" as first-class presets rather than ad hoc tuning
+- Whether steward moderation should happen before playback in some installations rather than after the fact
