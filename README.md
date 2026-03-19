@@ -82,6 +82,7 @@ Fast maintenance helpers are also included:
 
 Longer operator notes live in `docs/maintenance.md`.
 That includes a MinIO section covering which credentials live where, what is set before first deploy, and how manual MinIO provisioning changes the `.env` values.
+The install-day hardware and kiosk checklist lives in `docs/installation-checklist.md`.
 
 For a server reachable at `203.0.113.10`, set these values in `.env`:
 
@@ -194,6 +195,7 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 ## Directory map
 - `docker-compose.yml` — full local node stack
 - `docs/maintenance.md` — deployment, status, backup, restore, and troubleshooting runbook
+- `docs/installation-checklist.md` — hardware, browser kiosk mode, audio, and auto-start install checklist
 - `docs/roadmap.md` — landed changes and the next likely improvements
 - `scripts/check.sh` — quick syntax and patch-hygiene validation
 - `scripts/doctor.sh` — operator-focused env, compose, storage, and browser-constraint checks

@@ -14,6 +14,7 @@
 - `scripts/check.sh` and `scripts/status.sh` for quicker maintenance passes
 - `scripts/doctor.sh` to check `.env`, compose state, storage reachability, and browser/TLS constraints
 - `docs/maintenance.md` as the steward runbook
+- `docs/installation-checklist.md` for kiosk hardware, browser kiosk mode, audio routing, and auto-start
 - `README.md` pointers for operator maintenance and recovery flows
 - Disk-space and storage-pressure warnings surfaced in `/ops/`
 - Pool-health warnings in `/ops/` when lanes or moods become too sparse or imbalanced
@@ -56,18 +57,15 @@
 - Code comments around playback selection, scene composition, room tone, and wear processing
 - `README.md` audience-experience notes describing the intended listening effect
 
-## Now
+## Still Open Now
 
 ### User / speaker
 - Support a hands-free control path
   - USB button
   - footswitch
 
-### Audience / room effect
-
 ### Operator / stewardship
 - Add simple steward controls for pausing intake, pausing playback, or switching to a quieter mode
-- Add an installation checklist for kiosk hardware, browser kiosk mode, audio device selection, and auto-start on boot
 
 ## Next
 

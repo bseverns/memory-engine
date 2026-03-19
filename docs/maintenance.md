@@ -28,6 +28,12 @@ Run the operator doctor for env, browser, and storage posture:
 ./scripts/doctor.sh
 ```
 
+Walk through the install-day hardware and kiosk checklist:
+
+```bash
+open docs/installation-checklist.md
+```
+
 See service state and backend readiness:
 
 ```bash
@@ -62,6 +68,7 @@ Restore a backup:
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.
 - `scripts/restore.sh` restores one of those snapshots into the current stack.
+- `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
 
 ## Standard maintenance flow
 
