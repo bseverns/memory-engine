@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative, Node
+from .views import _pool_weight
 
 
 class EngineBehaviorTests(TestCase):
@@ -142,6 +143,81 @@ class EngineBehaviorTests(TestCase):
         self.assertGreater(preferred.wear, 0.0)
         self.assertEqual(AccessEvent.objects.filter(artifact=preferred, action="play").count(), 1)
 
+    def test_pool_next_falls_back_to_excluded_artifact_when_pool_is_too_small(self):
+        artifact = self.make_active_artifact(
+            raw_uri="raw/only.wav",
+            created_at=timezone.now() - timedelta(hours=10),
+        )
+
+        response = self.client.get(f"/api/v1/pool/next?exclude_ids={artifact.id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["artifact_id"], artifact.id)
+
+    def test_pool_next_respects_requested_lane_and_mood_when_available(self):
+        consent = self.make_consent("ROOM")
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/fresh.wav",
+            duration_ms=3000,
+            wear=0.01,
+            play_count=0,
+            created_at=timezone.now() - timedelta(hours=2),
+        )
+        worn = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/worn.wav",
+            duration_ms=26000,
+            wear=0.7,
+            play_count=8,
+            created_at=timezone.now() - timedelta(days=3),
+        )
+
+        response = self.client.get("/api/v1/pool/next?lane=worn&mood=weathered")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["artifact_id"], worn.id)
+        self.assertEqual(payload["lane"], "worn")
+        self.assertEqual(payload["mood"], "weathered")
+
+    def test_pool_weight_favors_settled_material_over_brand_new_material(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        fresh = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/new.wav",
+            created_at=now - timedelta(minutes=20),
+            last_access_at=now - timedelta(hours=3),
+        )
+        settled = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/settled.wav",
+            created_at=now - timedelta(hours=24),
+            last_access_at=now - timedelta(hours=3),
+        )
+
+        fresh_weight = _pool_weight(fresh, now, cooldown_seconds=90)
+        settled_weight = _pool_weight(settled, now, cooldown_seconds=90)
+
+        self.assertGreater(settled_weight, fresh_weight)
+
+    @patch("engine.views._health_component_status")
+    def test_healthz_returns_503_when_dependency_check_fails(self, health_mock):
+        health_mock.return_value = (
+            False,
+            {
+                "database": {"ok": False, "error": "down"},
+                "redis": {"ok": True},
+                "storage": {"ok": True},
+            },
+        )
+
+        response = self.client.get("/healthz")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.json()["ok"])
+
     @patch("engine.views._health_component_status")
     def test_node_status_reports_empty_pool_warning(self, health_mock):
         health_mock.return_value = (
@@ -160,3 +236,30 @@ class EngineBehaviorTests(TestCase):
         titles = {warning["title"] for warning in payload["warnings"]}
         self.assertIn("No playable sounds are available", titles)
         self.assertIn("Playback pool is running low", titles)
+
+    @patch("engine.views._health_component_status")
+    def test_node_status_reports_lane_imbalance_warning(self, health_mock):
+        health_mock.return_value = (
+            True,
+            {
+                "database": {"ok": True},
+                "redis": {"ok": True},
+                "storage": {"ok": True},
+            },
+        )
+        consent = self.make_consent("ROOM")
+        for index in range(6):
+            self.make_active_artifact(
+                consent=consent,
+                raw_uri=f"raw/fresh-{index}.wav",
+                duration_ms=3000,
+                wear=0.01,
+                play_count=0,
+                created_at=timezone.now() - timedelta(hours=2),
+            )
+
+        response = self.client.get("/api/v1/node/status")
+
+        self.assertEqual(response.status_code, 200)
+        titles = {warning["title"] for warning in response.json()["warnings"]}
+        self.assertIn("Fresh lane is dominating the pool", titles)
