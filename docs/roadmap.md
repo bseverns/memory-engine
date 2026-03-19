@@ -12,8 +12,11 @@
 - `scripts/backup.sh` and `scripts/restore.sh` for Postgres + MinIO recovery
 - Shared shell helpers to keep operator scripts consistent
 - `scripts/check.sh` and `scripts/status.sh` for quicker maintenance passes
+- `scripts/doctor.sh` to check `.env`, compose state, storage reachability, and browser/TLS constraints
 - `docs/maintenance.md` as the steward runbook
 - `README.md` pointers for operator maintenance and recovery flows
+- Disk-space and storage-pressure warnings surfaced in `/ops/`
+- Pool-health warnings in `/ops/` when lanes or moods become too sparse or imbalanced
 
 ### Recording experience
 - Short pre-roll countdown before recording begins
@@ -23,6 +26,9 @@
 - Browser-side trimming of quiet leading/trailing edges
 - Light peak normalization before the WAV is uploaded
 - Small fades on recorded takes to avoid clicks at the edges
+- Attract-loop guidance in idle mode so participants can begin without steward help
+- Quiet-take warning with a keep-or-retake choice before mode selection
+- Visible idle timeout so abandoned review screens reset cleanly
 
 ### Audience playback
 - Weighted pool selection with cooldown to reduce obvious repetition
@@ -42,6 +48,11 @@
   - movement-specific gap pacing instead of one steady room tempo
 - Playback loudness smoothing so contributions land closer together
 - Fade-in / fade-out and a short gap between room-loop items
+- Intensity profiles such as `quiet`, `balanced`, and `active` so pacing can be tuned without code edits
+- Scarcity mode for low-pool situations that leans harder on silence and room tone
+- Persistent anti-repetition window so repetition control survives browser refreshes and restarts
+- Adaptive gap timing based on total pool size so a sparse archive feels spacious and a deep archive feels alive
+- Steward-tunable movement presets so one installation can feel meditative while another feels more active
 - Code comments around playback selection, scene composition, room tone, and wear processing
 - `README.md` audience-experience notes describing the intended listening effect
 
@@ -51,21 +62,10 @@
 - Support a hands-free control path
   - USB button
   - footswitch
-- Add an attract loop for idle mode that teaches how to begin without needing steward intervention
-- Add a quiet-take warning after recording, with a clear keep-or-retake choice
-- Add a visible idle timeout so abandoned review screens reset themselves cleanly
 
 ### Audience / room effect
-- Add intensity profiles such as `quiet`, `balanced`, and `active` so pacing can be tuned without code edits
-- Add a scarcity mode for low-pool situations that leans harder on silence and room tone
-- Add a persistent anti-repetition window so repetition control survives browser refreshes and restarts
-- Add adaptive gap timing based on total pool size so a sparse archive feels spacious and a deep archive feels alive
-- Add steward-tunable movement presets so one installation can feel meditative while another feels more active
 
 ### Operator / stewardship
-- Add a "doctor" script that checks `.env`, ports, storage, MinIO reachability, and HTTPS/browser constraints
-- Add disk-space and storage-pressure warnings to `/ops/`
-- Add pool-health warnings to `/ops/` when the room is nearly empty or heavily imbalanced by lane or mood
 - Add simple steward controls for pausing intake, pausing playback, or switching to a quieter mode
 - Add an installation checklist for kiosk hardware, browser kiosk mode, audio device selection, and auto-start on boot
 

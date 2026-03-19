@@ -31,6 +31,7 @@ def kiosk_view(request):
             "roomScarcityEnabled": bool(settings.ROOM_SCARCITY_ENABLED),
             "roomScarcityLowThreshold": int(settings.ROOM_SCARCITY_LOW_THRESHOLD),
             "roomScarcitySevereThreshold": int(settings.ROOM_SCARCITY_SEVERE_THRESHOLD),
+            "roomAntiRepetitionWindowSize": int(settings.ROOM_ANTI_REPETITION_WINDOW_SIZE),
         },
     })
 
@@ -261,6 +262,7 @@ def _select_pool_artifact(
     preferred_lane: str = "any",
     preferred_density: str = "any",
     preferred_mood: str = "any",
+    excluded_ids: set[int] | None = None,
 ):
     cooldown_seconds = max(1, int(settings.POOL_PLAY_COOLDOWN_SECONDS))
     cooldown_threshold = now - timedelta(seconds=cooldown_seconds)
@@ -270,13 +272,23 @@ def _select_pool_artifact(
         status=Artifact.STATUS_ACTIVE,
         expires_at__gt=now,
     ).exclude(raw_uri="")
+    preferred_base_qs = base_qs
+    if excluded_ids:
+        preferred_base_qs = preferred_base_qs.exclude(id__in=excluded_ids)
 
-    cooldown_qs = base_qs.filter(
+    cooldown_qs = preferred_base_qs.filter(
         Q(last_access_at__isnull=True) | Q(last_access_at__lt=cooldown_threshold)
     )
     candidates = list(cooldown_qs.order_by("play_count", "wear", "-created_at")[:candidate_limit])
     if not candidates:
-        candidates = list(base_qs.order_by("last_access_at", "play_count", "wear", "-created_at")[:candidate_limit])
+        candidates = list(preferred_base_qs.order_by("last_access_at", "play_count", "wear", "-created_at")[:candidate_limit])
+    if not candidates and excluded_ids:
+        cooldown_qs = base_qs.filter(
+            Q(last_access_at__isnull=True) | Q(last_access_at__lt=cooldown_threshold)
+        )
+        candidates = list(cooldown_qs.order_by("play_count", "wear", "-created_at")[:candidate_limit])
+        if not candidates:
+            candidates = list(base_qs.order_by("last_access_at", "play_count", "wear", "-created_at")[:candidate_limit])
     if not candidates:
         return None, None
 
@@ -495,8 +507,25 @@ def pool_next(request):
     requested_mood = (request.query_params.get("mood") or "any").strip().lower()
     if requested_mood not in {"any", "clear", "hushed", "suspended", "weathered", "gathering"}:
         requested_mood = "any"
+    excluded_ids = set()
+    raw_excluded_ids = (request.query_params.get("exclude_ids") or "").strip()
+    if raw_excluded_ids:
+        for chunk in raw_excluded_ids.split(",")[:50]:
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            try:
+                excluded_ids.add(int(chunk))
+            except ValueError:
+                continue
 
-    art, selected_lane = _select_pool_artifact(now, requested_lane, requested_density, requested_mood)
+    art, selected_lane = _select_pool_artifact(
+        now,
+        requested_lane,
+        requested_density,
+        requested_mood,
+        excluded_ids=excluded_ids,
+    )
     if not art:
         return Response(status=status.HTTP_204_NO_CONTENT)
 

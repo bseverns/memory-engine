@@ -121,6 +121,7 @@ let loopMovementBudget = 0;
 let loopMovementProgress = 0;
 let loopHistory = [];
 let loopKnownPoolSize = 0;
+let persistentLoopWindow = [];
 let roomToneCtx = null;
 let roomToneNoiseSource = null;
 let roomToneMasterGain = null;
@@ -198,6 +199,7 @@ const ROOM_MOVEMENT_PRESETS = {
 const KIOSK_CONFIG = readKioskConfig();
 const ROOM_INTENSITY = ROOM_INTENSITY_PROFILES[KIOSK_CONFIG.roomIntensityProfile] || ROOM_INTENSITY_PROFILES.balanced;
 const ROOM_MOVEMENT_PRESET = ROOM_MOVEMENT_PRESETS[KIOSK_CONFIG.roomMovementPreset] || ROOM_MOVEMENT_PRESETS.balanced;
+const PERSISTENT_LOOP_WINDOW_KEY = "memory-engine-room-loop-window-v1";
 
 const PRE_ROLL_TONE = {
   gain: 0.04,
@@ -373,6 +375,7 @@ function readKioskConfig() {
       roomScarcityEnabled: true,
       roomScarcityLowThreshold: 6,
       roomScarcitySevereThreshold: 3,
+      roomAntiRepetitionWindowSize: 12,
     };
   }
 
@@ -385,8 +388,65 @@ function readKioskConfig() {
       roomScarcityEnabled: true,
       roomScarcityLowThreshold: 6,
       roomScarcitySevereThreshold: 3,
+      roomAntiRepetitionWindowSize: 12,
     };
   }
+}
+
+function antiRepetitionWindowSize() {
+  const configured = Number(KIOSK_CONFIG.roomAntiRepetitionWindowSize || 0);
+  return Math.max(0, Math.min(50, Number.isFinite(configured) ? Math.floor(configured) : 0));
+}
+
+function loadPersistentLoopWindow() {
+  const size = antiRepetitionWindowSize();
+  if (size <= 0 || !window.localStorage) {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(PERSISTENT_LOOP_WINDOW_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry) => Number(entry))
+      .filter((id) => Number.isInteger(id) && id > 0)
+      .slice(-size);
+  } catch (err) {
+    return [];
+  }
+}
+
+function savePersistentLoopWindow() {
+  const size = antiRepetitionWindowSize();
+  if (size <= 0 || !window.localStorage) {
+    return;
+  }
+
+  try {
+    const payload = persistentLoopWindow.slice(-size);
+    window.localStorage.setItem(PERSISTENT_LOOP_WINDOW_KEY, JSON.stringify(payload));
+  } catch (err) {}
+}
+
+function recentArtifactIdsForExclusion() {
+  const size = antiRepetitionWindowSize();
+  if (size <= 0) return [];
+  return persistentLoopWindow.slice(-size);
+}
+
+function rememberPersistentArtifactId(artifactId) {
+  const size = antiRepetitionWindowSize();
+  if (size <= 0) return;
+
+  const numericId = Number(artifactId);
+  if (!Number.isInteger(numericId) || numericId <= 0) return;
+
+  persistentLoopWindow = persistentLoopWindow.filter((id) => id !== numericId);
+  persistentLoopWindow.push(numericId);
+  persistentLoopWindow = persistentLoopWindow.slice(-size);
+  savePersistentLoopWindow();
 }
 
 function syncReviewTimeout(previousState, nextState) {
@@ -1395,6 +1455,7 @@ btnLoop.addEventListener("click", async () => {
   loopMovementProgress = 0;
   loopHistory = [];
   loopKnownPoolSize = 0;
+  persistentLoopWindow = loadPersistentLoopWindow();
   btnLoop.disabled = true;
   btnLoopStop.disabled = false;
   loopStatus.textContent = `Running (${ROOM_INTENSITY.name} intensity / ${ROOM_MOVEMENT_PRESET.name} preset)...`;
@@ -1420,12 +1481,16 @@ btnLoop.addEventListener("click", async () => {
       const lane = cue.lane || "any";
       const density = cue.density || "any";
       const mood = cue.mood || "any";
+      const excludedIds = recentArtifactIdsForExclusion();
       const params = new URLSearchParams({
         context: "kiosk",
         lane,
         density,
         mood,
       });
+      if (excludedIds.length) {
+        params.set("exclude_ids", excludedIds.join(","));
+      }
       const response = await fetch(`/api/v1/pool/next?${params.toString()}`, { cache: "no-store" });
       if (response.status === 204) {
         loopKnownPoolSize = 0;
@@ -1444,6 +1509,7 @@ btnLoop.addEventListener("click", async () => {
       const payload = await response.json();
       loopKnownPoolSize = Number(payload.pool_size || 0);
       rememberLoopPayload(payload, scene, movement);
+      rememberPersistentArtifactId(payload.artifact_id);
       const laneLabel = payload.lane ? `${payload.lane} ${payload.density || "memory"} memory` : "memory";
       const scarcityLabel = scarcityProfile(loopKnownPoolSize).label;
       loopStatus.textContent = scarcityLabel
