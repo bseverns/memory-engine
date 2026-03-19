@@ -46,6 +46,8 @@ const btnSecondary = document.getElementById("btnSecondary");
 const btnSubmit = document.getElementById("btnSubmit");
 const btnLoop = document.getElementById("btnLoop");
 const btnLoopStop = document.getElementById("btnLoopStop");
+const btnQuietKeep = document.getElementById("btnQuietKeep");
+const btnQuietRetake = document.getElementById("btnQuietRetake");
 
 const stageBadge = document.getElementById("stageBadge");
 const stageTitle = document.getElementById("stageTitle");
@@ -68,6 +70,14 @@ const modePanel = document.getElementById("modePanel");
 const countdownOverlay = document.getElementById("countdownOverlay");
 const countdownValue = document.getElementById("countdownValue");
 const countdownLabel = document.getElementById("countdownLabel");
+const quietTakePanel = document.getElementById("quietTakePanel");
+const quietTakeCopy = document.getElementById("quietTakeCopy");
+const reviewTimeoutPanel = document.getElementById("reviewTimeoutPanel");
+const reviewTimeoutChip = document.getElementById("reviewTimeoutChip");
+const reviewTimeoutFill = document.getElementById("reviewTimeoutFill");
+const attractPanel = document.getElementById("attractPanel");
+const attractLead = document.getElementById("attractLead");
+const attractSteps = Array.from(document.querySelectorAll(".attract-step"));
 const stepEls = Array.from(document.querySelectorAll(".step"));
 const choices = Array.from(document.querySelectorAll(".choice"));
 
@@ -95,6 +105,12 @@ let meterData = null;
 let meterFrame = 0;
 let timerInterval = 0;
 let countdownToken = 0;
+let reviewTimeoutInterval = 0;
+let reviewDeadlineTs = 0;
+let quietTakeNeedsDecision = false;
+let quietTakeAnalysis = null;
+let attractStepIndex = 0;
+let attractInterval = 0;
 
 let loopRunning = false;
 let loopScene = null;
@@ -104,6 +120,7 @@ let loopMovementIndex = 0;
 let loopMovementBudget = 0;
 let loopMovementProgress = 0;
 let loopHistory = [];
+let loopKnownPoolSize = 0;
 let roomToneCtx = null;
 let roomToneNoiseSource = null;
 let roomToneMasterGain = null;
@@ -112,6 +129,8 @@ let roomToneLfoGain = null;
 const PRE_ROLL_SECONDS = 3;
 const MAX_RECORDING_MS = 120000;
 const MIC_SIGNAL_THRESHOLD = 0.07;
+const REVIEW_IDLE_TIMEOUT_MS = 90000;
+const ATTRACT_ROTATE_MS = 3600;
 
 const RECORDING_PROCESSING = {
   trimThreshold: 0.014,
@@ -121,6 +140,64 @@ const RECORDING_PROCESSING = {
   maxGain: 3.2,
   fadeMs: 16,
 };
+
+const QUIET_TAKE = {
+  minDurationMs: 1800,
+  rmsThreshold: 0.015,
+  peakThreshold: 0.12,
+};
+
+const ATTRACT_MESSAGES = [
+  "Tap Arm microphone or press Space to begin.",
+  "Nothing records until you choose to start.",
+  "Check the meter first, then make the take when you are ready.",
+];
+
+const ROOM_INTENSITY_PROFILES = {
+  quiet: {
+    name: "quiet",
+    cueGapMultiplier: 1.24,
+    pauseGapMultiplier: 1.35,
+    roomToneMultiplier: 1.15,
+  },
+  balanced: {
+    name: "balanced",
+    cueGapMultiplier: 1.0,
+    pauseGapMultiplier: 1.0,
+    roomToneMultiplier: 1.0,
+  },
+  active: {
+    name: "active",
+    cueGapMultiplier: 0.82,
+    pauseGapMultiplier: 0.78,
+    roomToneMultiplier: 0.92,
+  },
+};
+
+const ROOM_MOVEMENT_PRESETS = {
+  meditative: {
+    name: "meditative",
+    movementGapMultiplier: 1.18,
+    minItemsDelta: 1,
+    maxItemsDelta: 1,
+  },
+  balanced: {
+    name: "balanced",
+    movementGapMultiplier: 1.0,
+    minItemsDelta: 0,
+    maxItemsDelta: 0,
+  },
+  active: {
+    name: "active",
+    movementGapMultiplier: 0.88,
+    minItemsDelta: 0,
+    maxItemsDelta: -1,
+  },
+};
+
+const KIOSK_CONFIG = readKioskConfig();
+const ROOM_INTENSITY = ROOM_INTENSITY_PROFILES[KIOSK_CONFIG.roomIntensityProfile] || ROOM_INTENSITY_PROFILES.balanced;
+const ROOM_MOVEMENT_PRESET = ROOM_MOVEMENT_PRESETS[KIOSK_CONFIG.roomMovementPreset] || ROOM_MOVEMENT_PRESETS.balanced;
 
 const PRE_ROLL_TONE = {
   gain: 0.04,
@@ -251,10 +328,12 @@ const ROOM_TONE = {
 };
 
 function setFlowState(nextState, options = {}) {
+  const previousState = flowState;
   flowState = nextState;
   if (options.errorMessage !== undefined) {
     lastErrorMessage = options.errorMessage;
   }
+  syncReviewTimeout(previousState, nextState);
   render();
 }
 
@@ -265,6 +344,9 @@ function render() {
   updateModePanel();
   updateButtons();
   updateStage();
+  updateQuietTakePanel();
+  updateReviewTimeoutPanel();
+  updateAttractPanel();
 }
 
 function updateStepper() {
@@ -282,9 +364,183 @@ function flowStateToStepIndex(state) {
   return 3;
 }
 
+function readKioskConfig() {
+  const el = document.getElementById("kiosk-config");
+  if (!el || !el.textContent) {
+    return {
+      roomIntensityProfile: "balanced",
+      roomMovementPreset: "balanced",
+      roomScarcityEnabled: true,
+      roomScarcityLowThreshold: 6,
+      roomScarcitySevereThreshold: 3,
+    };
+  }
+
+  try {
+    return JSON.parse(el.textContent);
+  } catch (err) {
+    return {
+      roomIntensityProfile: "balanced",
+      roomMovementPreset: "balanced",
+      roomScarcityEnabled: true,
+      roomScarcityLowThreshold: 6,
+      roomScarcitySevereThreshold: 3,
+    };
+  }
+}
+
+function syncReviewTimeout(previousState, nextState) {
+  if (nextState === FLOW.REVIEW) {
+    resetReviewDeadline();
+    if (!reviewTimeoutInterval) {
+      reviewTimeoutInterval = window.setInterval(tickReviewTimeout, 250);
+    }
+    return;
+  }
+
+  if (previousState === FLOW.REVIEW || reviewTimeoutInterval) {
+    window.clearInterval(reviewTimeoutInterval);
+    reviewTimeoutInterval = 0;
+    reviewDeadlineTs = 0;
+  }
+}
+
+function resetReviewDeadline() {
+  reviewDeadlineTs = performance.now() + REVIEW_IDLE_TIMEOUT_MS;
+}
+
+function tickReviewTimeout() {
+  if (flowState !== FLOW.REVIEW) return;
+
+  if (!preview.paused && !preview.ended) {
+    resetReviewDeadline();
+  }
+
+  if (performance.now() >= reviewDeadlineTs) {
+    window.clearInterval(reviewTimeoutInterval);
+    reviewTimeoutInterval = 0;
+    reviewDeadlineTs = 0;
+    preview.pause();
+    submitStatus.textContent = "Review timed out. The kiosk reset for the next person.";
+    runAction(startFreshSession);
+    return;
+  }
+
+  updateReviewTimeoutPanel();
+}
+
+function updateReviewTimeoutPanel() {
+  const visible = flowState === FLOW.REVIEW && reviewDeadlineTs > 0;
+  reviewTimeoutPanel.hidden = !visible;
+  if (!visible) {
+    reviewTimeoutChip.classList.remove("warning");
+    reviewTimeoutFill.style.width = "100%";
+    return;
+  }
+
+  const remainingMs = Math.max(0, reviewDeadlineTs - performance.now());
+  const progress = Math.max(0, Math.min(1, remainingMs / REVIEW_IDLE_TIMEOUT_MS));
+  reviewTimeoutChip.textContent = `Review resets in ${formatDuration(remainingMs)}`;
+  reviewTimeoutChip.classList.toggle("warning", remainingMs <= 20000);
+  reviewTimeoutFill.style.width = `${progress * 100}%`;
+}
+
+function noteReviewActivity() {
+  if (flowState !== FLOW.REVIEW) return;
+  resetReviewDeadline();
+  updateReviewTimeoutPanel();
+}
+
+function updateQuietTakePanel() {
+  const visible = flowState === FLOW.REVIEW && quietTakeNeedsDecision;
+  quietTakePanel.hidden = !visible;
+  if (!visible) return;
+
+  quietTakeCopy.textContent = quietTakeAnalysis
+    ? "The take made it through, but the microphone level stayed very soft. Keep it if that softness is intentional, or retake it before choosing a memory mode."
+    : "Listen back. If the softness is intentional, keep it. Otherwise retake it before choosing how the room should remember it.";
+}
+
+function startAttractLoop() {
+  if (attractInterval) return;
+  attractInterval = window.setInterval(() => {
+    attractStepIndex = (attractStepIndex + 1) % attractSteps.length;
+    if (flowState === FLOW.IDLE) {
+      updateAttractPanel();
+    }
+  }, ATTRACT_ROTATE_MS);
+}
+
+function updateAttractPanel() {
+  const visible = flowState === FLOW.IDLE;
+  attractPanel.hidden = !visible;
+  if (!visible) return;
+
+  attractLead.textContent = ATTRACT_MESSAGES[attractStepIndex % ATTRACT_MESSAGES.length];
+  attractSteps.forEach((step, index) => {
+    step.classList.toggle("active", index === attractStepIndex);
+  });
+}
+
+function resolveMovement(movement) {
+  return {
+    ...movement,
+    minItems: Math.max(1, movement.minItems + ROOM_MOVEMENT_PRESET.minItemsDelta),
+    maxItems: Math.max(
+      Math.max(1, movement.minItems + ROOM_MOVEMENT_PRESET.minItemsDelta),
+      movement.maxItems + ROOM_MOVEMENT_PRESET.maxItemsDelta,
+    ),
+    gapMultiplier: movement.gapMultiplier * ROOM_MOVEMENT_PRESET.movementGapMultiplier,
+  };
+}
+
+function scarcityProfile(poolSize) {
+  if (!KIOSK_CONFIG.roomScarcityEnabled) {
+    return { gapMultiplier: 1.0, pauseMultiplier: 1.0, toneMultiplier: 1.0, label: "" };
+  }
+
+  if (poolSize <= 0 || poolSize <= KIOSK_CONFIG.roomScarcitySevereThreshold) {
+    return { gapMultiplier: 1.8, pauseMultiplier: 2.1, toneMultiplier: 1.45, label: "scarce" };
+  }
+  if (poolSize <= KIOSK_CONFIG.roomScarcityLowThreshold) {
+    return { gapMultiplier: 1.35, pauseMultiplier: 1.55, toneMultiplier: 1.2, label: "thin" };
+  }
+  return { gapMultiplier: 1.0, pauseMultiplier: 1.0, toneMultiplier: 1.0, label: "" };
+}
+
+function adaptiveGapMultiplier(poolSize, movement, pauseGap = false) {
+  const scarcity = scarcityProfile(poolSize);
+  let archiveMultiplier = 1.0;
+
+  if (poolSize >= 40) {
+    archiveMultiplier = 0.76;
+  } else if (poolSize >= 24) {
+    archiveMultiplier = 0.88;
+  } else if (poolSize >= 12) {
+    archiveMultiplier = 0.96;
+  } else if (poolSize >= 8) {
+    archiveMultiplier = 1.05;
+  } else if (poolSize > 0) {
+    archiveMultiplier = 1.18;
+  }
+
+  return (
+    movement.gapMultiplier
+    * ROOM_INTENSITY.cueGapMultiplier
+    * archiveMultiplier
+    * (pauseGap ? ROOM_INTENSITY.pauseGapMultiplier : 1.0)
+    * (pauseGap ? scarcity.pauseMultiplier : scarcity.gapMultiplier)
+  );
+}
+
+function roomToneLevelFor(baseLevel, poolSize) {
+  const scarcity = scarcityProfile(poolSize);
+  return baseLevel * ROOM_INTENSITY.roomToneMultiplier * scarcity.toneMultiplier;
+}
+
 function updateModePanel() {
   const visible = [FLOW.REVIEW, FLOW.SUBMITTING, FLOW.COMPLETE].includes(flowState);
-  const interactive = flowState === FLOW.REVIEW;
+  const interactive = flowState === FLOW.REVIEW && !quietTakeNeedsDecision;
   modePanel.classList.toggle("locked", !interactive);
   choices.forEach((choice) => {
     choice.disabled = !interactive;
@@ -292,6 +548,8 @@ function updateModePanel() {
 
   if (!visible) {
     selectionHint.textContent = "Unlocked after recording";
+  } else if (flowState === FLOW.REVIEW && quietTakeNeedsDecision) {
+    selectionHint.textContent = "Keep or retake before choosing";
   } else if (flowState === FLOW.COMPLETE && selectedMode) {
     selectionHint.textContent = `Completed: ${MODE_COPY[selectedMode].name}`;
   } else if (!selectedMode) {
@@ -338,11 +596,19 @@ function updateButtons() {
     secondaryAction = cancelCurrentTake;
     secondaryDisabled = false;
   } else if (flowState === FLOW.REVIEW) {
-    primaryLabel = selectedMode ? MODE_COPY[selectedMode].submitLabel : "Choose a memory mode";
-    primaryAction = submitCurrentTake;
-    primaryDisabled = !selectedMode || !wavBlob;
-    secondaryLabel = "Record again";
-    secondaryAction = recordAgain;
+    if (quietTakeNeedsDecision) {
+      primaryLabel = "Keep this take";
+      primaryAction = acknowledgeQuietTake;
+      primaryDisabled = !wavBlob;
+      secondaryLabel = "Retake";
+      secondaryAction = recordAgain;
+    } else {
+      primaryLabel = selectedMode ? MODE_COPY[selectedMode].submitLabel : "Choose a memory mode";
+      primaryAction = submitCurrentTake;
+      primaryDisabled = !selectedMode || !wavBlob;
+      secondaryLabel = "Record again";
+      secondaryAction = recordAgain;
+    }
     secondaryDisabled = false;
   } else if (flowState === FLOW.SUBMITTING) {
     primaryLabel = "Submitting";
@@ -422,16 +688,27 @@ function updateStage() {
     shortcutHint.textContent = "Space or Enter: stop recording";
     meterText.textContent = "Live microphone signal";
   } else if (flowState === FLOW.REVIEW) {
-    stageBadge.textContent = "Review";
-    stageTitle.textContent = selectedMode ? `Ready to ${MODE_COPY[selectedMode].submitLabel.toLowerCase()}.` : "Listen back, then choose what happens next.";
-    stageCopy.textContent = selectedMode
-      ? MODE_COPY[selectedMode].reviewCopy
-      : "Use the audio preview if you want. Then choose 1, 2, or 3 to decide how the room should remember this take.";
+    if (quietTakeNeedsDecision) {
+      stageBadge.textContent = "Quiet take";
+      stageTitle.textContent = "This take sounds very quiet.";
+      stageCopy.textContent = "Listen back first. If the softness is intentional, keep the take. Otherwise retake it before choosing what happens next.";
+    } else {
+      stageBadge.textContent = "Review";
+      stageTitle.textContent = selectedMode ? `Ready to ${MODE_COPY[selectedMode].submitLabel.toLowerCase()}.` : "Listen back, then choose what happens next.";
+      stageCopy.textContent = selectedMode
+        ? MODE_COPY[selectedMode].reviewCopy
+        : "Use the audio preview if you want. Then choose 1, 2, or 3 to decide how the room should remember this take.";
+    }
     micStatus.textContent = mediaStream ? micLabel : "Microphone asleep";
-    recStatus.textContent = wavBlob ? "Take captured" : "No take captured";
-    shortcutHint.textContent = selectedMode ? "Space or Enter: submit selection" : "Press 1, 2, or 3 to choose a memory mode";
-    meterText.textContent = mediaStream ? "Microphone still armed" : "Microphone asleep";
-    setMicCheckStatus(mediaStream ? "Mic check complete" : "Mic check asleep", mediaStream ? "good" : "quiet");
+    recStatus.textContent = quietTakeNeedsDecision ? "Very quiet input detected" : (wavBlob ? "Take captured" : "No take captured");
+    shortcutHint.textContent = quietTakeNeedsDecision
+      ? "Space or Enter: keep this take"
+      : (selectedMode ? "Space or Enter: submit selection" : "Press 1, 2, or 3 to choose a memory mode");
+    meterText.textContent = quietTakeNeedsDecision ? "Preview this take before deciding" : (mediaStream ? "Microphone still armed" : "Microphone asleep");
+    setMicCheckStatus(
+      quietTakeNeedsDecision ? "Quiet take warning" : (mediaStream ? "Mic check complete" : "Mic check asleep"),
+      quietTakeNeedsDecision ? "quiet" : (mediaStream ? "good" : "quiet"),
+    );
   } else if (flowState === FLOW.SUBMITTING) {
     stageBadge.textContent = "Saving";
     stageTitle.textContent = "Please hold on for a moment.";
@@ -500,6 +777,8 @@ function clearTakeData({ clearReceipt = true } = {}) {
   wavBlob = null;
   durationMs = 0;
   buffers = [];
+  quietTakeNeedsDecision = false;
+  quietTakeAnalysis = null;
   clearPreview();
   submitStatus.textContent = "";
   if (clearReceipt) {
@@ -729,6 +1008,8 @@ function stopRecording() {
   previewUrl = URL.createObjectURL(wavBlob);
   preview.src = previewUrl;
   preview.hidden = false;
+  quietTakeNeedsDecision = !!processed.quietWarning;
+  quietTakeAnalysis = processed.quietWarning;
   submitStatus.textContent = processed.note;
 
   setFlowState(FLOW.REVIEW);
@@ -749,6 +1030,14 @@ async function recordAgain() {
     return;
   }
   await armMicrophone();
+}
+
+function acknowledgeQuietTake() {
+  if (flowState !== FLOW.REVIEW || !quietTakeNeedsDecision) return;
+  quietTakeNeedsDecision = false;
+  submitStatus.textContent = "Quiet take kept. Choose how the room should remember it.";
+  noteReviewActivity();
+  render();
 }
 
 async function submitCurrentTake() {
@@ -841,7 +1130,7 @@ async function startFreshSession() {
 
 function selectMode(mode) {
   if (![FLOW.REVIEW, FLOW.SUBMITTING, FLOW.COMPLETE].includes(flowState)) return;
-  if (!(mode in MODE_COPY) || flowState === FLOW.SUBMITTING) return;
+  if (!(mode in MODE_COPY) || flowState === FLOW.SUBMITTING || quietTakeNeedsDecision) return;
 
   selectedMode = mode;
   choices.forEach((choice) => {
@@ -850,6 +1139,7 @@ function selectMode(mode) {
 
   if (flowState === FLOW.REVIEW) {
     submitStatus.textContent = `${MODE_COPY[mode].name} selected.`;
+    noteReviewActivity();
   }
   render();
 }
@@ -917,12 +1207,22 @@ function describeSubmitError(err) {
 btnPrimary.addEventListener("click", () => runAction(primaryAction));
 btnSecondary.addEventListener("click", () => runAction(secondaryAction));
 btnSubmit.addEventListener("click", () => runAction(submitCurrentTake));
+btnQuietKeep.addEventListener("click", () => runAction(acknowledgeQuietTake));
+btnQuietRetake.addEventListener("click", () => runAction(recordAgain));
 
 choices.forEach((choice) => {
   choice.addEventListener("click", () => selectMode(choice.dataset.mode));
 });
 
+preview.addEventListener("play", noteReviewActivity);
+preview.addEventListener("seeking", noteReviewActivity);
+preview.addEventListener("pause", noteReviewActivity);
+
+document.addEventListener("pointerdown", noteReviewActivity, true);
+document.addEventListener("focusin", noteReviewActivity, true);
+
 document.addEventListener("keydown", (event) => {
+  noteReviewActivity();
   if (shouldIgnoreShortcut(event.target)) return;
 
   if (event.code === "Escape") {
@@ -937,7 +1237,7 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (flowState === FLOW.REVIEW && ["Digit1", "Digit2", "Digit3", "Numpad1", "Numpad2", "Numpad3"].includes(event.code)) {
+  if (flowState === FLOW.REVIEW && !quietTakeNeedsDecision && ["Digit1", "Digit2", "Digit3", "Numpad1", "Numpad2", "Numpad3"].includes(event.code)) {
     event.preventDefault();
     const codeToMode = {
       Digit1: "ROOM",
@@ -980,7 +1280,7 @@ function randomIntBetween(min, max) {
 
 function startLoopMovement(index = 0) {
   loopMovementIndex = index % ROOM_MOVEMENTS.length;
-  loopMovement = ROOM_MOVEMENTS[loopMovementIndex];
+  loopMovement = resolveMovement(ROOM_MOVEMENTS[loopMovementIndex]);
   loopMovementBudget = randomIntBetween(loopMovement.minItems, loopMovement.maxItems);
   loopMovementProgress = 0;
   loopScene = null;
@@ -1094,11 +1394,12 @@ btnLoop.addEventListener("click", async () => {
   loopMovementBudget = 0;
   loopMovementProgress = 0;
   loopHistory = [];
+  loopKnownPoolSize = 0;
   btnLoop.disabled = true;
   btnLoopStop.disabled = false;
-  loopStatus.textContent = "Running...";
+  loopStatus.textContent = `Running (${ROOM_INTENSITY.name} intensity / ${ROOM_MOVEMENT_PRESET.name} preset)...`;
   await ensureRoomTone();
-  setRoomToneLevel(ROOM_TONE.idleGain, 1.0);
+  setRoomToneLevel(roomToneLevelFor(ROOM_TONE.idleGain, loopKnownPoolSize), 1.0);
 
   while (loopRunning) {
     try {
@@ -1106,9 +1407,13 @@ btnLoop.addEventListener("click", async () => {
       if (cue.pauseMs) {
         // Some cues deliberately do nothing except hold the room tone. Those
         // gaps are part of the composition, not a fallback for missing content.
-        loopStatus.textContent = `Holding space in ${movement.name} / ${scene.name}.`;
-        setRoomToneLevel(toneLevelForName(cue.toneLevel), 1.4);
-        await sleep(Math.round(cue.pauseMs * (movement.gapMultiplier || 1)));
+        const pauseMultiplier = adaptiveGapMultiplier(loopKnownPoolSize, movement, true);
+        const scarcityLabel = scarcityProfile(loopKnownPoolSize).label;
+        loopStatus.textContent = scarcityLabel
+          ? `Holding space in ${movement.name} / ${scene.name} (${scarcityLabel} pool).`
+          : `Holding space in ${movement.name} / ${scene.name}.`;
+        setRoomToneLevel(roomToneLevelFor(toneLevelForName(cue.toneLevel), loopKnownPoolSize), 1.4);
+        await sleep(Math.round(cue.pauseMs * pauseMultiplier));
         continue;
       }
 
@@ -1123,32 +1428,38 @@ btnLoop.addEventListener("click", async () => {
       });
       const response = await fetch(`/api/v1/pool/next?${params.toString()}`, { cache: "no-store" });
       if (response.status === 204) {
-        loopStatus.textContent = `No ${mood} ${density} memory available in ${movement.name}. Holding the room tone.`;
-        setRoomToneLevel(ROOM_TONE.sparseGain, 1.8);
-        await sleep(1500);
+        loopKnownPoolSize = 0;
+        loopStatus.textContent = `No ${mood} ${density} memory available in ${movement.name}. Scarcity mode is holding the room tone.`;
+        setRoomToneLevel(roomToneLevelFor(ROOM_TONE.sparseGain, loopKnownPoolSize), 1.8);
+        await sleep(Math.round(1500 * adaptiveGapMultiplier(loopKnownPoolSize, movement, true)));
         continue;
       }
       if (!response.ok) {
         loopStatus.textContent = `Pool error: ${response.status}`;
-        setRoomToneLevel(ROOM_TONE.sparseGain, 1.4);
+        setRoomToneLevel(roomToneLevelFor(ROOM_TONE.sparseGain, loopKnownPoolSize), 1.4);
         await sleep(1500);
         continue;
       }
 
       const payload = await response.json();
+      loopKnownPoolSize = Number(payload.pool_size || 0);
       rememberLoopPayload(payload, scene, movement);
       const laneLabel = payload.lane ? `${payload.lane} ${payload.density || "memory"} memory` : "memory";
-      loopStatus.textContent = `Playing ${laneLabel} in ${movement.name} / ${scene.name} (wear ${payload.wear.toFixed(3)})`;
-      setRoomToneLevel(ROOM_TONE.duckGain, 0.8);
+      const scarcityLabel = scarcityProfile(loopKnownPoolSize).label;
+      loopStatus.textContent = scarcityLabel
+        ? `Playing ${laneLabel} in ${movement.name} / ${scene.name} (${scarcityLabel} pool, wear ${payload.wear.toFixed(3)})`
+        : `Playing ${laneLabel} in ${movement.name} / ${scene.name} (wear ${payload.wear.toFixed(3)})`;
+      setRoomToneLevel(roomToneLevelFor(ROOM_TONE.duckGain, loopKnownPoolSize), 0.8);
       await playUrlWithLightChain(payload.audio_url, payload.wear);
       advanceLoopMovement();
       if (loopRunning) {
-        setRoomToneLevel(ROOM_TONE.idleGain, 1.4);
-        await sleep(Math.round((cue.gapMs || PLAYBACK_SMOOTHING.betweenLoopItemsMs) * (movement.gapMultiplier || 1)));
+        const gapMultiplier = adaptiveGapMultiplier(loopKnownPoolSize, movement, false);
+        setRoomToneLevel(roomToneLevelFor(ROOM_TONE.idleGain, loopKnownPoolSize), 1.4);
+        await sleep(Math.round((cue.gapMs || PLAYBACK_SMOOTHING.betweenLoopItemsMs) * gapMultiplier));
       }
     } catch (err) {
       loopStatus.textContent = "Room loop interrupted.";
-      setRoomToneLevel(ROOM_TONE.sparseGain, 1.2);
+      setRoomToneLevel(roomToneLevelFor(ROOM_TONE.sparseGain, loopKnownPoolSize), 1.2);
       await sleep(1500);
     }
   }
@@ -1273,7 +1584,7 @@ function mergeBuffers(chunks) {
 
 function processRecordingSamples(samples, sr) {
   if (!samples.length) {
-    return { samples, note: "Choose how this take should be handled." };
+    return { samples, note: "Choose how this take should be handled.", quietWarning: null };
   }
 
   const trimmed = trimSilence(
@@ -1283,18 +1594,48 @@ function processRecordingSamples(samples, sr) {
     RECORDING_PROCESSING.edgePaddingMs,
     RECORDING_PROCESSING.minContentMs,
   );
+  const quietWarning = analyzeTakeLevel(trimmed, sr);
   const normalized = normalizeSamples(trimmed, RECORDING_PROCESSING.targetPeak, RECORDING_PROCESSING.maxGain);
   applyFade(normalized, sr, RECORDING_PROCESSING.fadeMs);
 
   const changedDuration = samples.length !== trimmed.length;
-  const note = changedDuration
+  let note = changedDuration
     ? "Take captured. Quiet edges were trimmed and the level was smoothed."
     : "Take captured. The level was smoothed for playback.";
+  if (quietWarning) {
+    note = "Take captured. The input stayed very quiet, so please keep or retake it before choosing a memory mode.";
+  }
 
   return {
     samples: normalized,
     note,
+    quietWarning,
   };
+}
+
+function analyzeTakeLevel(samples, sr) {
+  if (!samples.length) return null;
+
+  const durationMs = (samples.length / sr) * 1000;
+  if (durationMs < QUIET_TAKE.minDurationMs) {
+    return null;
+  }
+
+  let peak = 0;
+  let sumSquares = 0;
+  for (let i = 0; i < samples.length; i += 1) {
+    const value = samples[i];
+    const abs = Math.abs(value);
+    peak = Math.max(peak, abs);
+    sumSquares += value * value;
+  }
+
+  const rms = Math.sqrt(sumSquares / samples.length);
+  if (rms >= QUIET_TAKE.rmsThreshold || peak >= QUIET_TAKE.peakThreshold) {
+    return null;
+  }
+
+  return { peak, rms, durationMs };
 }
 
 function trimSilence(samples, sr, threshold, edgePaddingMs, minContentMs) {
@@ -1527,10 +1868,13 @@ function smoothstep(value) {
 }
 
 window.addEventListener("beforeunload", () => {
+  window.clearInterval(attractInterval);
+  window.clearInterval(reviewTimeoutInterval);
   stopLoopPlayback();
   stopRoomTone();
   teardownMicrophone();
 });
 
 setReceiptText("No receipt yet.");
+startAttractLoop();
 render();

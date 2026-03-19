@@ -22,6 +22,12 @@ Run the fast repo checks before deploy:
 ./scripts/check.sh
 ```
 
+Run the operator doctor for env, browser, and storage posture:
+
+```bash
+./scripts/doctor.sh
+```
+
 See service state and backend readiness:
 
 ```bash
@@ -52,6 +58,7 @@ Restore a backup:
 - `scripts/first_boot.sh` creates `.env` if needed, replaces development defaults, and optionally chains into deployment.
 - `scripts/deploy.sh` writes host and TLS settings into `.env`, refuses obvious development secrets, and runs compose.
 - `scripts/check.sh` is the quick sanity pass for JavaScript, Python, shell syntax, and `git diff --check`.
+- `scripts/doctor.sh` checks `.env`, compose state, MinIO reachability through `/healthz`, and browser/TLS constraints that affect recording.
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.
 - `scripts/restore.sh` restores one of those snapshots into the current stack.
@@ -63,10 +70,11 @@ For a normal update on an existing server:
 1. Pull the latest repo state.
 2. Review `.env` if the change introduces new settings.
 3. Run `./scripts/check.sh`.
-4. Run `./scripts/backup.sh`.
-5. Run `./scripts/deploy.sh --public-host ...`.
-6. Run `./scripts/status.sh`.
-7. Open `/ops/` and confirm the node is `ready`.
+4. Run `./scripts/doctor.sh`.
+5. Run `./scripts/backup.sh`.
+6. Run `./scripts/deploy.sh --public-host ...`.
+7. Run `./scripts/status.sh`.
+8. Open `/ops/` and confirm the node is `ready` with no critical storage or pool warnings.
 
 That sequence is deliberately conservative. The extra backup step matters more here than squeezing a few seconds out of deploy time.
 

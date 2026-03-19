@@ -2,6 +2,7 @@ import os
 import hashlib
 import random
 import secrets
+import shutil
 from datetime import timedelta
 from django.conf import settings
 from django.db import connection
@@ -23,7 +24,15 @@ from .storage import put_bytes, stream_key, delete_key, s3_client
 from .tasks import generate_spectrogram
 
 def kiosk_view(request):
-    return render(request, "engine/kiosk.html", {})
+    return render(request, "engine/kiosk.html", {
+        "kiosk_config": {
+            "roomIntensityProfile": settings.ROOM_INTENSITY_PROFILE,
+            "roomMovementPreset": settings.ROOM_MOVEMENT_PRESET,
+            "roomScarcityEnabled": bool(settings.ROOM_SCARCITY_ENABLED),
+            "roomScarcityLowThreshold": int(settings.ROOM_SCARCITY_LOW_THRESHOLD),
+            "roomScarcitySevereThreshold": int(settings.ROOM_SCARCITY_SEVERE_THRESHOLD),
+        },
+    })
 
 def operator_dashboard_view(request):
     return render(request, "engine/operator_dashboard.html", {})
@@ -71,6 +80,84 @@ def _health_component_status() -> tuple[bool, dict]:
 
     ok = all(component["ok"] for component in components.values())
     return ok, components
+
+def _disk_status(path: str) -> dict:
+    total_bytes, used_bytes, free_bytes = shutil.disk_usage(path)
+    total_gb = total_bytes / (1024 ** 3)
+    free_gb = free_bytes / (1024 ** 3)
+    used_percent = 0.0 if total_bytes <= 0 else (used_bytes / total_bytes) * 100.0
+    free_percent = 0.0 if total_bytes <= 0 else (free_bytes / total_bytes) * 100.0
+
+    state = "ready"
+    if (
+        free_gb <= float(settings.OPS_DISK_CRITICAL_FREE_GB)
+        or free_percent <= float(settings.OPS_DISK_CRITICAL_FREE_PERCENT)
+    ):
+        state = "critical"
+    elif (
+        free_gb <= float(settings.OPS_DISK_WARNING_FREE_GB)
+        or free_percent <= float(settings.OPS_DISK_WARNING_FREE_PERCENT)
+    ):
+        state = "warning"
+
+    return {
+        "path": path,
+        "state": state,
+        "total_gb": round(total_gb, 2),
+        "free_gb": round(free_gb, 2),
+        "used_percent": round(used_percent, 1),
+        "free_percent": round(free_percent, 1),
+    }
+
+def _pool_warnings(active_count: int, lane_counts: dict, mood_counts: dict, playable_count: int) -> list[dict]:
+    warnings = []
+
+    if active_count <= int(settings.OPS_POOL_LOW_COUNT):
+        warnings.append({
+            "level": "warning",
+            "title": "Playback pool is running low",
+            "detail": f"Only {active_count} active sounds are available right now.",
+        })
+
+    if playable_count <= 0:
+        warnings.append({
+            "level": "critical",
+            "title": "No playable sounds are available",
+            "detail": "The room loop has nothing eligible to play from the current pool.",
+        })
+        return warnings
+
+    imbalance_ratio = float(settings.OPS_POOL_IMBALANCE_RATIO)
+
+    for lane, count in lane_counts.items():
+        if count == 0 and playable_count >= 4:
+            warnings.append({
+                "level": "warning",
+                "title": f"{lane.title()} lane is empty",
+                "detail": "The room may feel flatter because one playback lane has no playable material.",
+            })
+        elif playable_count >= 6 and (count / playable_count) >= imbalance_ratio:
+            warnings.append({
+                "level": "warning",
+                "title": f"{lane.title()} lane is dominating the pool",
+                "detail": f"{count} of {playable_count} playable sounds are currently classified as {lane}.",
+            })
+
+    for mood, count in mood_counts.items():
+        if count == 0 and playable_count >= 6:
+            warnings.append({
+                "level": "warning",
+                "title": f"{mood.title()} mood is missing",
+                "detail": "The room's compositional palette is narrowed because one mood has no playable material.",
+            })
+        elif playable_count >= 8 and (count / playable_count) >= imbalance_ratio:
+            warnings.append({
+                "level": "warning",
+                "title": f"{mood.title()} mood is heavily overrepresented",
+                "detail": f"{count} of {playable_count} playable sounds currently cluster in that mood.",
+            })
+
+    return warnings
 
 def _artifact_age_hours(artifact: Artifact, now) -> float:
     return max(0.0, (now - artifact.created_at).total_seconds() / 3600.0)
@@ -395,6 +482,10 @@ def revoke(request):
 @api_view(["GET"])
 def pool_next(request):
     now = timezone.now()
+    playable_count = Artifact.objects.filter(
+        status=Artifact.STATUS_ACTIVE,
+        expires_at__gt=now,
+    ).exclude(raw_uri="").count()
     requested_lane = (request.query_params.get("lane") or "any").strip().lower()
     if requested_lane not in {"any", "fresh", "mid", "worn"}:
         requested_lane = "any"
@@ -435,6 +526,7 @@ def pool_next(request):
         "age_hours": round(age_hours, 3),
         "wear": art.wear,
         "play_count": art.play_count,
+        "pool_size": playable_count,
         "audio_url": f"/api/v1/blob/{art.id}/raw",
         "expires_at": art.expires_at,
     })
@@ -459,14 +551,45 @@ def node_status(request):
     active = active_qs.count()
     expired = Artifact.objects.filter(status=Artifact.STATUS_EXPIRED).count()
     revoked = Artifact.objects.filter(status=Artifact.STATUS_REVOKED).count()
+    playable_artifacts = list(active_qs.exclude(raw_uri=""))
     lane_counts = {"fresh": 0, "mid": 0, "worn": 0}
-    for artifact in active_qs.exclude(raw_uri=""):
+    mood_counts = {
+        "clear": 0,
+        "hushed": 0,
+        "suspended": 0,
+        "weathered": 0,
+        "gathering": 0,
+    }
+    for artifact in playable_artifacts:
         lane_counts[_artifact_lane(artifact, now)] += 1
+        mood_counts[_artifact_mood(artifact, now)] += 1
+
+    playable_count = len(playable_artifacts)
+    storage = _disk_status(settings.OPS_STORAGE_PATH)
+    warnings = []
+    if storage["state"] == "critical":
+        warnings.append({
+            "level": "critical",
+            "title": "Storage is critically low",
+            "detail": f"{storage['free_gb']} GB free ({storage['free_percent']}%).",
+        })
+    elif storage["state"] == "warning":
+        warnings.append({
+            "level": "warning",
+            "title": "Storage pressure is rising",
+            "detail": f"{storage['free_gb']} GB free ({storage['free_percent']}%).",
+        })
+    warnings.extend(_pool_warnings(active, lane_counts, mood_counts, playable_count))
+
     return Response({
         "ok": ok,
         "components": components,
         "active": active,
         "lanes": lane_counts,
+        "moods": mood_counts,
+        "playable": playable_count,
+        "storage": storage,
+        "warnings": warnings,
         "expired": expired,
         "revoked": revoked,
         "now": now,

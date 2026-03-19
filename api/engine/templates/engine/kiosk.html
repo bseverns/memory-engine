@@ -67,12 +67,59 @@
 
       <div class="hint">Please avoid names or identifying details.</div>
       <audio id="preview" controls class="preview" hidden></audio>
+      <section id="quietTakePanel" class="quiet-take-panel" hidden aria-live="polite">
+        <div>
+          <p class="section-kicker">Quiet take check</p>
+          <h3>This recording came in very softly.</h3>
+          <p id="quietTakeCopy" class="stage-copy quiet-take-copy">Listen back. If the softness is intentional, keep it. Otherwise retake it before choosing how the room should remember it.</p>
+        </div>
+        <div class="row quiet-take-actions">
+          <button id="btnQuietKeep" class="btn secondary">Keep this take</button>
+          <button id="btnQuietRetake" class="btn secondary">Retake</button>
+        </div>
+      </section>
+      <section id="reviewTimeoutPanel" class="review-timeout-panel" hidden aria-live="polite">
+        <div class="review-timeout-head">
+          <span id="reviewTimeoutChip" class="shortcut review-timeout-chip">Review resets in 01:30</span>
+          <span class="muted">Touch the screen, use the keyboard, or play the preview to keep this session open.</span>
+        </div>
+        <div class="review-timeout-track" aria-hidden="true">
+          <div id="reviewTimeoutFill" class="review-timeout-fill"></div>
+        </div>
+      </section>
       <div id="countdownOverlay" class="countdown-overlay" hidden>
         <div class="countdown-card">
           <p class="section-kicker">Get ready</p>
           <div id="countdownValue" class="countdown-value">3</div>
           <p id="countdownLabel" class="countdown-label">Recording starts in a moment.</p>
         </div>
+      </div>
+    </section>
+
+    <section id="attractPanel" class="panel attract-panel" aria-live="polite">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">How to begin</p>
+          <h3>No steward needed</h3>
+        </div>
+        <span id="attractLead" class="selection-hint">Tap Arm microphone or press Space to begin.</span>
+      </div>
+      <div class="attract-steps">
+        <article class="attract-step active">
+          <span class="attract-step-number">1</span>
+          <strong>Arm the microphone</strong>
+          <span>Tap the main button or press `Space` to wake the mic without starting the recording yet.</span>
+        </article>
+        <article class="attract-step">
+          <span class="attract-step-number">2</span>
+          <strong>Check the level</strong>
+          <span>Watch the meter and say a few words so you know the room can hear you before you record.</span>
+        </article>
+        <article class="attract-step">
+          <span class="attract-step-number">3</span>
+          <strong>Record, then choose</strong>
+          <span>Make the take, listen back if you want, then choose whether it stays in the room, becomes a fossil, or disappears.</span>
+        </article>
       </div>
     </section>
 
@@ -133,6 +180,7 @@
     </footer>
   </div>
 
+  {{ kiosk_config|json_script:"kiosk-config" }}
   <script src="/static/engine/kiosk.js"></script>
 </body>
 </html>

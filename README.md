@@ -77,6 +77,7 @@ Fast maintenance helpers are also included:
 ```bash
 ./scripts/check.sh
 ./scripts/status.sh
+./scripts/doctor.sh
 ```
 
 Longer operator notes live in `docs/maintenance.md`.
@@ -195,6 +196,7 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 - `docs/maintenance.md` — deployment, status, backup, restore, and troubleshooting runbook
 - `docs/roadmap.md` — landed changes and the next likely improvements
 - `scripts/check.sh` — quick syntax and patch-hygiene validation
+- `scripts/doctor.sh` — operator-focused env, compose, storage, and browser-constraint checks
 - `scripts/deploy.sh` — server-side deploy helper for IP-now / domain-later rollout
 - `scripts/first_boot.sh` — bootstrap strong secrets and node identity before deployment
 - `scripts/backup.sh` — snapshot Postgres + MinIO data
