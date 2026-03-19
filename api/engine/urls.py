@@ -1,14 +1,14 @@
 from django.urls import path
-from . import views
+from . import api_views
 
 urlpatterns = [
-    path("artifacts/audio", views.create_audio_artifact),
-    path("ephemeral/audio", views.create_ephemeral_audio),
-    path("ephemeral/consume", views.consume_ephemeral),
-    path("healthz", views.healthz),
-    path("revoke", views.revoke),
-    path("pool/next", views.pool_next),
-    path("node/status", views.node_status),
-    path("blob/<int:artifact_id>/raw", views.blob_proxy_raw),
-    path("derivatives/spectrograms", views.list_spectrograms),
+    path("artifacts/audio", api_views.create_audio_artifact),
+    path("ephemeral/audio", api_views.create_ephemeral_audio),
+    path("ephemeral/consume", api_views.consume_ephemeral),
+    path("healthz", api_views.healthz),
+    path("revoke", api_views.revoke),
+    path("pool/next", api_views.pool_next),
+    path("node/status", api_views.node_status),
+    path("blob/<int:artifact_id>/raw", api_views.blob_proxy_raw),
+    path("derivatives/spectrograms", api_views.list_spectrograms),
 ]

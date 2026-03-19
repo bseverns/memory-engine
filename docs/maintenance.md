@@ -63,7 +63,7 @@ Restore a backup:
 
 - `scripts/first_boot.sh` creates `.env` if needed, replaces development defaults, and optionally chains into deployment.
 - `scripts/deploy.sh` writes host and TLS settings into `.env`, refuses obvious development secrets, and runs compose.
-- `scripts/check.sh` is the quick sanity pass for JavaScript, Python, shell syntax, and `git diff --check`.
+- `scripts/check.sh` is the quick sanity pass for JavaScript, Python, shell syntax, the Django behavior suite, and `git diff --check`.
 - `scripts/doctor.sh` checks `.env`, compose state, MinIO reachability through `/healthz`, and browser/TLS constraints that affect recording.
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.

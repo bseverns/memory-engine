@@ -6,7 +6,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative, Node
-from .views import _pool_weight
+from .pool import pool_weight
 
 
 class EngineBehaviorTests(TestCase):
@@ -31,7 +31,7 @@ class EngineBehaviorTests(TestCase):
         payload.update(overrides)
         return Artifact.objects.create(**payload)
 
-    @patch("engine.views.put_bytes")
+    @patch("engine.api_views.put_bytes")
     def test_room_save_creates_active_artifact_and_revocation_token(self, put_bytes_mock):
         upload = SimpleUploadedFile("audio.wav", b"RIFFtest-room-audio", content_type="audio/wav")
 
@@ -49,8 +49,8 @@ class EngineBehaviorTests(TestCase):
         self.assertEqual(len(response.json()["revocation_token"]), 10)
         put_bytes_mock.assert_called_once()
 
-    @patch("engine.views.generate_spectrogram.delay")
-    @patch("engine.views.put_bytes")
+    @patch("engine.api_views.generate_spectrogram.delay")
+    @patch("engine.api_views.put_bytes")
     def test_fossil_save_queues_spectrogram_generation(self, put_bytes_mock, delay_mock):
         upload = SimpleUploadedFile("audio.wav", b"RIFFtest-fossil-audio", content_type="audio/wav")
 
@@ -65,8 +65,8 @@ class EngineBehaviorTests(TestCase):
         put_bytes_mock.assert_called_once()
         delay_mock.assert_called_once_with(artifact.id)
 
-    @patch("engine.views.delete_key")
-    @patch("engine.views.put_bytes")
+    @patch("engine.api_views.delete_key")
+    @patch("engine.api_views.put_bytes")
     def test_ephemeral_audio_can_be_consumed_and_revoked(self, put_bytes_mock, delete_key_mock):
         upload = SimpleUploadedFile("audio.wav", b"RIFFtest-ephemeral", content_type="audio/wav")
 
@@ -96,7 +96,7 @@ class EngineBehaviorTests(TestCase):
         self.assertEqual(artifact.raw_uri, "")
         delete_key_mock.assert_called_once_with(f"ephemeral/{artifact.id}/audio.wav")
 
-    @patch("engine.views.delete_key")
+    @patch("engine.api_views.delete_key")
     def test_revoke_token_revokes_artifacts_and_derivatives(self, delete_key_mock):
         token = "ABCDEF1234"
         consent = self.make_consent("ROOM", token=token)
@@ -197,12 +197,12 @@ class EngineBehaviorTests(TestCase):
             last_access_at=now - timedelta(hours=3),
         )
 
-        fresh_weight = _pool_weight(fresh, now, cooldown_seconds=90)
-        settled_weight = _pool_weight(settled, now, cooldown_seconds=90)
+        fresh_weight = pool_weight(fresh, now, cooldown_seconds=90)
+        settled_weight = pool_weight(settled, now, cooldown_seconds=90)
 
         self.assertGreater(settled_weight, fresh_weight)
 
-    @patch("engine.views._health_component_status")
+    @patch("engine.api_views.health_component_status")
     def test_healthz_returns_503_when_dependency_check_fails(self, health_mock):
         health_mock.return_value = (
             False,
@@ -218,7 +218,7 @@ class EngineBehaviorTests(TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertFalse(response.json()["ok"])
 
-    @patch("engine.views._health_component_status")
+    @patch("engine.api_views.health_component_status")
     def test_node_status_reports_empty_pool_warning(self, health_mock):
         health_mock.return_value = (
             True,
@@ -237,7 +237,7 @@ class EngineBehaviorTests(TestCase):
         self.assertIn("No playable sounds are available", titles)
         self.assertIn("Playback pool is running low", titles)
 
-    @patch("engine.views._health_component_status")
+    @patch("engine.api_views.health_component_status")
     def test_node_status_reports_lane_imbalance_warning(self, health_mock):
         health_mock.return_value = (
             True,

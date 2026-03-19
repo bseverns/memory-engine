@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
-from engine.views import kiosk_view, healthz, operator_dashboard_view
+from engine.api_views import healthz
+from engine.views import kiosk_view, operator_dashboard_view
 
 urlpatterns = [
     path("admin/", admin.site.urls),
