@@ -1,5 +1,5 @@
 import io
-from datetime import timedelta
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -13,6 +13,7 @@ from memory_engine.config_validation import validate_runtime_settings
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative, Node, StewardAction, StewardState
 from .operator_auth import OPS_SESSION_KEY
 from .pool import pool_weight
+from .room_composer import active_daypart_for_hour, room_schedule_snapshot
 
 
 class EngineBehaviorTests(TestCase):
@@ -603,3 +604,31 @@ class EngineBehaviorTests(TestCase):
             validate_runtime_settings(config)
 
         self.assertIn("https://", str(ctx.exception))
+
+    def test_room_schedule_snapshot_uses_daypart_overrides_when_enabled(self):
+        schedule = room_schedule_snapshot(
+            intensity_profile="balanced",
+            movement_preset="balanced",
+            daypart_enabled=True,
+            now=timezone.make_aware(datetime(2026, 3, 20, 18, 0, 0), timezone.get_current_timezone()),
+        )
+
+        self.assertEqual(schedule["daypartName"], "evening")
+        self.assertEqual(schedule["intensityProfile"], "active")
+        self.assertEqual(schedule["movementPreset"], "balanced")
+
+    def test_room_schedule_snapshot_falls_back_to_base_profiles_when_disabled(self):
+        schedule = room_schedule_snapshot(
+            intensity_profile="balanced",
+            movement_preset="active",
+            daypart_enabled=False,
+            now=timezone.make_aware(datetime(2026, 3, 20, 8, 0, 0), timezone.get_current_timezone()),
+        )
+
+        self.assertEqual(schedule["daypartName"], "")
+        self.assertEqual(schedule["intensityProfile"], "balanced")
+        self.assertEqual(schedule["movementPreset"], "active")
+
+    def test_active_daypart_for_hour_handles_overnight_windows(self):
+        self.assertEqual(active_daypart_for_hour(23)["name"], "night")
+        self.assertEqual(active_daypart_for_hour(4)["name"], "night")

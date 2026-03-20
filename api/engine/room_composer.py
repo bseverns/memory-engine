@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from django.utils import timezone
+
+
 ROOM_LOOP_CONFIG = {
     "intensityProfiles": {
         "quiet": {
@@ -135,6 +140,40 @@ ROOM_LOOP_CONFIG = {
             "sceneNames": ["clearings", "hushed drift", "afterimage"],
         },
     ],
+    "dayparts": [
+        {
+            "name": "morning",
+            "label": "Morning",
+            "startHour": 6,
+            "endHour": 11,
+            "intensityProfile": "quiet",
+            "movementPreset": "meditative",
+        },
+        {
+            "name": "afternoon",
+            "label": "Afternoon",
+            "startHour": 12,
+            "endHour": 16,
+            "intensityProfile": "balanced",
+            "movementPreset": "balanced",
+        },
+        {
+            "name": "evening",
+            "label": "Evening",
+            "startHour": 17,
+            "endHour": 21,
+            "intensityProfile": "active",
+            "movementPreset": "balanced",
+        },
+        {
+            "name": "night",
+            "label": "Night",
+            "startHour": 22,
+            "endHour": 5,
+            "intensityProfile": "quiet",
+            "movementPreset": "meditative",
+        },
+    ],
     "tone": {
         "idleGain": 0.011,
         "sparseGain": 0.017,
@@ -142,3 +181,40 @@ ROOM_LOOP_CONFIG = {
         "fadeSeconds": 1.25,
     },
 }
+
+
+def daypart_matches_hour(daypart: dict, hour: int) -> bool:
+    start_hour = int(daypart.get("startHour", 0))
+    end_hour = int(daypart.get("endHour", 23))
+    if start_hour <= end_hour:
+        return start_hour <= hour <= end_hour
+    return hour >= start_hour or hour <= end_hour
+
+
+def active_daypart_for_hour(hour: int, loop_config: dict | None = None) -> dict | None:
+    config = loop_config or ROOM_LOOP_CONFIG
+    for daypart in config.get("dayparts", []):
+        if daypart_matches_hour(daypart, hour):
+            return daypart
+    return None
+
+
+def room_schedule_snapshot(
+    *,
+    intensity_profile: str,
+    movement_preset: str,
+    daypart_enabled: bool,
+    now=None,
+    loop_config: dict | None = None,
+) -> dict:
+    config = loop_config or ROOM_LOOP_CONFIG
+    current_time = timezone.localtime(now or timezone.now())
+    active_daypart = active_daypart_for_hour(current_time.hour, config) if daypart_enabled else None
+
+    return {
+        "daypartEnabled": bool(daypart_enabled),
+        "daypartName": active_daypart.get("name", "") if active_daypart else "",
+        "daypartLabel": active_daypart.get("label", "") if active_daypart else "",
+        "intensityProfile": active_daypart.get("intensityProfile", intensity_profile) if active_daypart else intensity_profile,
+        "movementPreset": active_daypart.get("movementPreset", movement_preset) if active_daypart else movement_preset,
+    }

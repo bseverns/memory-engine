@@ -9,14 +9,22 @@ from .operator_auth import (
     operator_session_active,
     start_operator_session,
 )
-from .room_composer import ROOM_LOOP_CONFIG
+from .room_composer import ROOM_LOOP_CONFIG, room_schedule_snapshot
 from .steward import steward_state_payload
 
 
 def room_surface_config():
+    schedule = room_schedule_snapshot(
+        intensity_profile=settings.ROOM_INTENSITY_PROFILE,
+        movement_preset=settings.ROOM_MOVEMENT_PRESET,
+        daypart_enabled=bool(settings.ROOM_DAYPART_ENABLED),
+    )
     return {
-        "roomIntensityProfile": settings.ROOM_INTENSITY_PROFILE,
-        "roomMovementPreset": settings.ROOM_MOVEMENT_PRESET,
+        "roomIntensityProfile": schedule["intensityProfile"],
+        "roomMovementPreset": schedule["movementPreset"],
+        "roomDaypartEnabled": schedule["daypartEnabled"],
+        "roomDaypartName": schedule["daypartName"],
+        "roomDaypartLabel": schedule["daypartLabel"],
         "roomScarcityEnabled": bool(settings.ROOM_SCARCITY_ENABLED),
         "roomScarcityLowThreshold": int(settings.ROOM_SCARCITY_LOW_THRESHOLD),
         "roomScarcitySevereThreshold": int(settings.ROOM_SCARCITY_SEVERE_THRESHOLD),

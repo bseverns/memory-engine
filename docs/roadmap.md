@@ -68,6 +68,7 @@
 - Scarcity mode for low-pool situations that leans harder on silence and room tone
 - Persistent anti-repetition window so repetition control survives browser refreshes and restarts
 - Adaptive gap timing based on total pool size so a sparse archive feels spacious and a deep archive feels alive
+- Daypart scheduling so movement pacing and intensity can shift across morning, afternoon, evening, and night
 - Steward-tunable movement presets so one installation can feel meditative while another feels more active
 - Code comments around playback selection, scene composition, room tone, and wear processing
 - `README.md` audience-experience notes describing the intended listening effect
@@ -92,7 +93,6 @@
 - Push beyond metadata-derived mood shaping into a room state that responds to context
   - learn from time-of-day or room activity patterns
   - explore whether semantic or transcript-aware grouping is worth the complexity
-- Add daypart scheduling so movement pacing and density can vary across morning, afternoon, and evening
 - Add steward-tunable room-tone options, including the ability to swap the synthetic bed for site-specific ambience
 - Add rare overlap or layering events so the room can occasionally feel accumulative instead of strictly sequential
 - Add more explicit density balancing so long or heavy material does not cluster too often by accident
