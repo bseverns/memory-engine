@@ -26,6 +26,7 @@ def steward_state_payload(state: StewardState | None = None) -> dict:
         "quieter_mode": bool(state.quieter_mode),
         "maintenance_mode": bool(state.maintenance_mode),
         "mood_bias": str(state.mood_bias or ""),
+        "kiosk_language_code": str(state.kiosk_language_code or ""),
         "kiosk_accessibility_mode": str(state.kiosk_accessibility_mode or ""),
         "kiosk_force_reduced_motion": bool(state.kiosk_force_reduced_motion),
         "kiosk_max_recording_seconds": int(state.kiosk_max_recording_seconds or 120),
@@ -54,6 +55,7 @@ def update_steward_state(
     quieter_mode: bool,
     maintenance_mode: bool,
     mood_bias: str,
+    kiosk_language_code: str,
     kiosk_accessibility_mode: str,
     kiosk_force_reduced_motion: bool,
     kiosk_max_recording_seconds: int,
@@ -71,6 +73,9 @@ def update_steward_state(
     normalized_mood_bias = str(mood_bias or "").strip().lower()
     if normalized_mood_bias not in {"", "clear", "hushed", "suspended", "weathered", "gathering"}:
         normalized_mood_bias = ""
+    normalized_language_code = str(kiosk_language_code or "").strip().lower()
+    if normalized_language_code not in {"", "en", "es_mx_ca"}:
+        normalized_language_code = ""
     normalized_accessibility_mode = str(kiosk_accessibility_mode or "").strip().lower()
     if normalized_accessibility_mode not in {"", "large_high_contrast"}:
         normalized_accessibility_mode = ""
@@ -111,6 +116,23 @@ def update_steward_state(
             actor=actor or "operator",
             detail=f"mood bias set to {mood_detail}",
             payload={"field": "mood_bias", "value": normalized_mood_bias},
+        )
+
+    previous_language_code = str(state.kiosk_language_code or "")
+    if previous_language_code != normalized_language_code:
+        state.kiosk_language_code = normalized_language_code
+        language_detail = normalized_language_code or "installation default"
+        changes.append({
+            "field": "kiosk_language_code",
+            "value": normalized_language_code,
+            "action": "kiosk_language_code.updated",
+            "detail": f"kiosk language set to {language_detail}",
+        })
+        record_steward_action(
+            action="kiosk_language_code.updated",
+            actor=actor or "operator",
+            detail=f"kiosk language set to {language_detail}",
+            payload={"field": "kiosk_language_code", "value": normalized_language_code},
         )
 
     previous_accessibility_mode = str(state.kiosk_accessibility_mode or "")
@@ -170,6 +192,7 @@ def update_steward_state(
             "quieter_mode",
             "maintenance_mode",
             "mood_bias",
+            "kiosk_language_code",
             "kiosk_accessibility_mode",
             "kiosk_force_reduced_motion",
             "kiosk_max_recording_seconds",

@@ -11,7 +11,7 @@
     <header class="hero playback-hero">
       <p class="eyebrow">Listening surface</p>
       <h1>Room Memory</h1>
-      <p class="sub">This machine does not record. It only listens back through the room archive, moving between fresher and more weathered memories while the separate recording station collects new takes.</p>
+      <p class="sub playback-sub">A dedicated listening surface for the shared room mix.</p>
     </header>
 
     <section class="stage playback-stage">
@@ -19,34 +19,13 @@
         <span class="badge">Playback surface</span>
         <span id="playbackAutostartNote" class="selection-hint">Attempting to start the room loop...</span>
       </div>
-      <h2>Let the room drift through its own memory.</h2>
-      <p class="stage-copy">This page is meant for the listening machine only. It should stay simpler and more atmospheric than the recording station, with no consent choices or microphone controls visible.</p>
 
       <div class="playback-status-card">
         <p class="section-kicker">Current state</p>
         <div id="playbackStatus" class="playback-status">Starting room loop...</div>
-        <p class="muted playback-status-copy">If the browser blocks audio after boot, tap the start button once. After that, this surface can remain dedicated to playback.</p>
       </div>
 
       <div id="playbackVisualShell" class="playback-visual-shell">
-        <div class="playback-note-grid">
-          <article class="playback-note-card">
-            <p class="section-kicker">Fresh</p>
-            <strong>Nearer voices</strong>
-            <span>Newer material stays a little clearer and more immediate when it first enters the room.</span>
-          </article>
-          <article class="playback-note-card">
-            <p class="section-kicker">Weathering</p>
-            <strong>Patina, not collapse</strong>
-            <span>Repeatedly heard memories pick up a little grain and softness instead of turning into caricature.</span>
-          </article>
-          <article class="playback-note-card">
-            <p class="section-kicker">Pacing</p>
-            <strong>Composed drift</strong>
-            <span>The loop moves through arrival, gathering, weathering, and release rather than behaving like a flat shuffle.</span>
-          </article>
-        </div>
-
         <aside id="playbackFossilVisuals" class="fossil-visual-card" hidden>
           <p class="section-kicker">Fossil drift</p>
           <figure class="fossil-visual">
@@ -67,7 +46,8 @@
         <button id="btnPlaybackStop" class="btn secondary" disabled>Pause playback</button>
       </div>
 
-      <div class="shortcut-row">
+      <div class="shortcut-row playback-utility-row">
+        <button id="btnPlaybackInfo" class="btn secondary" type="button" aria-haspopup="dialog" aria-controls="playbackInfoLightbox" aria-expanded="false">About this room</button>
         <span class="shortcut">Space or Enter: start playback</span>
         <span class="shortcut">Esc: pause playback</span>
       </div>
@@ -77,6 +57,51 @@
       <small>This surface does not capture audio. Use `/kiosk/` on the separate recording station.</small>
     </footer>
   </div>
+
+  <section id="playbackInfoLightbox" class="lightbox" hidden aria-hidden="true">
+    <div class="lightbox-backdrop" data-close-lightbox="true"></div>
+    <div class="lightbox-card" role="dialog" aria-modal="true" aria-labelledby="playbackInfoTitle">
+      <div class="panel-head lightbox-head">
+        <div>
+          <p class="section-kicker">Listening notes</p>
+          <h3 id="playbackInfoTitle">How this surface behaves</h3>
+        </div>
+        <button id="btnPlaybackInfoClose" class="btn secondary lightbox-close" type="button">Close</button>
+      </div>
+      <div class="playback-note-grid">
+        <article class="playback-note-card">
+          <p class="section-kicker">Shared mix</p>
+          <strong>Many kiosks, one room</strong>
+          <span>Any recording station pointed at this node feeds the same archive, and this surface listens back through that combined pool.</span>
+        </article>
+        <article class="playback-note-card">
+          <p class="section-kicker">Windows</p>
+          <strong>Moving source slices</strong>
+          <span>Long recordings can be revisited as shorter windows, so the room hears different edges of the same memory over time.</span>
+        </article>
+        <article class="playback-note-card">
+          <p class="section-kicker">Weathering</p>
+          <strong>Patina, not collapse</strong>
+          <span>Repeatedly heard material picks up softness and grain without being crushed into caricature.</span>
+        </article>
+        <article class="playback-note-card">
+          <p class="section-kicker">Pacing</p>
+          <strong>Composed drift</strong>
+          <span>The loop moves through arrival, gathering, weathering, and release rather than staying in a flat shuffle.</span>
+        </article>
+        <article class="playback-note-card">
+          <p class="section-kicker">Use</p>
+          <strong>Keep it dedicated</strong>
+          <span>This machine does not record. Leave capture to <code>/kiosk/</code> and let this surface stay with the room.</span>
+        </article>
+        <article class="playback-note-card">
+          <p class="section-kicker">Startup</p>
+          <strong>One tap if needed</strong>
+          <span>If the browser blocks autoplay after boot, tap Start listening once and the room can remain hands-off after that.</span>
+        </article>
+      </div>
+    </div>
+  </section>
 
   {{ kiosk_config|json_script:"kiosk-config" }}
   <script src="/static/engine/kiosk-audio.js"></script>

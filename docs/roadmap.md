@@ -44,6 +44,7 @@
 - Attract-loop guidance in idle mode so participants can begin without steward help
 - Quiet-take warning with a keep-or-retake choice before mode selection
 - Visible idle timeout so abandoned review screens reset cleanly
+- Multilingual kiosk copy, starting with steward-selectable Spanish tuned toward southern Mexico / Central America
 - Larger-type / higher-contrast accessibility mode for difficult rooms
 - Reduced-motion handling for the countdown and kiosk transitions
 - Steward-configurable max recording duration instead of keeping it browser-only
@@ -74,6 +75,7 @@
 - Daypart scheduling so movement pacing and intensity can shift across morning, afternoon, evening, and night
 - Quiet-hours mode so spaces can soften room pacing and playback intensity on a schedule
 - Steward-tunable room-tone options, including the ability to swap the synthetic bed for site-specific ambience
+- Windowed playback for long-form recordings so multiple kiosks can feed one shared mix while the room only pulls moving source slices up to 45 seconds at a time
 - Rare overlap or layering events so the room can occasionally feel accumulative instead of strictly sequential
 - More explicit density balancing so long or heavy material is less likely to cluster by accident
 - A "featured return" path for older material that has been absent long enough to feel newly arrived again
@@ -93,7 +95,6 @@
 ## Next
 
 ### User / speaker
-- Add multilingual kiosk copy so the full guided flow can be swapped per installation
 - Add optional headphone or monitor-check mode for setup and microphone testing
 
 ### Audience / room effect

@@ -10,6 +10,9 @@
   const fossilFallback = document.getElementById("playbackFossilFallback");
   const fossilTitle = document.getElementById("playbackFossilTitle");
   const fossilMeta = document.getElementById("playbackFossilMeta");
+  const infoButton = document.getElementById("btnPlaybackInfo");
+  const infoCloseButton = document.getElementById("btnPlaybackInfoClose");
+  const infoLightbox = document.getElementById("playbackInfoLightbox");
   const SURFACE_STATE_POLL_MS = 5000;
 
   if (!startButton || !stopButton || !statusEl || !autostartNote) {
@@ -40,6 +43,7 @@
   let surfaceStateInterval = 0;
   let fossilVisualInterval = 0;
   let fossilVisualIndex = 0;
+  let infoLightboxOpen = false;
 
   function updateSurfaceNote(message) {
     autostartNote.textContent = message;
@@ -66,6 +70,26 @@
     }
     fossilVisualsEl.hidden = !enabled;
     fossilVisualShell.classList.toggle("compact", !enabled);
+  }
+
+  function renderInfoLightbox() {
+    if (!infoLightbox) return;
+    infoLightbox.hidden = !infoLightboxOpen;
+    infoLightbox.setAttribute("aria-hidden", infoLightboxOpen ? "false" : "true");
+    if (infoButton) {
+      infoButton.setAttribute("aria-expanded", infoLightboxOpen ? "true" : "false");
+    }
+    document.body.classList.toggle("lightbox-open", infoLightboxOpen);
+  }
+
+  function openInfoLightbox() {
+    infoLightboxOpen = true;
+    renderInfoLightbox();
+  }
+
+  function closeInfoLightbox() {
+    infoLightboxOpen = false;
+    renderInfoLightbox();
   }
 
   function describeFossilEntry(entry) {
@@ -201,7 +225,33 @@
     updateSurfaceNote("Playback paused on this surface.");
   });
 
+  infoButton?.addEventListener("click", () => {
+    openInfoLightbox();
+  });
+
+  infoCloseButton?.addEventListener("click", () => {
+    closeInfoLightbox();
+  });
+
+  infoLightbox?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.matches("[data-close-lightbox='true']")) {
+      closeInfoLightbox();
+    }
+  });
+
   document.addEventListener("keydown", (event) => {
+    if (event.code === "Escape" && infoLightboxOpen) {
+      event.preventDefault();
+      closeInfoLightbox();
+      return;
+    }
+
+    if (infoLightboxOpen) {
+      return;
+    }
+
     if (event.code === "Space" || event.code === "Enter") {
       event.preventDefault();
       requestPlaybackStart(true);
@@ -230,6 +280,7 @@
     updateSurfaceNote("Autostart disabled for this visit. Tap Start listening when ready.");
     statusEl.textContent = "Ready to start room playback.";
   }
+  renderInfoLightbox();
   void refreshSurfaceState();
   void refreshFossilVisuals();
   surfaceStateInterval = global.setInterval(() => {

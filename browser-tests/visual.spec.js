@@ -50,6 +50,7 @@ function healthyNodeStatusPayload(overrides = {}) {
       playback_paused: false,
       quieter_mode: false,
       mood_bias: "",
+      kiosk_language_code: "",
       kiosk_accessibility_mode: "",
       kiosk_force_reduced_motion: false,
       kiosk_max_recording_seconds: 120,
@@ -132,6 +133,7 @@ async function applyStewardControls(page, {
   playbackPaused = false,
   quieterMode = false,
   moodBias = "",
+  kioskLanguageCode = "",
   kioskAccessibilityMode = "",
   kioskReducedMotion = false,
   kioskMaxRecordingSeconds = 120,
@@ -141,6 +143,7 @@ async function applyStewardControls(page, {
   await setCheckboxState(page.locator("#opsPlaybackPaused"), playbackPaused);
   await setCheckboxState(page.locator("#opsQuieterMode"), quieterMode);
   await page.locator("#opsMoodBias").selectOption(moodBias);
+  await page.locator("#opsKioskLanguageCode").selectOption(kioskLanguageCode);
   await page.locator("#opsKioskAccessibilityMode").selectOption(kioskAccessibilityMode);
   await setCheckboxState(page.locator("#opsKioskReducedMotion"), kioskReducedMotion);
   await page.locator("#opsKioskMaxRecordingSeconds").fill(String(kioskMaxRecordingSeconds));
@@ -151,6 +154,8 @@ async function applyStewardControls(page, {
   if (playbackPaused) expectedStatus.push("playback paused");
   if (quieterMode) expectedStatus.push("quieter mode");
   if (moodBias) expectedStatus.push(`mood bias: ${moodBias}`);
+  if (kioskLanguageCode === "es_mx_ca") expectedStatus.push("kiosk language: español");
+  else if (kioskLanguageCode) expectedStatus.push(`kiosk language: ${kioskLanguageCode}`);
   if (kioskAccessibilityMode) expectedStatus.push("accessible kiosk");
   if (kioskReducedMotion) expectedStatus.push("reduced-motion kiosk");
   if (kioskMaxRecordingSeconds !== 120) expectedStatus.push(`kiosk max: ${kioskMaxRecordingSeconds}s`);
@@ -186,6 +191,17 @@ test.describe("visual stack walkthrough", () => {
     await saveScreenshot(page, "recording-kiosk-accessible.png");
   });
 
+  test("captures the recording kiosk in Spanish", async ({ page }) => {
+    await mockHealthyOpsStatus(page);
+    await applyStewardControls(page, {
+      kioskLanguageCode: "es_mx_ca",
+    });
+    await page.goto("/kiosk/");
+    await expect(page.getByRole("heading", { name: "Memoria de la sala" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Activar micrófono" })).toBeVisible();
+    await saveScreenshot(page, "recording-kiosk-spanish.png");
+  });
+
   test("captures the dedicated playback surface", async ({ page }) => {
     await mockHealthyOpsStatus(page);
     await mockSpectrograms(page.context());
@@ -194,6 +210,16 @@ test.describe("visual stack walkthrough", () => {
     await expect(page.getByRole("heading", { name: "Room Memory" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Start listening" })).toBeVisible();
     await saveScreenshot(page, "room-playback.png");
+  });
+
+  test("captures the playback info lightbox", async ({ page }) => {
+    await mockHealthyOpsStatus(page);
+    await mockSpectrograms(page.context());
+    await applyStewardControls(page, {});
+    await page.goto("/room/?autostart=0");
+    await page.getByRole("button", { name: "About this room" }).click();
+    await expect(page.getByRole("heading", { name: "How this surface behaves" })).toBeVisible();
+    await saveScreenshot(page, "room-playback-info.png");
   });
 
   test("captures the operator dashboard in a ready state", async ({ page }) => {
@@ -207,6 +233,7 @@ test.describe("visual stack walkthrough", () => {
             playback_paused: false,
             quieter_mode: false,
             mood_bias: "",
+            kiosk_language_code: "",
             kiosk_accessibility_mode: "",
             kiosk_force_reduced_motion: false,
             kiosk_max_recording_seconds: 120,
@@ -261,6 +288,7 @@ test.describe("visual stack walkthrough", () => {
         playback_paused: false,
         quieter_mode: true,
         mood_bias: "weathered",
+        kiosk_language_code: "",
         kiosk_accessibility_mode: "",
         kiosk_force_reduced_motion: false,
         kiosk_max_recording_seconds: 120,
@@ -275,6 +303,7 @@ test.describe("visual stack walkthrough", () => {
             playback_paused: false,
             quieter_mode: true,
             mood_bias: "weathered",
+            kiosk_language_code: "",
             kiosk_accessibility_mode: "",
             kiosk_force_reduced_motion: false,
             kiosk_max_recording_seconds: 120,

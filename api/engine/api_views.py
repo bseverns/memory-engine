@@ -23,6 +23,7 @@ from .pool import (
     artifact_lane,
     artifact_mood,
     artifact_playback_key,
+    artifact_playback_window,
     playable_artifact_queryset,
     select_pool_artifact,
 )
@@ -288,6 +289,7 @@ def pool_next(request):
             chunk for chunk in (piece.strip() for piece in raw_recent_densities.split(",")[:6])
             if chunk in {"light", "medium", "dense"}
         ]
+    segment_variant = (request.query_params.get("segment_variant") or "").strip()[:120]
 
     artifact, selected_lane = select_pool_artifact(
         now,
@@ -304,6 +306,7 @@ def pool_next(request):
     density = artifact_density(artifact)
     mood = artifact_mood(artifact, now)
     featured_return = artifact_is_featured_return(artifact, now)
+    playback_window = artifact_playback_window(artifact, now, variant=segment_variant)
 
     with transaction.atomic():
         artifact = Artifact.objects.select_for_update().get(id=artifact.id)
@@ -322,6 +325,11 @@ def pool_next(request):
         "density": density,
         "mood": mood,
         "duration_ms": artifact.duration_ms,
+        "playback_start_ms": playback_window["start_ms"],
+        "playback_duration_ms": playback_window["duration_ms"],
+        "playback_windowed": playback_window["windowed"],
+        "playback_revolution_index": playback_window["revolution_index"],
+        "playback_revolution_seconds": int(settings.ROOM_SOURCE_SLICE_REVOLUTION_SECONDS),
         "age_hours": round(age_hours, 3),
         "wear": artifact.wear,
         "featured_return": featured_return,
@@ -437,6 +445,7 @@ def operator_controls(request):
         quieter_mode=parse_boolish(request.data.get("quieter_mode", state.quieter_mode)),
         maintenance_mode=parse_boolish(request.data.get("maintenance_mode", state.maintenance_mode)),
         mood_bias=request.data.get("mood_bias", state.mood_bias),
+        kiosk_language_code=request.data.get("kiosk_language_code", state.kiosk_language_code),
         kiosk_accessibility_mode=request.data.get("kiosk_accessibility_mode", state.kiosk_accessibility_mode),
         kiosk_force_reduced_motion=parse_boolish(
             request.data.get("kiosk_force_reduced_motion", state.kiosk_force_reduced_motion),

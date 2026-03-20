@@ -17,30 +17,6 @@ const FLOW = {
   ERROR: "error",
 };
 
-const MODE_COPY = {
-  ROOM: {
-    name: "Room Memory",
-    submitLabel: "Save to room memory",
-    reviewCopy: "Stored on this device for about 48 hours and replayed in the room with gentle wear over time.",
-    completeTitle: "Saved to this room.",
-    completeStatus: "Saved locally.",
-  },
-  FOSSIL: {
-    name: "Fossil Only",
-    submitLabel: "Save as a fossil",
-    reviewCopy: "The raw recording expires in about 48 hours. A spectrogram image and a low-storage audio residue may remain locally for longer.",
-    completeTitle: "Saved as a local fossil.",
-    completeStatus: "Saved locally as a fossil.",
-  },
-  NOSAVE: {
-    name: "Don't Save",
-    submitLabel: "Play once, then discard",
-    reviewCopy: "The recording will play once immediately and then be discarded.",
-    completeTitle: "Played once and discarded.",
-    completeStatus: "Discarded after playback.",
-  },
-};
-
 const btnPrimary = document.getElementById("btnPrimary");
 const btnSecondary = document.getElementById("btnSecondary");
 const btnSubmit = document.getElementById("btnSubmit");
@@ -79,9 +55,28 @@ const reviewTimeoutFill = document.getElementById("reviewTimeoutFill");
 const attractPanel = document.getElementById("attractPanel");
 const attractLead = document.getElementById("attractLead");
 const operatorNotice = document.getElementById("operatorNotice");
+const heroEyebrow = document.getElementById("heroEyebrow");
+const heroTitle = document.getElementById("heroTitle");
+const heroSub = document.getElementById("heroSub");
+const meterLabel = document.getElementById("meterLabel");
+const elapsedLabel = document.getElementById("elapsedLabel");
+const remainingLabel = document.getElementById("remainingLabel");
+const shortcutReset = document.getElementById("shortcutReset");
+const privacyHint = document.getElementById("privacyHint");
+const quietTakeKicker = document.getElementById("quietTakeKicker");
+const quietTakeTitle = document.getElementById("quietTakeTitle");
+const reviewTimeoutHint = document.getElementById("reviewTimeoutHint");
+const receiptKicker = document.getElementById("receiptKicker");
+const receiptTitle = document.getElementById("receiptTitle");
+const countdownKicker = document.getElementById("countdownKicker");
+const footerCopy = document.getElementById("footerCopy");
 const attractSteps = Array.from(document.querySelectorAll(".attract-step"));
 const stepEls = Array.from(document.querySelectorAll(".step"));
 const choices = Array.from(document.querySelectorAll(".choice"));
+const choiceCopyEls = new Map(choices.map((choice) => [choice.dataset.mode, {
+  title: choice.querySelector(".choice-title"),
+  copy: choice.querySelector(".choice-copy"),
+}]));
 
 let flowState = FLOW.IDLE;
 let primaryAction = null;
@@ -111,11 +106,7 @@ const REVIEW_IDLE_TIMEOUT_MS = 90000;
 const ATTRACT_ROTATE_MS = 3600;
 const SURFACE_STATE_POLL_MS = 5000;
 
-const ATTRACT_MESSAGES = [
-  "Tap Arm microphone or press Space to begin.",
-  "Nothing records until you choose to start.",
-  "Check the meter first, then make the take when you are ready.",
-];
+const kioskCopyApi = window.MemoryEngineKioskCopy;
 
 const PRE_ROLL_TONE = {
   gain: 0.04,
@@ -145,12 +136,14 @@ function readKioskConfig() {
 }
 
 const kioskConfig = readKioskConfig();
+const DEFAULT_LANGUAGE_CODE = String(kioskConfig.kioskLanguageCode || "en");
 const DEFAULT_MAX_RECORDING_SECONDS = Number(kioskConfig.kioskMaxRecordingSeconds || 120);
 let surfaceState = {
   intake_paused: false,
   playback_paused: false,
   quieter_mode: false,
   maintenance_mode: false,
+  kiosk_language_code: "",
   kiosk_accessibility_mode: "",
   kiosk_force_reduced_motion: false,
   kiosk_max_recording_seconds: DEFAULT_MAX_RECORDING_SECONDS,
@@ -168,6 +161,37 @@ const captureController = window.MemoryEngineKioskCapture.createController({
   },
 });
 
+function currentLanguageCode() {
+  return kioskCopyApi.resolveLanguageCode(surfaceState.kiosk_language_code, DEFAULT_LANGUAGE_CODE);
+}
+
+function currentCopy() {
+  return kioskCopyApi.getPack(currentLanguageCode());
+}
+
+function formatCopy(template, values = {}) {
+  return kioskCopyApi.formatMessage(template, values);
+}
+
+function modeCopy(mode) {
+  return currentCopy().modes[mode];
+}
+
+function localizedDateTime(value) {
+  return new Date(value).toLocaleString(currentCopy().locale);
+}
+
+function processingNoteForKey(noteKey, fallback = "") {
+  const copy = currentCopy();
+  const map = {
+    choose_mode: copy.processingNoteChoose,
+    trimmed_and_smoothed: copy.processingNoteTrimmed,
+    smoothed: copy.processingNoteSmoothed,
+    quiet_warning: copy.processingNoteQuiet,
+  };
+  return map[noteKey] || fallback;
+}
+
 function setFlowState(nextState, options = {}) {
   const previousState = flowState;
   flowState = nextState;
@@ -178,7 +202,37 @@ function setFlowState(nextState, options = {}) {
   render();
 }
 
+function applyStaticCopy() {
+  const copy = currentCopy();
+  document.documentElement.lang = copy.htmlLang;
+  document.title = copy.documentTitle;
+  if (heroEyebrow) heroEyebrow.textContent = copy.heroEyebrow;
+  if (heroTitle) heroTitle.textContent = copy.heroTitle;
+  if (heroSub) heroSub.textContent = copy.heroSub;
+  if (meterLabel) meterLabel.textContent = copy.meterLabel;
+  if (elapsedLabel) elapsedLabel.textContent = copy.timerElapsed;
+  if (remainingLabel) remainingLabel.textContent = copy.timerRemaining;
+  if (shortcutReset) shortcutReset.textContent = copy.resetShortcut;
+  if (privacyHint) privacyHint.textContent = copy.privacyHint;
+  if (quietTakeKicker) quietTakeKicker.textContent = copy.quietTakeKicker;
+  if (quietTakeTitle) quietTakeTitle.textContent = copy.quietTakeTitle;
+  if (btnQuietKeep) btnQuietKeep.textContent = copy.quietTakeKeep;
+  if (btnQuietRetake) btnQuietRetake.textContent = copy.quietTakeRetake;
+  if (reviewTimeoutHint) reviewTimeoutHint.textContent = copy.reviewTimeoutHint;
+  if (receiptKicker) receiptKicker.textContent = copy.receiptKicker;
+  if (receiptTitle) receiptTitle.textContent = copy.receiptTitle;
+  if (countdownKicker) countdownKicker.textContent = copy.countdownKicker;
+  if (footerCopy) footerCopy.textContent = copy.footerCopy;
+  for (const [mode, els] of choiceCopyEls.entries()) {
+    const modeStrings = copy.modes[mode];
+    if (!modeStrings) continue;
+    if (els.title) els.title.textContent = modeStrings.name;
+    if (els.copy) els.copy.textContent = modeStrings.optionCopy;
+  }
+}
+
 function render() {
+  applyStaticCopy();
   document.body.dataset.state = flowState;
   document.body.classList.toggle("a11y-mode", accessibilityModeEnabled());
   document.body.classList.toggle("reduced-motion-mode", shouldReduceMotion());
@@ -225,13 +279,14 @@ function updateOperatorNotice() {
   }
 
   operatorNotice.hidden = false;
+  const copy = currentCopy();
   if (surfaceState.maintenance_mode) {
-    operatorNotice.textContent = "This node is in maintenance mode. Recording and room playback are resting until the steward returns it to service.";
+    operatorNotice.textContent = copy.operatorMaintenance;
     return;
   }
   operatorNotice.textContent = flowState === FLOW.REVIEW && wavBlob
-    ? "Recording intake is paused by the steward. New submissions are temporarily on hold."
-    : "Recording intake is paused by the steward. This station is resting until intake resumes.";
+    ? copy.operatorPausedReview
+    : copy.operatorPausedIdle;
 }
 
 function updateStepper() {
@@ -281,7 +336,7 @@ function tickReviewTimeout() {
     reviewTimeoutInterval = 0;
     reviewDeadlineTs = 0;
     preview.pause();
-    submitStatus.textContent = "Review timed out. The kiosk reset for the next person.";
+    submitStatus.textContent = currentCopy().reviewTimedOut;
     runAction(startFreshSession);
     return;
   }
@@ -300,7 +355,9 @@ function updateReviewTimeoutPanel() {
 
   const remainingMs = Math.max(0, reviewDeadlineTs - performance.now());
   const progress = Math.max(0, Math.min(1, remainingMs / REVIEW_IDLE_TIMEOUT_MS));
-  reviewTimeoutChip.textContent = `Review resets in ${formatDuration(remainingMs)}`;
+  reviewTimeoutChip.textContent = formatCopy(currentCopy().reviewResetsIn, {
+    duration: formatDuration(remainingMs),
+  });
   reviewTimeoutChip.classList.toggle("warning", remainingMs <= 20000);
   reviewTimeoutFill.style.width = `${progress * 100}%`;
 }
@@ -316,9 +373,10 @@ function updateQuietTakePanel() {
   quietTakePanel.hidden = !visible;
   if (!visible) return;
 
+  const copy = currentCopy();
   quietTakeCopy.textContent = quietTakeAnalysis
-    ? "The take made it through, but the microphone level stayed very soft. Keep it if that softness is intentional, or retake it before choosing a memory mode."
-    : "Listen back. If the softness is intentional, keep it. Otherwise retake it before choosing how the room should remember it.";
+    ? copy.quietTakeCopyMeasured
+    : copy.quietTakeCopyDefault;
 }
 
 function startAttractLoop() {
@@ -340,14 +398,21 @@ function updateAttractPanel() {
   attractPanel.hidden = !visible;
   if (!visible) return;
 
-  const activeIndex = shouldReduceMotion() ? 0 : (attractStepIndex % ATTRACT_MESSAGES.length);
-  attractLead.textContent = ATTRACT_MESSAGES[activeIndex];
+  const copy = currentCopy();
+  const messages = [
+    copy.shortcutArm,
+    copy.stageIdleCopy,
+    copy.stageArmedCopy,
+  ];
+  const activeIndex = shouldReduceMotion() ? 0 : (attractStepIndex % messages.length);
+  attractLead.textContent = messages[activeIndex];
   attractSteps.forEach((step, index) => {
     step.classList.toggle("active", index === activeIndex);
   });
 }
 
 function updateModePanel() {
+  const copy = currentCopy();
   const visible = [FLOW.REVIEW, FLOW.SUBMITTING].includes(flowState);
   if (modePanel) {
     modePanel.hidden = !visible;
@@ -359,22 +424,22 @@ function updateModePanel() {
   });
 
   if (!visible) {
-    selectionHint.textContent = "Unlocked after recording";
+    selectionHint.textContent = copy.selectionUnlocked;
   } else if (flowState === FLOW.REVIEW && quietTakeNeedsDecision) {
-    selectionHint.textContent = "Keep or retake before choosing";
+    selectionHint.textContent = copy.selectionKeepOrRetake;
   } else if (!selectedMode) {
-    selectionHint.textContent = "Press 1, 2, or 3 to choose";
+    selectionHint.textContent = copy.selectionPressChoice;
   } else {
-    selectionHint.textContent = `Selected: ${MODE_COPY[selectedMode].name}`;
+    selectionHint.textContent = formatCopy(copy.selectionSelected, { name: modeCopy(selectedMode).name });
   }
 
   if (intakePaused()) {
-    selectionHint.textContent = "Intake is paused by the steward";
+    selectionHint.textContent = copy.selectionPaused;
   }
 
   const canSubmit = flowState === FLOW.REVIEW && !!wavBlob && !!selectedMode && !intakePaused();
   btnSubmit.disabled = !canSubmit;
-  btnSubmit.textContent = selectedMode ? MODE_COPY[selectedMode].submitLabel : "Submit selection";
+  btnSubmit.textContent = selectedMode ? modeCopy(selectedMode).submitLabel : copy.submitSelection;
 }
 
 function updateReceiptPanel() {
@@ -383,66 +448,67 @@ function updateReceiptPanel() {
 }
 
 function updateButtons() {
-  let primaryLabel = "Arm microphone";
+  const copy = currentCopy();
+  let primaryLabel = copy.btnArm;
   let primaryDisabled = false;
-  let secondaryLabel = "Start over";
+  let secondaryLabel = copy.btnStartOver;
   let secondaryDisabled = true;
 
   primaryAction = armMicrophone;
   secondaryAction = startFreshSession;
 
   if (flowState === FLOW.ARMING) {
-    primaryLabel = "Arming microphone";
+    primaryLabel = copy.btnArming;
     primaryDisabled = true;
-    secondaryLabel = "Please wait";
+    secondaryLabel = copy.btnPleaseWait;
     secondaryDisabled = true;
   } else if (flowState === FLOW.ARMED) {
-    primaryLabel = "Start recording";
+    primaryLabel = copy.btnStartRecording;
     primaryAction = startRecording;
-    secondaryLabel = "Disarm microphone";
+    secondaryLabel = copy.btnDisarm;
     secondaryAction = disarmToIdle;
     secondaryDisabled = false;
   } else if (flowState === FLOW.COUNTDOWN) {
-    primaryLabel = "Starting soon";
+    primaryLabel = copy.btnStartingSoon;
     primaryDisabled = true;
-    secondaryLabel = "Cancel countdown";
+    secondaryLabel = copy.btnCancelCountdown;
     secondaryAction = cancelCountdown;
     secondaryDisabled = false;
   } else if (flowState === FLOW.RECORDING) {
-    primaryLabel = "Stop recording";
+    primaryLabel = copy.btnStopRecording;
     primaryAction = stopRecording;
-    secondaryLabel = "Cancel take";
+    secondaryLabel = copy.btnCancelTake;
     secondaryAction = cancelCurrentTake;
     secondaryDisabled = false;
   } else if (flowState === FLOW.REVIEW) {
     if (quietTakeNeedsDecision) {
-      primaryLabel = "Keep this take";
+      primaryLabel = copy.quietTakeKeep;
       primaryAction = acknowledgeQuietTake;
       primaryDisabled = !wavBlob;
-      secondaryLabel = "Retake";
+      secondaryLabel = copy.quietTakeRetake;
       secondaryAction = recordAgain;
     } else {
-      primaryLabel = selectedMode ? MODE_COPY[selectedMode].submitLabel : "Choose a memory mode";
+      primaryLabel = selectedMode ? modeCopy(selectedMode).submitLabel : copy.btnChooseMemoryMode;
       primaryAction = submitCurrentTake;
       primaryDisabled = !selectedMode || !wavBlob;
-      secondaryLabel = "Record again";
+      secondaryLabel = copy.btnRecordAgain;
       secondaryAction = recordAgain;
     }
     secondaryDisabled = false;
   } else if (flowState === FLOW.SUBMITTING) {
-    primaryLabel = "Submitting";
+    primaryLabel = copy.btnSubmitting;
     primaryDisabled = true;
-    secondaryLabel = "Please wait";
+    secondaryLabel = copy.btnPleaseWait;
     secondaryDisabled = true;
   } else if (flowState === FLOW.COMPLETE) {
-    primaryLabel = "Start another recording";
+    primaryLabel = copy.btnStartAnother;
     primaryAction = startFreshSession;
-    secondaryLabel = "Start over";
+    secondaryLabel = copy.btnStartOver;
     secondaryDisabled = true;
   } else if (flowState === FLOW.ERROR) {
-    primaryLabel = "Try microphone again";
+    primaryLabel = copy.btnTryMicAgain;
     primaryAction = armMicrophone;
-    secondaryLabel = "Start over";
+    secondaryLabel = copy.btnStartOver;
     secondaryAction = startFreshSession;
     secondaryDisabled = false;
   }
@@ -450,10 +516,10 @@ function updateButtons() {
   if (intakePaused() && ![FLOW.RECORDING, FLOW.SUBMITTING, FLOW.COMPLETE].includes(flowState)) {
     primaryDisabled = true;
     if (flowState === FLOW.IDLE || flowState === FLOW.ERROR) {
-      primaryLabel = "Recording paused";
+      primaryLabel = copy.btnRecordingPaused;
     } else if (flowState === FLOW.REVIEW) {
-      primaryLabel = "Submission paused";
-      secondaryLabel = "Reset session";
+      primaryLabel = copy.btnSubmissionPaused;
+      secondaryLabel = copy.btnResetSession;
       secondaryAction = startFreshSession;
       secondaryDisabled = false;
     }
@@ -466,6 +532,7 @@ function updateButtons() {
 }
 
 function updateStage() {
+  const copy = currentCopy();
   const hasMic = captureController.hasLiveInput();
   const maxRecordingMs = recordingLimitMs();
   const elapsedMs = flowState === FLOW.RECORDING ? (performance.now() - recStartTs) : durationMs;
@@ -474,134 +541,134 @@ function updateStage() {
     : Math.max(0, maxRecordingMs - durationMs);
   recTimer.textContent = formatDuration(elapsedMs);
   remainingTimer.textContent = formatDuration(remainingMs);
-  maxDurationHint.textContent = `Max ${formatDuration(maxRecordingMs)}`;
+  maxDurationHint.textContent = formatCopy(copy.maxDuration, { duration: formatDuration(maxRecordingMs) });
 
   if (intakePaused() && flowState === FLOW.IDLE) {
-    stageBadge.textContent = maintenanceMode() ? "Maintenance" : "Paused";
+    stageBadge.textContent = maintenanceMode() ? copy.badgeMaintenance : copy.badgePaused;
     stageTitle.textContent = maintenanceMode()
-      ? "This recording station is offline for maintenance."
-      : "This recording station is resting.";
+      ? copy.stageMaintenanceIdleTitle
+      : copy.stagePausedIdleTitle;
     stageCopy.textContent = maintenanceMode()
-      ? "A steward has taken this node out of service for a while. Recording will return when maintenance mode is cleared."
-      : "A steward has paused intake for a while. Nothing new will be recorded until intake resumes.";
-    micStatus.textContent = "Microphone asleep";
-    recStatus.textContent = maintenanceMode() ? "Node in maintenance mode" : "Recording intake paused";
-    shortcutHint.textContent = maintenanceMode() ? "Node temporarily offline" : "Recording is paused by the steward";
-    meterText.textContent = "Waiting for intake to resume";
-    setMicCheckStatus("Mic check asleep", "quiet");
+      ? copy.stageMaintenanceIdleCopy
+      : copy.stagePausedIdleCopy;
+    micStatus.textContent = copy.micAsleep;
+    recStatus.textContent = maintenanceMode() ? copy.recMaintenance : copy.recPaused;
+    shortcutHint.textContent = maintenanceMode() ? copy.shortcutOffline : copy.shortcutPaused;
+    meterText.textContent = copy.meterWaitingResume;
+    setMicCheckStatus(copy.micCheckAsleep, "quiet");
     setMeterLevel(0);
   } else if (flowState === FLOW.IDLE) {
-    stageBadge.textContent = "Not armed";
-    stageTitle.textContent = "When you are ready, wake the microphone.";
-    stageCopy.textContent = "Nothing records until you begin. Take a breath, notice the room, and start only when it feels right.";
-    micStatus.textContent = "Microphone asleep";
-    recStatus.textContent = "Microphone not armed";
-    shortcutHint.textContent = "Space or Enter: arm microphone";
-    meterText.textContent = "Waiting for microphone";
-    setMicCheckStatus("Mic check unavailable", "quiet");
+    stageBadge.textContent = copy.badgeNotArmed;
+    stageTitle.textContent = copy.stageIdleTitle;
+    stageCopy.textContent = copy.stageIdleCopy;
+    micStatus.textContent = copy.micAsleep;
+    recStatus.textContent = copy.recNotArmed;
+    shortcutHint.textContent = copy.shortcutArm;
+    meterText.textContent = copy.meterWaitingMic;
+    setMicCheckStatus(copy.micCheckUnavailable, "quiet");
     setMeterLevel(0);
   } else if (flowState === FLOW.ARMING) {
-    stageBadge.textContent = "Arming";
-    stageTitle.textContent = "Allow the microphone, then settle.";
-    stageCopy.textContent = "The screen will stay still and wait. Recording does not begin until you choose it.";
-    micStatus.textContent = "Requesting microphone access";
-    recStatus.textContent = "Waiting for microphone access";
-    shortcutHint.textContent = "Microphone request in progress";
-    meterText.textContent = "Requesting access";
-    setMicCheckStatus("Mic check starting up", "quiet");
+    stageBadge.textContent = copy.badgeArming;
+    stageTitle.textContent = copy.stageArmingTitle;
+    stageCopy.textContent = copy.stageArmingCopy;
+    micStatus.textContent = copy.micRequesting;
+    recStatus.textContent = copy.recWaitingMicAccess;
+    shortcutHint.textContent = copy.micRequesting;
+    meterText.textContent = copy.meterRequestingAccess;
+    setMicCheckStatus(copy.micCheckStarting, "quiet");
   } else if (flowState === FLOW.ARMED) {
-    stageBadge.textContent = intakePaused() ? (maintenanceMode() ? "Maintenance" : "Paused") : "Ready";
+    stageBadge.textContent = intakePaused() ? (maintenanceMode() ? copy.badgeMaintenance : copy.badgePaused) : copy.badgeReady;
     stageTitle.textContent = intakePaused()
-      ? (maintenanceMode() ? "This node is offline for maintenance." : "The steward has paused recording intake.")
-      : "You are ready, but not yet recording.";
+      ? (maintenanceMode() ? copy.stageArmedMaintenanceTitle : copy.stageArmedPausedTitle)
+      : copy.stageArmedTitle;
     stageCopy.textContent = intakePaused()
       ? (maintenanceMode()
-        ? "This take can be reset, but recording cannot begin until the node returns to service."
-        : "This take can be reset, but a new recording cannot begin until intake resumes.")
-      : "Speak a little if you want to watch the meter. Begin when the moment feels settled.";
+        ? copy.stageArmedMaintenanceCopy
+        : copy.stageArmedPausedCopy)
+      : copy.stageArmedCopy;
     micStatus.textContent = micLabel;
     recStatus.textContent = intakePaused()
-      ? (maintenanceMode() ? "Node in maintenance mode" : "Recording intake paused")
-      : "Standing by";
+      ? (maintenanceMode() ? copy.recMaintenance : copy.recPaused)
+      : copy.recStandingBy;
     shortcutHint.textContent = intakePaused()
-      ? (maintenanceMode() ? "Node temporarily offline" : "Recording is paused by the steward")
-      : "Space or Enter: start recording";
-    meterText.textContent = hasMic ? "Listening for room sound" : "Microphone unavailable";
+      ? (maintenanceMode() ? copy.shortcutOffline : copy.shortcutPaused)
+      : copy.shortcutStart;
+    meterText.textContent = hasMic ? copy.meterListeningRoom : copy.meterMicUnavailable;
   } else if (flowState === FLOW.COUNTDOWN) {
-    stageBadge.textContent = "Get ready";
-    stageTitle.textContent = "Take a breath.";
-    stageCopy.textContent = "Recording begins in a moment. You can still cancel if you need more time.";
+    stageBadge.textContent = copy.badgeGetReady;
+    stageTitle.textContent = copy.stageCountdownTitle;
+    stageCopy.textContent = copy.stageCountdownCopy;
     micStatus.textContent = micLabel;
-    recStatus.textContent = "Countdown in progress";
-    shortcutHint.textContent = "Escape: cancel countdown";
-    meterText.textContent = "Listening for room sound";
+    recStatus.textContent = copy.recCountdown;
+    shortcutHint.textContent = copy.shortcutCancelCountdown;
+    meterText.textContent = copy.meterListeningRoom;
   } else if (flowState === FLOW.RECORDING) {
-    stageBadge.textContent = "Recording";
-    stageTitle.textContent = "Speak when you are ready.";
-    stageCopy.textContent = "Stop whenever you feel complete. The take also ends automatically when the timer reaches zero.";
+    stageBadge.textContent = copy.badgeRecording;
+    stageTitle.textContent = copy.stageRecordingTitle;
+    stageCopy.textContent = copy.stageRecordingCopy;
     micStatus.textContent = micLabel;
-    recStatus.textContent = "Recording in progress";
-    shortcutHint.textContent = "Space or Enter: stop recording";
-    meterText.textContent = "Live microphone signal";
+    recStatus.textContent = copy.recRecording;
+    shortcutHint.textContent = copy.shortcutStop;
+    meterText.textContent = copy.meterRecordingSignal;
   } else if (flowState === FLOW.REVIEW) {
     if (quietTakeNeedsDecision) {
-      stageBadge.textContent = "Quiet take";
-      stageTitle.textContent = "This take arrived very softly.";
-      stageCopy.textContent = "Listen once. Keep it if that softness is right, or retake it before choosing what happens next.";
+      stageBadge.textContent = copy.badgeQuietTake;
+      stageTitle.textContent = copy.stageQuietTitle;
+      stageCopy.textContent = copy.stageQuietCopy;
     } else {
-      stageBadge.textContent = intakePaused() ? (maintenanceMode() ? "Maintenance" : "Paused") : "Review";
+      stageBadge.textContent = intakePaused() ? (maintenanceMode() ? copy.badgeMaintenance : copy.badgePaused) : copy.badgeReview;
       stageTitle.textContent = intakePaused()
-        ? (maintenanceMode() ? "This take is waiting while the node is offline." : "This take is waiting while intake is paused.")
-        : (selectedMode ? `Ready to ${MODE_COPY[selectedMode].submitLabel.toLowerCase()}.` : "Listen back, then choose what follows.");
+        ? (maintenanceMode() ? copy.stageReviewMaintenanceTitle : copy.stageReviewPausedTitle)
+        : (selectedMode ? formatCopy(copy.stageReadyTo, { label: modeCopy(selectedMode).submitLabel.toLowerCase() }) : copy.stageReviewTitle);
       stageCopy.textContent = intakePaused()
         ? (maintenanceMode()
-          ? "A steward put this node into maintenance mode before the take was submitted. Reset for the next person after the node returns to service."
-          : "A steward paused intake before this take was submitted. You can keep the screen open or reset for the next person once intake resumes.")
+          ? copy.stageReviewMaintenanceCopy
+          : copy.stageReviewPausedCopy)
         : (selectedMode
-          ? MODE_COPY[selectedMode].reviewCopy
-          : "Use the preview if you want. Then choose 1, 2, or 3 for the next step.");
+          ? modeCopy(selectedMode).reviewCopy
+          : copy.stageReviewCopy);
     }
-    micStatus.textContent = hasMic ? micLabel : "Microphone asleep";
-    recStatus.textContent = quietTakeNeedsDecision ? "Very quiet input detected" : (wavBlob ? "Take captured" : "No take captured");
+    micStatus.textContent = hasMic ? micLabel : copy.micAsleep;
+    recStatus.textContent = quietTakeNeedsDecision ? copy.recQuietInput : (wavBlob ? copy.recTakeCaptured : copy.recNoTake);
     shortcutHint.textContent = quietTakeNeedsDecision
-      ? "Space or Enter: keep this take"
+      ? copy.shortcutKeepQuiet
       : (intakePaused()
-        ? (maintenanceMode() ? "Node temporarily offline" : "Submission is paused by the steward")
-        : (selectedMode ? "Space or Enter: submit selection" : "Press 1, 2, or 3 to choose a memory mode"));
-    meterText.textContent = quietTakeNeedsDecision ? "Preview this take before deciding" : (hasMic ? "Microphone still armed" : "Microphone asleep");
+        ? (maintenanceMode() ? copy.shortcutOffline : copy.shortcutPausedSubmit)
+        : (selectedMode ? copy.shortcutSubmit : copy.shortcutModeChoice));
+    meterText.textContent = quietTakeNeedsDecision ? copy.meterPreviewTake : (hasMic ? copy.meterMicStillArmed : copy.meterMicAsleep);
     setMicCheckStatus(
-      quietTakeNeedsDecision ? "Quiet take warning" : (hasMic ? "Mic check complete" : "Mic check asleep"),
+      quietTakeNeedsDecision ? copy.micCheckQuietWarning : (hasMic ? copy.micCheckComplete : copy.micCheckAsleep),
       quietTakeNeedsDecision ? "quiet" : (hasMic ? "good" : "quiet"),
     );
   } else if (flowState === FLOW.SUBMITTING) {
-    stageBadge.textContent = "Saving";
-    stageTitle.textContent = "Please hold for a moment.";
-    stageCopy.textContent = "The kiosk is finishing this session and will only show something to keep if this take produced one.";
-    micStatus.textContent = "Microphone asleep";
-    recStatus.textContent = "Submitting";
-    shortcutHint.textContent = "Submitting current take";
-    meterText.textContent = "Microphone asleep";
-    setMicCheckStatus("Mic check asleep", "quiet");
+    stageBadge.textContent = copy.badgeSaving;
+    stageTitle.textContent = copy.stageSavingTitle;
+    stageCopy.textContent = copy.stageSavingCopy;
+    micStatus.textContent = copy.micAsleep;
+    recStatus.textContent = copy.recSubmitting;
+    shortcutHint.textContent = copy.shortcutSubmitting;
+    meterText.textContent = copy.meterMicAsleep;
+    setMicCheckStatus(copy.micCheckAsleep, "quiet");
     setMeterLevel(0);
   } else if (flowState === FLOW.COMPLETE) {
-    stageBadge.textContent = "Finished";
-    stageTitle.textContent = selectedMode ? MODE_COPY[selectedMode].completeTitle : "Session complete.";
-    stageCopy.textContent = "The microphone is asleep again. Begin another recording whenever the next person is ready.";
-    micStatus.textContent = "Microphone asleep";
-    recStatus.textContent = "Session complete";
-    shortcutHint.textContent = "Space or Enter: start another recording";
-    meterText.textContent = "Microphone asleep";
-    setMicCheckStatus("Mic check asleep", "quiet");
+    stageBadge.textContent = copy.badgeFinished;
+    stageTitle.textContent = selectedMode ? modeCopy(selectedMode).completeTitle : copy.stageCompleteFallback;
+    stageCopy.textContent = copy.stageCompleteCopy;
+    micStatus.textContent = copy.micAsleep;
+    recStatus.textContent = copy.recComplete;
+    shortcutHint.textContent = copy.shortcutStartAnother;
+    meterText.textContent = copy.meterMicAsleep;
+    setMicCheckStatus(copy.micCheckAsleep, "quiet");
     setMeterLevel(0);
   } else if (flowState === FLOW.ERROR) {
-    stageBadge.textContent = "Microphone issue";
-    stageTitle.textContent = "The kiosk could not reach the microphone.";
-    stageCopy.textContent = lastErrorMessage || "Check that the USB microphone is connected, then try again.";
-    micStatus.textContent = "Microphone unavailable";
-    recStatus.textContent = "Microphone error";
-    shortcutHint.textContent = "Space or Enter: try again";
-    meterText.textContent = "Microphone unavailable";
-    setMicCheckStatus("Mic check unavailable", "quiet");
+    stageBadge.textContent = copy.badgeMicIssue;
+    stageTitle.textContent = copy.stageErrorTitle;
+    stageCopy.textContent = lastErrorMessage || copy.stageErrorCopyFallback;
+    micStatus.textContent = copy.micUnavailable;
+    recStatus.textContent = copy.recMicError;
+    shortcutHint.textContent = copy.shortcutTryAgain;
+    meterText.textContent = copy.meterMicUnavailable;
+    setMicCheckStatus(copy.micCheckUnavailable, "quiet");
     setMeterLevel(0);
   }
 }
@@ -611,24 +678,25 @@ function setMeterLevel(level) {
 }
 
 function handleMeterLevel(boosted) {
+  const copy = currentCopy();
   setMeterLevel(boosted);
 
   if (flowState === FLOW.ARMED) {
-    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? "Signal detected" : "Waiting for a voice";
+    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? copy.meterSignalDetected : copy.meterWaitingVoice;
     setMicCheckStatus(
-      boosted > MIC_SIGNAL_THRESHOLD ? "Mic check: we hear you" : "Mic check: speak a little louder",
+      boosted > MIC_SIGNAL_THRESHOLD ? copy.micCheckWeHearYou : copy.micCheckSpeakLouder,
       boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
     );
   } else if (flowState === FLOW.COUNTDOWN) {
-    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? "Signal detected" : "Listening closely";
+    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? copy.meterSignalDetected : copy.meterListeningClosely;
     setMicCheckStatus(
-      boosted > MIC_SIGNAL_THRESHOLD ? "Mic check: we hear you" : "Mic check: speak a little louder",
+      boosted > MIC_SIGNAL_THRESHOLD ? copy.micCheckWeHearYou : copy.micCheckSpeakLouder,
       boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
     );
   } else if (flowState === FLOW.RECORDING) {
-    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? "Recording signal" : "Listening closely";
+    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? copy.meterRecordingSignal : copy.meterListeningClosely;
     setMicCheckStatus(
-      boosted > MIC_SIGNAL_THRESHOLD ? "Mic check: signal is healthy" : "Mic check: very quiet input",
+      boosted > MIC_SIGNAL_THRESHOLD ? copy.micCheckHealthy : copy.micCheckVeryQuiet,
       boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
     );
   }
@@ -718,21 +786,22 @@ async function startRecording() {
 }
 
 function startCountdown() {
+  const copy = currentCopy();
   countdownToken += 1;
   const localToken = countdownToken;
   const countdownSeconds = shouldReduceMotion() ? 1 : PRE_ROLL_SECONDS;
   setFlowState(FLOW.COUNTDOWN);
   countdownValue.textContent = String(countdownSeconds);
   countdownLabel.textContent = shouldReduceMotion()
-    ? "Recording will begin shortly."
-    : "Recording starts in a moment.";
+    ? copy.countdownSoon
+    : copy.countdownMoment;
 
   const tick = (secondsLeft) => {
     if (localToken !== countdownToken || flowState !== FLOW.COUNTDOWN) return;
     countdownValue.textContent = String(secondsLeft);
     countdownLabel.textContent = shouldReduceMotion()
-      ? (secondsLeft > 1 ? "Recording will begin shortly." : "Recording starts now.")
-      : (secondsLeft > 1 ? "Recording starts in a moment." : "Recording starts now.");
+      ? (secondsLeft > 1 ? copy.countdownSoon : copy.countdownNow)
+      : (secondsLeft > 1 ? copy.countdownMoment : copy.countdownNow);
     if (!shouldReduceMotion()) {
       captureController.playPreRollTone(PRE_ROLL_TONE, secondsLeft <= 1);
     }
@@ -797,7 +866,7 @@ function stopRecording() {
   preview.hidden = false;
   quietTakeNeedsDecision = !!processed.quietWarning;
   quietTakeAnalysis = processed.quietWarning;
-  submitStatus.textContent = processed.note;
+  submitStatus.textContent = processingNoteForKey(processed.noteKey, processed.note);
 
   setFlowState(FLOW.REVIEW);
 }
@@ -806,7 +875,7 @@ function cancelCurrentTake() {
   if (flowState !== FLOW.RECORDING) return;
   stopRecordingNodes();
   clearTakeData({ clearReceipt: false });
-  submitStatus.textContent = "Take discarded. The microphone is still armed.";
+  submitStatus.textContent = currentCopy().takeDiscarded;
   setFlowState(FLOW.ARMED);
 }
 
@@ -822,7 +891,7 @@ async function recordAgain() {
 function acknowledgeQuietTake() {
   if (flowState !== FLOW.REVIEW || !quietTakeNeedsDecision) return;
   quietTakeNeedsDecision = false;
-  submitStatus.textContent = "Quiet take kept. Choose how the room should remember it.";
+  submitStatus.textContent = currentCopy().quietTakeKept;
   noteReviewActivity();
   render();
 }
@@ -832,10 +901,10 @@ async function submitCurrentTake() {
     return;
   }
   if (intakePaused()) {
-    throw new Error("Recording intake is paused by the steward right now.");
+    throw new Error(currentCopy().submitErrorPaused);
   }
 
-  submitStatus.textContent = "Submitting...";
+  submitStatus.textContent = currentCopy().submitQueued;
   setFlowState(FLOW.SUBMITTING);
   await teardownMicrophone();
 
@@ -864,11 +933,12 @@ async function submitSave(mode) {
   }
 
   const payload = await res.json();
-  submitStatus.textContent = MODE_COPY[mode].completeStatus;
+  const copy = currentCopy();
+  submitStatus.textContent = modeCopy(mode).completeStatus;
   setReceiptHtml(`
-    <div><strong>Revocation code</strong><span class="token">${payload.revocation_token}</span></div>
-    <div class="muted">Keep this code. A steward can revoke it later on this node.</div>
-    <div class="muted">Raw expires at: ${new Date(payload.artifact.expires_at).toLocaleString()}</div>
+    <div><strong>${copy.receiptCodeLabel}</strong><span class="token">${payload.revocation_token}</span></div>
+    <div class="muted">${copy.receiptCodeHelp}</div>
+    <div class="muted">${formatCopy(copy.receiptExpiryLabel, { date: localizedDateTime(payload.artifact.expires_at) })}</div>
   `);
 }
 
@@ -883,8 +953,8 @@ async function submitNoSave() {
   }
 
   const payload = await res.json();
-  submitStatus.textContent = "Playing once, then discarding.";
-  setReceiptText("This recording is being played once and then removed from the device.");
+  submitStatus.textContent = currentCopy().nosavePlaying;
+  setReceiptText(currentCopy().nosaveReceipt);
 
   await playUrlWithLightChain(payload.play_url, 0.0);
 
@@ -900,7 +970,7 @@ async function submitNoSave() {
     throw new Error(`Discard failed (${consumeRes.status})`);
   }
 
-  submitStatus.textContent = MODE_COPY.NOSAVE.completeStatus;
+  submitStatus.textContent = modeCopy("NOSAVE").completeStatus;
 }
 
 async function disarmToIdle() {
@@ -920,7 +990,7 @@ async function startFreshSession() {
 
 function selectMode(mode) {
   if (![FLOW.REVIEW, FLOW.SUBMITTING, FLOW.COMPLETE].includes(flowState)) return;
-  if (!(mode in MODE_COPY) || flowState === FLOW.SUBMITTING || quietTakeNeedsDecision) return;
+  if (!(mode in currentCopy().modes) || flowState === FLOW.SUBMITTING || quietTakeNeedsDecision) return;
 
   selectedMode = mode;
   choices.forEach((choice) => {
@@ -928,7 +998,7 @@ function selectMode(mode) {
   });
 
   if (flowState === FLOW.REVIEW) {
-    submitStatus.textContent = `${MODE_COPY[mode].name} selected.`;
+    submitStatus.textContent = formatCopy(currentCopy().selectionSelected, { name: modeCopy(mode).name });
     noteReviewActivity();
   }
   render();
@@ -948,20 +1018,21 @@ async function teardownMicrophone() {
 }
 
 function describeMicError(err) {
-  if (!err || !err.name) return "Check that the USB microphone is connected, then try again.";
-  if (err.name === "NotAllowedError") return "Browser access to the microphone was denied. Allow it and try again.";
-  if (err.name === "NotFoundError") return "No microphone was found. Check the USB microphone connection.";
-  if (err.name === "NotReadableError") return "The microphone is busy or unavailable. Reconnect it and try again.";
-  return err.message || "Check that the USB microphone is connected, then try again.";
+  const copy = currentCopy();
+  if (!err || !err.name) return copy.stageErrorCopyFallback;
+  if (err.name === "NotAllowedError") return copy.micErrorDenied;
+  if (err.name === "NotFoundError") return copy.micErrorMissing;
+  if (err.name === "NotReadableError") return copy.micErrorBusy;
+  return err.message || copy.stageErrorCopyFallback;
 }
 
 function describeSubmitError(err) {
   if (err && /423/.test(err.message || "")) {
     return surfaceState.maintenance_mode
-      ? "This node is in maintenance mode right now."
-      : "Recording intake is paused by the steward right now.";
+      ? currentCopy().submitErrorMaintenance
+      : currentCopy().submitErrorPaused;
   }
-  return err && err.message ? err.message : "Something went wrong while submitting the take.";
+  return err && err.message ? err.message : currentCopy().submitErrorFallback;
 }
 
 async function refreshSurfaceState() {
@@ -1046,7 +1117,7 @@ function shouldIgnoreShortcut(target) {
 function runAction(action) {
   if (typeof action !== "function") return;
   Promise.resolve(action()).catch((err) => {
-    setFlowState(FLOW.ERROR, { errorMessage: err.message || "Unexpected kiosk error." });
+    setFlowState(FLOW.ERROR, { errorMessage: err.message || currentCopy().unexpectedError });
   });
 }
 

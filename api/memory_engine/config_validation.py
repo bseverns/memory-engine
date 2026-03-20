@@ -41,6 +41,7 @@ def validate_runtime_settings(settings_obj) -> None:
 
     room_tone_source_mode = str(getattr(settings_obj, "ROOM_TONE_SOURCE_MODE", "synthetic") or "").strip().lower()
     room_tone_source_url = str(getattr(settings_obj, "ROOM_TONE_SOURCE_URL", "") or "").strip()
+    kiosk_default_language_code = str(getattr(settings_obj, "KIOSK_DEFAULT_LANGUAGE_CODE", "en") or "").strip().lower()
     if room_tone_source_mode not in {"synthetic", "site_ambience"}:
         errors.append("ROOM_TONE_SOURCE_MODE must be 'synthetic' or 'site_ambience'.")
     if room_tone_source_mode == "site_ambience":
@@ -74,6 +75,8 @@ def validate_runtime_settings(settings_obj) -> None:
     ensure_non_negative(errors, settings_obj, "ROOM_SCARCITY_SEVERE_THRESHOLD")
     ensure_non_negative(errors, settings_obj, "ROOM_SCARCITY_LOW_THRESHOLD")
     ensure_between(errors, settings_obj, "ROOM_ANTI_REPETITION_WINDOW_SIZE", 0, 50)
+    ensure_between(errors, settings_obj, "ROOM_SOURCE_SLICE_MAX_SECONDS", 5, 120)
+    ensure_positive(errors, settings_obj, "ROOM_SOURCE_SLICE_REVOLUTION_SECONDS")
     ensure_between(errors, settings_obj, "ROOM_OVERLAP_CHANCE", 0.0, 1.0, inclusive_min=True, inclusive_max=True)
     ensure_positive(errors, settings_obj, "ROOM_OVERLAP_MIN_POOL_SIZE")
     ensure_positive(errors, settings_obj, "ROOM_OVERLAP_MAX_LAYERS")
@@ -89,6 +92,9 @@ def validate_runtime_settings(settings_obj) -> None:
     ensure_between(errors, settings_obj, "OPS_DISK_CRITICAL_FREE_PERCENT", 0.0, 100.0)
     ensure_between(errors, settings_obj, "OPS_DISK_WARNING_FREE_PERCENT", 0.0, 100.0)
     ensure_positive(errors, settings_obj, "OPS_RETENTION_SOON_HOURS")
+
+    if kiosk_default_language_code not in {"en", "es_mx_ca"}:
+        errors.append("KIOSK_DEFAULT_LANGUAGE_CODE must be 'en' or 'es_mx_ca'.")
 
     fresh_max_age = float(getattr(settings_obj, "POOL_FRESH_MAX_AGE_HOURS", 0.0))
     worn_min_age = float(getattr(settings_obj, "POOL_WORN_MIN_AGE_HOURS", 0.0))

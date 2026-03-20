@@ -48,7 +48,7 @@
 
   function processRecordingSamples(samples, sampleRate) {
     if (!samples.length) {
-      return { samples, note: "Choose how this take should be handled.", quietWarning: null };
+      return { samples, note: "Choose how this take should be handled.", noteKey: "choose_mode", quietWarning: null };
     }
 
     const trimmed = trimSilence(
@@ -67,16 +67,19 @@
     applyFade(normalized, sampleRate, RECORDING_PROCESSING.fadeMs);
 
     const changedDuration = samples.length !== trimmed.length;
+    let noteKey = changedDuration ? "trimmed_and_smoothed" : "smoothed";
     let note = changedDuration
       ? "Take captured. Quiet edges were trimmed and the level was smoothed."
       : "Take captured. The level was smoothed for playback.";
     if (quietWarning) {
+      noteKey = "quiet_warning";
       note = "Take captured. The input stayed very quiet, so please keep or retake it before choosing a memory mode.";
     }
 
     return {
       samples: normalized,
       note,
+      noteKey,
       quietWarning,
     };
   }
@@ -228,6 +231,13 @@
     await ensureWorkletModule(ctx);
     const buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
     const peak = getBufferPeak(buffer);
+    const requestedStartSeconds = Math.max(0, Number(options.startMs || 0) / 1000);
+    const requestedDurationSeconds = Math.max(0, Number(options.durationMs || 0) / 1000);
+    const playbackStartSeconds = Math.min(Math.max(0, buffer.duration - 0.02), requestedStartSeconds);
+    const availableDurationSeconds = Math.max(0.02, buffer.duration - playbackStartSeconds);
+    const playbackDurationSeconds = requestedDurationSeconds > 0
+      ? Math.min(availableDurationSeconds, requestedDurationSeconds)
+      : availableDurationSeconds;
 
     const src = ctx.createBufferSource();
     src.buffer = buffer;
@@ -271,13 +281,13 @@
     const normalizedGain = peak > 0.0001
       ? clamp(PLAYBACK_SMOOTHING.targetPeak / peak, PLAYBACK_SMOOTHING.minGain, PLAYBACK_SMOOTHING.maxGain)
       : 1.0;
-    const fadeInSeconds = Math.min(PLAYBACK_SMOOTHING.fadeInSeconds, Math.max(0.02, buffer.duration / 4));
-    const fadeOutSeconds = Math.min(PLAYBACK_SMOOTHING.fadeOutSeconds, Math.max(0.04, buffer.duration / 3));
-    const releaseAt = Math.max(fadeInSeconds, buffer.duration - fadeOutSeconds);
+    const fadeInSeconds = Math.min(PLAYBACK_SMOOTHING.fadeInSeconds, Math.max(0.02, playbackDurationSeconds / 4));
+    const fadeOutSeconds = Math.min(PLAYBACK_SMOOTHING.fadeOutSeconds, Math.max(0.04, playbackDurationSeconds / 3));
+    const releaseAt = Math.max(fadeInSeconds, playbackDurationSeconds - fadeOutSeconds);
     gain.gain.setValueAtTime(0.0001, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(normalizedGain * 0.95 * outputGainMultiplier, ctx.currentTime + fadeInSeconds);
     gain.gain.setValueAtTime(normalizedGain * 0.95 * outputGainMultiplier, ctx.currentTime + releaseAt);
-    gain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + buffer.duration);
+    gain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + playbackDurationSeconds);
 
     src.connect(lowpass);
     lowpass.connect(shelf);
@@ -300,7 +310,7 @@
         resolve();
       };
       try {
-        src.start();
+        src.start(0, playbackStartSeconds, playbackDurationSeconds);
       } catch (err) {
         reject(err);
       }

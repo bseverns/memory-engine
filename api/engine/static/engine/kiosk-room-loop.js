@@ -536,6 +536,7 @@
         lane: cue.lane === "worn" ? "mid" : "any",
         density: cue.density === "dense" ? "medium" : (cue.density || "medium"),
         mood: cue.mood || currentMoodBias() || "any",
+        segment_variant: `layer:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
       });
       if (combinedExclusions.length) {
         params.set("exclude_ids", combinedExclusions.join(","));
@@ -565,6 +566,8 @@
         return;
       }
       await playUrlWithLightChain(payload.audio_url, payload.wear, {
+        startMs: payload.playback_start_ms,
+        durationMs: payload.playback_duration_ms,
         outputGainMultiplier: surfaceOutputGainMultiplier() * Number(config.roomOverlapGainMultiplier || 0.68),
       });
     }
@@ -764,6 +767,7 @@
             lane,
             density,
             mood,
+            segment_variant: `${movement.name}:${scene.name}:${loopMovementIndex}:${loopMovementProgress}:${loopSceneCueIndex}`,
           });
           const recentDensities = recentDensityWindow();
           if (recentDensities.length) {
@@ -812,6 +816,8 @@
           );
           setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.duckGain, loopKnownPoolSize)), 0.8);
           const playbackPromises = [playUrlWithLightChain(payload.audio_url, payload.wear, {
+            startMs: payload.playback_start_ms,
+            durationMs: payload.playback_duration_ms,
             outputGainMultiplier: surfaceOutputGainMultiplier(),
           })];
           if (layerPayload) {

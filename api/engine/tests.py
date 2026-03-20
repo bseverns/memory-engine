@@ -12,7 +12,7 @@ from memory_engine.config_validation import validate_runtime_settings
 
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative, Node, StewardAction, StewardState
 from .operator_auth import OPS_SESSION_KEY
-from .pool import pool_weight
+from .pool import artifact_playback_window, pool_weight
 from .room_composer import active_daypart_for_hour, quiet_hours_active_for_hour, room_schedule_snapshot
 
 
@@ -186,6 +186,24 @@ class EngineBehaviorTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["artifact_id"], artifact.id)
 
+    def test_pool_next_windows_long_recordings_into_room_slices(self):
+        artifact = self.make_active_artifact(
+            raw_uri="raw/long.wav",
+            duration_ms=300000,
+            created_at=timezone.now() - timedelta(hours=10),
+        )
+
+        response = self.client.get(f"/api/v1/pool/next?exclude_ids={artifact.id + 1000}")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["artifact_id"], artifact.id)
+        self.assertTrue(payload["playback_windowed"])
+        self.assertEqual(payload["playback_duration_ms"], 45000)
+        self.assertGreaterEqual(payload["playback_start_ms"], 0)
+        self.assertLessEqual(payload["playback_start_ms"], artifact.duration_ms - payload["playback_duration_ms"])
+        self.assertEqual(payload["playback_revolution_seconds"], 300)
+
     def test_pool_next_respects_requested_lane_and_mood_when_available(self):
         consent = self.make_consent("ROOM")
         self.make_active_artifact(
@@ -233,6 +251,33 @@ class EngineBehaviorTests(TestCase):
         settled_weight = pool_weight(settled, now, cooldown_seconds=90)
 
         self.assertGreater(settled_weight, fresh_weight)
+
+    def test_artifact_playback_window_moves_across_revolutions_for_long_recordings(self):
+        artifact = self.make_active_artifact(
+            raw_uri="raw/windowed.wav",
+            duration_ms=300000,
+            created_at=timezone.now() - timedelta(hours=12),
+        )
+
+        first = artifact_playback_window(
+            artifact,
+            timezone.make_aware(datetime(2026, 3, 20, 10, 0, 0), timezone.get_current_timezone()),
+            max_slice_seconds=45,
+            revolution_seconds=300,
+            variant="primary",
+        )
+        second = artifact_playback_window(
+            artifact,
+            timezone.make_aware(datetime(2026, 3, 20, 10, 5, 0), timezone.get_current_timezone()),
+            max_slice_seconds=45,
+            revolution_seconds=300,
+            variant="primary",
+        )
+
+        self.assertTrue(first["windowed"])
+        self.assertEqual(first["duration_ms"], 45000)
+        self.assertEqual(second["duration_ms"], 45000)
+        self.assertNotEqual(first["start_ms"], second["start_ms"])
 
     def test_pool_weight_prefers_light_release_after_dense_cluster(self):
         now = timezone.now()
@@ -321,6 +366,7 @@ class EngineBehaviorTests(TestCase):
                 "playback_paused": True,
                 "quieter_mode": True,
                 "mood_bias": "weathered",
+                "kiosk_language_code": "es_mx_ca",
                 "kiosk_accessibility_mode": "large_high_contrast",
                 "kiosk_force_reduced_motion": True,
                 "kiosk_max_recording_seconds": 90,
@@ -335,18 +381,20 @@ class EngineBehaviorTests(TestCase):
         self.assertTrue(state.playback_paused)
         self.assertTrue(state.quieter_mode)
         self.assertEqual(state.mood_bias, "weathered")
+        self.assertEqual(state.kiosk_language_code, "es_mx_ca")
         self.assertEqual(state.kiosk_accessibility_mode, "large_high_contrast")
         self.assertTrue(state.kiosk_force_reduced_motion)
         self.assertEqual(state.kiosk_max_recording_seconds, 90)
-        self.assertEqual(StewardAction.objects.count(), 8)
+        self.assertEqual(StewardAction.objects.count(), 9)
         payload = response.json()
         self.assertTrue(payload["operator_state"]["maintenance_mode"])
         self.assertEqual(payload["operator_state"]["mood_bias"], "weathered")
+        self.assertEqual(payload["operator_state"]["kiosk_language_code"], "es_mx_ca")
         self.assertEqual(payload["operator_state"]["kiosk_accessibility_mode"], "large_high_contrast")
         self.assertTrue(payload["operator_state"]["kiosk_force_reduced_motion"])
         self.assertEqual(payload["operator_state"]["kiosk_max_recording_seconds"], 90)
         self.assertTrue(payload["operator_state"]["intake_paused"])
-        self.assertEqual(len(payload["changes"]), 8)
+        self.assertEqual(len(payload["changes"]), 9)
 
     @patch("engine.api_views.put_bytes")
     def test_intake_pause_blocks_new_audio_artifact_creation(self, put_bytes_mock):
@@ -601,6 +649,8 @@ class EngineBehaviorTests(TestCase):
             ROOM_SCARCITY_SEVERE_THRESHOLD=3,
             ROOM_SCARCITY_LOW_THRESHOLD=6,
             ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            ROOM_SOURCE_SLICE_MAX_SECONDS=45,
+            ROOM_SOURCE_SLICE_REVOLUTION_SECONDS=300,
             ROOM_OVERLAP_CHANCE=0.1,
             ROOM_OVERLAP_MIN_POOL_SIZE=6,
             ROOM_OVERLAP_MAX_LAYERS=2,
@@ -608,6 +658,7 @@ class EngineBehaviorTests(TestCase):
             ROOM_OVERLAP_MAX_DELAY_MS=520,
             ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
             OPS_SESSION_TTL_SECONDS=43200,
+            KIOSK_DEFAULT_LANGUAGE_CODE="en",
             KIOSK_DEFAULT_MAX_RECORDING_SECONDS=120,
             OPS_POOL_LOW_COUNT=6,
             OPS_POOL_IMBALANCE_RATIO=0.72,
@@ -651,6 +702,8 @@ class EngineBehaviorTests(TestCase):
             ROOM_SCARCITY_SEVERE_THRESHOLD=8,
             ROOM_SCARCITY_LOW_THRESHOLD=6,
             ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            ROOM_SOURCE_SLICE_MAX_SECONDS=45,
+            ROOM_SOURCE_SLICE_REVOLUTION_SECONDS=300,
             ROOM_OVERLAP_CHANCE=0.1,
             ROOM_OVERLAP_MIN_POOL_SIZE=6,
             ROOM_OVERLAP_MAX_LAYERS=2,
@@ -658,6 +711,7 @@ class EngineBehaviorTests(TestCase):
             ROOM_OVERLAP_MAX_DELAY_MS=520,
             ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
             OPS_SESSION_TTL_SECONDS=43200,
+            KIOSK_DEFAULT_LANGUAGE_CODE="en",
             KIOSK_DEFAULT_MAX_RECORDING_SECONDS=120,
             OPS_POOL_LOW_COUNT=6,
             OPS_POOL_IMBALANCE_RATIO=0.72,
@@ -706,6 +760,8 @@ class EngineBehaviorTests(TestCase):
             ROOM_SCARCITY_SEVERE_THRESHOLD=3,
             ROOM_SCARCITY_LOW_THRESHOLD=6,
             ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            ROOM_SOURCE_SLICE_MAX_SECONDS=45,
+            ROOM_SOURCE_SLICE_REVOLUTION_SECONDS=300,
             ROOM_OVERLAP_CHANCE=0.1,
             ROOM_OVERLAP_MIN_POOL_SIZE=6,
             ROOM_OVERLAP_MAX_LAYERS=2,
@@ -713,6 +769,7 @@ class EngineBehaviorTests(TestCase):
             ROOM_OVERLAP_MAX_DELAY_MS=520,
             ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
             OPS_SESSION_TTL_SECONDS=43200,
+            KIOSK_DEFAULT_LANGUAGE_CODE="en",
             KIOSK_DEFAULT_MAX_RECORDING_SECONDS=120,
             OPS_POOL_LOW_COUNT=6,
             OPS_POOL_IMBALANCE_RATIO=0.72,
@@ -818,6 +875,8 @@ class EngineBehaviorTests(TestCase):
             ROOM_SCARCITY_SEVERE_THRESHOLD=3,
             ROOM_SCARCITY_LOW_THRESHOLD=6,
             ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            ROOM_SOURCE_SLICE_MAX_SECONDS=45,
+            ROOM_SOURCE_SLICE_REVOLUTION_SECONDS=300,
             ROOM_OVERLAP_CHANCE=0.1,
             ROOM_OVERLAP_MIN_POOL_SIZE=6,
             ROOM_OVERLAP_MAX_LAYERS=2,
@@ -825,6 +884,7 @@ class EngineBehaviorTests(TestCase):
             ROOM_OVERLAP_MAX_DELAY_MS=520,
             ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
             OPS_SESSION_TTL_SECONDS=43200,
+            KIOSK_DEFAULT_LANGUAGE_CODE="en",
             KIOSK_DEFAULT_MAX_RECORDING_SECONDS=120,
             OPS_POOL_LOW_COUNT=6,
             OPS_POOL_IMBALANCE_RATIO=0.72,
@@ -839,6 +899,62 @@ class EngineBehaviorTests(TestCase):
             validate_runtime_settings(config)
 
         self.assertIn("ROOM_TONE_SOURCE_URL", str(ctx.exception))
+
+    def test_runtime_config_validation_rejects_unknown_kiosk_language(self):
+        config = SimpleNamespace(
+            ALLOWED_HOSTS=["localhost"],
+            CSRF_TRUSTED_ORIGINS=["http://localhost"],
+            MINIO_ENDPOINT="http://minio:9000",
+            SECURE_SSL_REDIRECT=False,
+            SESSION_COOKIE_SECURE=False,
+            CSRF_COOKIE_SECURE=False,
+            WEAR_EPSILON_PER_PLAY=0.003,
+            POOL_PLAY_COOLDOWN_SECONDS=90,
+            POOL_CANDIDATE_LIMIT=40,
+            POOL_FRESH_MAX_AGE_HOURS=8.0,
+            POOL_WORN_MIN_AGE_HOURS=18.0,
+            POOL_FEATURED_RETURN_MIN_AGE_HOURS=168.0,
+            POOL_FEATURED_RETURN_MIN_ABSENCE_HOURS=96.0,
+            POOL_FEATURED_RETURN_BOOST=1.45,
+            POOL_DENSITY_CLUSTER_PENALTY=0.62,
+            POOL_DENSITY_RELEASE_BOOST=1.18,
+            RAW_TTL_HOURS_ROOM=48,
+            RAW_TTL_HOURS_FOSSIL=48,
+            DERIVATIVE_TTL_DAYS_FOSSIL=365,
+            ROOM_QUIET_HOURS_START_HOUR=22,
+            ROOM_QUIET_HOURS_END_HOUR=6,
+            ROOM_QUIET_HOURS_GAP_MULTIPLIER=1.2,
+            ROOM_QUIET_HOURS_TONE_MULTIPLIER=0.78,
+            ROOM_QUIET_HOURS_OUTPUT_GAIN_MULTIPLIER=0.72,
+            ROOM_TONE_SOURCE_MODE="synthetic",
+            ROOM_TONE_SOURCE_URL="",
+            ROOM_SCARCITY_SEVERE_THRESHOLD=3,
+            ROOM_SCARCITY_LOW_THRESHOLD=6,
+            ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            ROOM_SOURCE_SLICE_MAX_SECONDS=45,
+            ROOM_SOURCE_SLICE_REVOLUTION_SECONDS=300,
+            ROOM_OVERLAP_CHANCE=0.1,
+            ROOM_OVERLAP_MIN_POOL_SIZE=6,
+            ROOM_OVERLAP_MAX_LAYERS=2,
+            ROOM_OVERLAP_MIN_DELAY_MS=180,
+            ROOM_OVERLAP_MAX_DELAY_MS=520,
+            ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
+            OPS_SESSION_TTL_SECONDS=43200,
+            KIOSK_DEFAULT_LANGUAGE_CODE="fr",
+            KIOSK_DEFAULT_MAX_RECORDING_SECONDS=120,
+            OPS_POOL_LOW_COUNT=6,
+            OPS_POOL_IMBALANCE_RATIO=0.72,
+            OPS_DISK_CRITICAL_FREE_GB=3.0,
+            OPS_DISK_WARNING_FREE_GB=8.0,
+            OPS_DISK_CRITICAL_FREE_PERCENT=8.0,
+            OPS_DISK_WARNING_FREE_PERCENT=15.0,
+            OPS_RETENTION_SOON_HOURS=24,
+        )
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("KIOSK_DEFAULT_LANGUAGE_CODE", str(ctx.exception))
 
     @patch("engine.api_views.stream_key")
     def test_spectrogram_list_and_blob_proxy_expose_public_visual_url(self, stream_key_mock):

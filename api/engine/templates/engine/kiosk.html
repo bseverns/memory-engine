@@ -9,9 +9,9 @@
 <body class="recording-page">
   <div class="shell">
     <header class="hero">
-      <p class="eyebrow">Recording station</p>
-      <h1>Room Memory</h1>
-      <p class="sub">A quiet place to offer a voice or sound. This screen stays focused on the act of recording, then steps aside.</p>
+      <p id="heroEyebrow" class="eyebrow">Recording station</p>
+      <h1 id="heroTitle">Room Memory</h1>
+      <p id="heroSub" class="sub">A quiet place to offer a voice or sound. This screen stays focused on the act of recording, then steps aside.</p>
     </header>
 
     <section class="stage">
@@ -24,7 +24,7 @@
 
       <div class="meter-card">
         <div class="meter-head">
-          <span>Mic level</span>
+          <span id="meterLabel">Mic level</span>
           <span id="meterText">Waiting for microphone</span>
         </div>
         <div class="meter" aria-hidden="true">
@@ -39,11 +39,11 @@
       <div class="recording-strip">
         <span id="recStatus" class="status">Microphone not armed</span>
         <div class="timer-cluster">
-          <span class="timer-label">Elapsed</span>
+          <span id="elapsedLabel" class="timer-label">Elapsed</span>
           <span id="recTimer" class="timer">00:00</span>
         </div>
         <div class="timer-cluster">
-          <span class="timer-label">Remaining</span>
+          <span id="remainingLabel" class="timer-label">Remaining</span>
           <span id="remainingTimer" class="timer alt">02:00</span>
         </div>
       </div>
@@ -55,17 +55,17 @@
 
       <div class="shortcut-row">
         <span id="shortcutHint" class="shortcut">Space or Enter: arm microphone</span>
-        <span class="shortcut">Esc: reset</span>
+        <span id="shortcutReset" class="shortcut">Esc: reset</span>
       </div>
 
       <section id="operatorNotice" class="operator-notice" hidden aria-live="polite"></section>
 
-      <div class="hint">Please avoid names or identifying details.</div>
+      <div id="privacyHint" class="hint">Please avoid names or identifying details.</div>
       <audio id="preview" controls class="preview" hidden></audio>
       <section id="quietTakePanel" class="quiet-take-panel" hidden aria-live="polite">
         <div>
-          <p class="section-kicker">Quiet take check</p>
-          <h3>This recording came in very softly.</h3>
+          <p id="quietTakeKicker" class="section-kicker">Quiet take check</p>
+          <h3 id="quietTakeTitle">This recording came in very softly.</h3>
           <p id="quietTakeCopy" class="stage-copy quiet-take-copy">Listen back. If the softness is intentional, keep it. Otherwise retake it before choosing how the room should remember it.</p>
         </div>
         <div class="row quiet-take-actions">
@@ -76,7 +76,7 @@
       <section id="reviewTimeoutPanel" class="review-timeout-panel" hidden aria-live="polite">
         <div class="review-timeout-head">
           <span id="reviewTimeoutChip" class="shortcut review-timeout-chip">Review resets in 01:30</span>
-          <span class="muted">Touch the screen, use the keyboard, or play the preview to keep this session open.</span>
+          <span id="reviewTimeoutHint" class="muted">Touch the screen, use the keyboard, or play the preview to keep this session open.</span>
         </div>
         <div class="review-timeout-track" aria-hidden="true">
           <div id="reviewTimeoutFill" class="review-timeout-fill"></div>
@@ -88,18 +88,18 @@
         <div class="choices">
           <button class="choice" data-mode="ROOM" data-key="1" aria-keyshortcuts="1">
             <span class="choice-key">1</span>
-            <strong>Room Memory</strong>
-            <span>Stored on this device. Deleted in about 48 hours. Played in the room.</span>
+            <strong class="choice-title">Room Memory</strong>
+            <span class="choice-copy">Stored on this device. Deleted in about 48 hours. Played in the room.</span>
           </button>
           <button class="choice" data-mode="FOSSIL" data-key="2" aria-keyshortcuts="2">
             <span class="choice-key">2</span>
-            <strong>Fossil Only</strong>
-            <span>Raw fades sooner. A spectrogram image and a low-storage audio residue may remain locally for longer.</span>
+            <strong class="choice-title">Fossil Only</strong>
+            <span class="choice-copy">Raw fades sooner. A spectrogram image and a low-storage audio residue may remain locally for longer.</span>
           </button>
           <button class="choice" data-mode="NOSAVE" data-key="3" aria-keyshortcuts="3">
             <span class="choice-key">3</span>
-            <strong>Don’t Save</strong>
-            <span>Play once immediately, then discard.</span>
+            <strong class="choice-title">Don’t Save</strong>
+            <span class="choice-copy">Play once immediately, then discard.</span>
           </button>
         </div>
         <div class="row">
@@ -109,14 +109,14 @@
       </section>
 
       <section id="receiptPanel" class="panel receipt-panel" hidden>
-        <p class="section-kicker">Receipt</p>
-        <h3>What to keep</h3>
+        <p id="receiptKicker" class="section-kicker">Receipt</p>
+        <h3 id="receiptTitle">What to keep</h3>
         <div id="receipt" class="receipt muted"></div>
       </section>
 
       <div id="countdownOverlay" class="countdown-overlay" hidden>
         <div class="countdown-card">
-          <p class="section-kicker">Get ready</p>
+          <p id="countdownKicker" class="section-kicker">Get ready</p>
           <div id="countdownValue" class="countdown-value">3</div>
           <p id="countdownLabel" class="countdown-label">Recording starts in a moment.</p>
         </div>
@@ -124,11 +124,12 @@
     </section>
 
     <footer>
-      <small>Local-first node. Nothing is published. Revocation works only on this node’s network.</small>
+      <small id="footerCopy">Local-first node. Nothing is published. Revocation works only on this node’s network.</small>
     </footer>
   </div>
 
   {{ kiosk_config|json_script:"kiosk-config" }}
+  <script src="/static/engine/kiosk-copy.js"></script>
   <script src="/static/engine/kiosk-audio.js"></script>
   <script src="/static/engine/kiosk-capture.js"></script>
   <script src="/static/engine/kiosk-room-loop.js"></script>

@@ -110,6 +110,13 @@
     return `${actor} · ${timestamp}`;
   }
 
+  function describeKioskLanguage(code) {
+    const normalized = String(code || "").trim().toLowerCase();
+    if (normalized === "es_mx_ca") return "español";
+    if (normalized === "en") return "english";
+    return normalized;
+  }
+
   function retentionCards(retention) {
     if (!retention) {
       return [{
@@ -219,6 +226,7 @@
       opsPlaybackPaused: doc.getElementById("opsPlaybackPaused"),
       opsQuieterMode: doc.getElementById("opsQuieterMode"),
       opsMoodBias: doc.getElementById("opsMoodBias"),
+      opsKioskLanguageCode: doc.getElementById("opsKioskLanguageCode"),
       opsKioskAccessibilityMode: doc.getElementById("opsKioskAccessibilityMode"),
       opsKioskReducedMotion: doc.getElementById("opsKioskReducedMotion"),
       opsKioskMaxRecordingSeconds: doc.getElementById("opsKioskMaxRecordingSeconds"),
@@ -238,6 +246,9 @@
     dom.opsQuieterMode.checked = Boolean(operatorState.quieter_mode);
     if (dom.opsMoodBias) {
       dom.opsMoodBias.value = String(operatorState.mood_bias || "");
+    }
+    if (dom.opsKioskLanguageCode) {
+      dom.opsKioskLanguageCode.value = String(operatorState.kiosk_language_code || "");
     }
     if (dom.opsKioskAccessibilityMode) {
       dom.opsKioskAccessibilityMode.value = String(operatorState.kiosk_accessibility_mode || "");
@@ -287,6 +298,7 @@
       if (state.playback_paused) labels.push("playback paused");
       if (state.quieter_mode) labels.push("quieter mode");
       if (state.mood_bias) labels.push(`mood bias: ${state.mood_bias}`);
+      if (state.kiosk_language_code) labels.push(`kiosk language: ${describeKioskLanguage(state.kiosk_language_code)}`);
       if (state.kiosk_accessibility_mode) labels.push("accessible kiosk");
       if (state.kiosk_force_reduced_motion) labels.push("reduced-motion kiosk");
       if (Number(state.kiosk_max_recording_seconds || 120) !== 120) {
@@ -370,6 +382,7 @@
             playback_paused: Boolean(dom.opsPlaybackPaused?.checked),
             quieter_mode: Boolean(dom.opsQuieterMode?.checked),
             mood_bias: String(dom.opsMoodBias?.value || ""),
+            kiosk_language_code: String(dom.opsKioskLanguageCode?.value || ""),
             kiosk_accessibility_mode: String(dom.opsKioskAccessibilityMode?.value || ""),
             kiosk_force_reduced_motion: Boolean(dom.opsKioskReducedMotion?.checked),
             kiosk_max_recording_seconds: Number(dom.opsKioskMaxRecordingSeconds?.value || 120),

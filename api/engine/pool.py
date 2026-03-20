@@ -1,3 +1,4 @@
+import hashlib
 import random
 from datetime import timedelta
 
@@ -43,6 +44,47 @@ def artifact_playback_key(artifact: Artifact, now):
         return artifact.raw_uri
     essence = artifact_essence_derivative(artifact, now)
     return essence.uri if essence else ""
+
+
+def artifact_playback_window(
+    artifact: Artifact,
+    now,
+    *,
+    max_slice_seconds: int | None = None,
+    revolution_seconds: int | None = None,
+    variant: str = "",
+):
+    max_slice_ms = max(1000, int((max_slice_seconds or settings.ROOM_SOURCE_SLICE_MAX_SECONDS) * 1000))
+    cycle_seconds = max(1, int(revolution_seconds or settings.ROOM_SOURCE_SLICE_REVOLUTION_SECONDS))
+    full_duration_ms = max(0, int(artifact.duration_ms or 0))
+    playback_duration_ms = min(full_duration_ms, max_slice_ms) if full_duration_ms else 0
+    revolution_index = int(now.timestamp()) // cycle_seconds
+
+    if full_duration_ms <= playback_duration_ms:
+        return {
+            "start_ms": 0,
+            "duration_ms": playback_duration_ms,
+            "full_duration_ms": full_duration_ms,
+            "windowed": False,
+            "revolution_index": revolution_index,
+        }
+
+    available_offset_ms = max(0, full_duration_ms - playback_duration_ms)
+    seed_input = f"{artifact.id}:{revolution_index}:{variant or 'base'}".encode("utf-8")
+    digest = hashlib.sha256(seed_input).digest()
+    ratio = int.from_bytes(digest[:8], "big") / float((1 << 64) - 1)
+    raw_start_ms = int(round(available_offset_ms * ratio))
+    quantum_ms = 250
+    start_ms = int(round(raw_start_ms / quantum_ms) * quantum_ms)
+    start_ms = max(0, min(available_offset_ms, start_ms))
+
+    return {
+        "start_ms": start_ms,
+        "duration_ms": playback_duration_ms,
+        "full_duration_ms": full_duration_ms,
+        "windowed": True,
+        "revolution_index": revolution_index,
+    }
 
 
 def artifact_age_hours(artifact: Artifact, now) -> float:

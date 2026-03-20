@@ -99,6 +99,7 @@ class StewardState(models.Model):
     quieter_mode = models.BooleanField(default=False)
     maintenance_mode = models.BooleanField(default=False)
     mood_bias = models.CharField(max_length=32, blank=True, default="")
+    kiosk_language_code = models.CharField(max_length=32, blank=True, default="")
     kiosk_accessibility_mode = models.CharField(max_length=32, blank=True, default="")
     kiosk_force_reduced_motion = models.BooleanField(default=False)
     kiosk_max_recording_seconds = models.PositiveIntegerField(default=120)
