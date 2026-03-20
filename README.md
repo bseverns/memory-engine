@@ -102,6 +102,8 @@ Backup and restore helpers are included for operators:
 ```bash
 ./scripts/backup.sh
 ./scripts/restore.sh --from backups/20260317-120000
+./scripts/export_bundle.sh --latest
+./scripts/support_bundle.sh
 ```
 
 Fast maintenance helpers are also included:
@@ -236,7 +238,9 @@ Caddy will then be able to obtain a public certificate automatically, assuming p
 ## Operator view
 - `/ops/` now sits behind the shared steward secret in `OPS_SHARED_SECRET`.
 - After sign-in, `/ops/` provides the node state (`ready`, `degraded`, `broken`), dependency checks, current artifact counts, and a quick view of fresh/mid/worn lane balance.
-- `/ops/` also carries live steward controls for pausing intake, pausing playback, and switching the room into a quieter mode.
+- `/ops/` also carries live steward controls for maintenance mode, pausing intake, pausing playback, and switching the room into a quieter mode.
+- `/ops/` now includes a retention view for raw-audio expiry pressure and fossil hold posture.
+- `/ops/` recent events now include revocations, restores, exports, and live control changes.
 
 ## Decay feel tuning (v0)
 The kiosk applies **stateful wear** on each playback (raw audio remains immutable). Wear is stored server-side and mapped to gentle “memory loss” effects client-side (WebAudio).
@@ -266,6 +270,8 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 - `scripts/first_boot.sh` — bootstrap strong secrets and node identity before deployment
 - `scripts/backup.sh` — snapshot Postgres + MinIO data
 - `scripts/restore.sh` — restore Postgres + MinIO data from a backup folder
+- `scripts/export_bundle.sh` — package one backup snapshot into a portable handoff archive with checksums
+- `scripts/support_bundle.sh` — gather redacted env, health, status, and recent logs for remote support
 - `scripts/status.sh` — compose and backend readiness summary for operators
 - `api/` — Django project + Celery worker
 - `api/engine/` — models, API endpoints, tasks

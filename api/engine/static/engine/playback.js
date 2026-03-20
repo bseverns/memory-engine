@@ -32,6 +32,13 @@
       const operatorState = payload.operator_state || {};
       roomLoopController.setSurfaceState(operatorState);
 
+      if (operatorState.maintenance_mode) {
+        roomLoopController.stop("Playback paused for maintenance.");
+        updateSurfaceNote("This node is in maintenance mode. Listening playback is intentionally offline.");
+        statusEl.textContent = "Playback is offline while the steward performs maintenance.";
+        return;
+      }
+
       if (operatorState.playback_paused) {
         roomLoopController.stop("Playback paused by steward.");
         updateSurfaceNote("Playback is paused by the steward on this machine.");
@@ -58,6 +65,11 @@
   }
 
   function requestPlaybackStart(userInitiated) {
+    if (roomLoopController.getSurfaceState && roomLoopController.getSurfaceState().maintenance_mode) {
+      updateSurfaceNote("This node is in maintenance mode. Playback will resume when the steward clears it.");
+      statusEl.textContent = "Playback is offline while the steward performs maintenance.";
+      return;
+    }
     autostartRequested = true;
     updateSurfaceNote(
       userInitiated

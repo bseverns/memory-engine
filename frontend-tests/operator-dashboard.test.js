@@ -55,3 +55,16 @@ test("actionCards formats recent steward changes", () => {
   assert.equal(cards[0].title, "intake paused enabled");
   assert.match(cards[0].detail, /operator@127\.0\.0\.1/);
 });
+
+test("retentionCards summarize upcoming raw and fossil retention edges", () => {
+  const cards = operatorDashboard.retentionCards({
+    soon_window_hours: 24,
+    raw_expiring_soon: 2,
+    next_raw_expiry_at: "2026-03-21T10:00:00Z",
+    next_fossil_expiry_at: "2026-04-01T12:00:00Z",
+  });
+
+  assert.equal(cards.length, 3);
+  assert.equal(cards[0].title, "Raw audio expiring in 24h");
+  assert.match(cards[0].detail, /2 recording/);
+});

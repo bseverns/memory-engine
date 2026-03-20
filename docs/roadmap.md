@@ -11,6 +11,8 @@
 - `scripts/first_boot.sh` to stamp out development defaults and set node identity
 - `scripts/deploy.sh` for public-IP-now / domain-later rollout
 - `scripts/backup.sh` and `scripts/restore.sh` for Postgres + MinIO recovery
+- `scripts/export_bundle.sh` for portable archival or migration handoff bundles
+- `scripts/support_bundle.sh` for remote-friendly support log collection
 - Shared shell helpers to keep operator scripts consistent
 - `scripts/check.sh` and `scripts/status.sh` for quicker maintenance passes
 - `scripts/doctor.sh` to check `.env`, compose state, storage reachability, and browser/TLS constraints
@@ -20,7 +22,15 @@
 - Disk-space and storage-pressure warnings surfaced in `/ops/`
 - Pool-health warnings in `/ops/` when lanes or moods become too sparse or imbalanced
 - Simple steward controls for pausing intake, pausing playback, or switching to a quieter mode
+- Maintenance mode so intake and audience playback can be suspended cleanly
 - Persisted steward state and audit rows for live control changes
+- Audit logging for revocation, restore, export, and stewardship actions
+- Retention summary in `/ops/` showing raw-audio expiry pressure and fossil hold posture
+- Safer restore flow with confirmation prompts and automatic pre-restore snapshots
+- Rotation notes and helper steps for Postgres, Django, and MinIO credential changes
+- MinIO deployment notes covering root-backed vs separate app credentials
+- Documented migration path from compose-managed MinIO to an external S3-compatible backend
+- Decision notes for MinIO bucket versioning and object locking posture
 
 ### Recording experience
 - Split the browser experience into a dedicated recording station at `/kiosk/` and a separate playback surface at `/room/`
@@ -39,6 +49,7 @@
 - Weighted pool selection with cooldown to reduce obvious repetition
 - Selection weighting that also accounts for age and recentness, so the room favors settled material without locking into the oldest memories
 - Separate "fresh" and "worn" playback lanes so the room has more temporal depth
+- Explicit "essence" afterlife for `FOSSIL` memories so raw audio can expire while a smaller residue remains playable
 - Gentle room-tone bedding behind sparse or empty playback moments
 - Stronger scene composition in the pool
   - weighted clustering by density
@@ -81,9 +92,6 @@
 - Push beyond metadata-derived mood shaping into a room state that responds to context
   - learn from time-of-day or room activity patterns
   - explore whether semantic or transcript-aware grouping is worth the complexity
-- Decide whether older memories should gain an explicit "essence only" afterlife
-  - extract a low-storage archival derivative for room tone or residue
-  - retire raw audio by policy once that derivative exists
 - Add daypart scheduling so movement pacing and density can vary across morning, afternoon, and evening
 - Add steward-tunable room-tone options, including the ability to swap the synthetic bed for site-specific ambience
 - Add rare overlap or layering events so the room can occasionally feel accumulative instead of strictly sequential
@@ -94,17 +102,7 @@
 - Add a way to pin or bias certain moods temporarily during performances or steward-led sessions
 
 ### Operator / stewardship
-- Add export bundles for backup, migration, or archival handoff
 - Add one-command firewall / restart-on-boot setup for a specific server OS target
-- Add a safer restore flow with pre-restore snapshots and confirmation prompts
-- Decide whether production MinIO should keep using the default root-backed app credentials or switch to a separately provisioned service identity
-- Add rotation notes and helper steps for Postgres, Django, and MinIO credential changes
-- Add audit logging for revocation, restore, export, and stewardship actions
-- Add a way to mark a node as maintenance-only so audience playback and intake can be suspended cleanly
-- Add remote-friendly log bundling for support without handing over full server access
-- Add a retention dashboard that shows expected raw-audio expiry and fossil retention windows
-- Add a documented migration path for moving from compose-managed MinIO to an external S3-compatible backend
-- Add a decision and notes for whether MinIO bucket versioning or object locking is worth enabling in production
 
 ## Later
 
@@ -137,7 +135,6 @@
 - Whether the pool should learn from time-of-day or room activity patterns
 - Whether the kiosk should expose revocation and moderation tools directly, or keep those fully steward-side
 - Whether transcripts, embeddings, or other semantic grouping would meaningfully improve scene composition
-- Whether the room should eventually extract a low-storage "essence" derivative from older recordings instead of keeping every raw sample playable until expiry
 - Whether the audience experience should remain audio-only or eventually include light, projection, or fossil visuals
 - Whether multiple kiosks should share a pool or remain strictly room-local
 - Whether revocation should stay steward-mediated or gain a participant-facing path using the receipt code

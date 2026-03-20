@@ -72,6 +72,34 @@
     <section class="panel dashboard-panel">
       <div class="panel-head">
         <div>
+          <p class="section-kicker">Retention</p>
+          <h3>Raw expiry and fossil hold</h3>
+        </div>
+      </div>
+      <div class="status-grid">
+        <article class="status-card">
+          <p class="section-kicker">Raw audio held</p>
+          <div id="opsRetentionRawHeld" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Raw expiring soon</p>
+          <div id="opsRetentionRawSoon" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Fossils retained</p>
+          <div id="opsRetentionFossils" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Residue only</p>
+          <div id="opsRetentionResidue" class="status-number">-</div>
+        </article>
+      </div>
+      <div id="opsRetentionSummary" class="component-list"></div>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
           <p class="section-kicker">Dependencies</p>
           <h3>Readiness checks</h3>
         </div>
@@ -91,6 +119,13 @@
         </div>
       </div>
       <form id="opsControlsForm" class="ops-controls-form">
+        <label class="ops-toggle">
+          <input id="opsMaintenanceMode" type="checkbox" name="maintenance_mode"/>
+          <span>
+            <strong>Maintenance mode</strong>
+            <span>Suspends both intake and room playback so the node can be serviced cleanly.</span>
+          </span>
+        </label>
         <label class="ops-toggle">
           <input id="opsIntakePaused" type="checkbox" name="intake_paused"/>
           <span>
@@ -119,8 +154,8 @@
       </form>
       <div class="panel-head">
         <div>
-          <p class="section-kicker">Recent steward actions</p>
-          <h3>Last control changes</h3>
+          <p class="section-kicker">Recent operator events</p>
+          <h3>Last changes and interventions</h3>
         </div>
       </div>
       <div id="opsRecentActions" class="component-list"></div>

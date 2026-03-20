@@ -150,6 +150,7 @@ let surfaceState = {
   intake_paused: false,
   playback_paused: false,
   quieter_mode: false,
+  maintenance_mode: false,
   ...(kioskConfig.operatorState || {}),
 };
 let surfaceStateInterval = 0;
@@ -186,7 +187,11 @@ function render() {
 }
 
 function intakePaused() {
-  return Boolean(surfaceState.intake_paused);
+  return Boolean(surfaceState.intake_paused || surfaceState.maintenance_mode);
+}
+
+function maintenanceMode() {
+  return Boolean(surfaceState.maintenance_mode);
 }
 
 function updateOperatorNotice() {
@@ -198,6 +203,10 @@ function updateOperatorNotice() {
   }
 
   operatorNotice.hidden = false;
+  if (surfaceState.maintenance_mode) {
+    operatorNotice.textContent = "This node is in maintenance mode. Recording and room playback are resting until the steward returns it to service.";
+    return;
+  }
   operatorNotice.textContent = flowState === FLOW.REVIEW && wavBlob
     ? "Recording intake is paused by the steward. New submissions are temporarily on hold."
     : "Recording intake is paused by the steward. This station is resting until intake resumes.";
@@ -441,12 +450,16 @@ function updateStage() {
   maxDurationHint.textContent = `Max ${formatDuration(MAX_RECORDING_MS)}`;
 
   if (intakePaused() && flowState === FLOW.IDLE) {
-    stageBadge.textContent = "Paused";
-    stageTitle.textContent = "This recording station is resting.";
-    stageCopy.textContent = "A steward has paused intake for a while. Nothing new will be recorded until intake resumes.";
+    stageBadge.textContent = maintenanceMode() ? "Maintenance" : "Paused";
+    stageTitle.textContent = maintenanceMode()
+      ? "This recording station is offline for maintenance."
+      : "This recording station is resting.";
+    stageCopy.textContent = maintenanceMode()
+      ? "A steward has taken this node out of service for a while. Recording will return when maintenance mode is cleared."
+      : "A steward has paused intake for a while. Nothing new will be recorded until intake resumes.";
     micStatus.textContent = "Microphone asleep";
-    recStatus.textContent = "Recording intake paused";
-    shortcutHint.textContent = "Recording is paused by the steward";
+    recStatus.textContent = maintenanceMode() ? "Node in maintenance mode" : "Recording intake paused";
+    shortcutHint.textContent = maintenanceMode() ? "Node temporarily offline" : "Recording is paused by the steward";
     meterText.textContent = "Waiting for intake to resume";
     setMicCheckStatus("Mic check asleep", "quiet");
     setMeterLevel(0);
@@ -470,14 +483,22 @@ function updateStage() {
     meterText.textContent = "Requesting access";
     setMicCheckStatus("Mic check starting up", "quiet");
   } else if (flowState === FLOW.ARMED) {
-    stageBadge.textContent = intakePaused() ? "Paused" : "Ready";
-    stageTitle.textContent = intakePaused() ? "The steward has paused recording intake." : "You are ready, but not yet recording.";
+    stageBadge.textContent = intakePaused() ? (maintenanceMode() ? "Maintenance" : "Paused") : "Ready";
+    stageTitle.textContent = intakePaused()
+      ? (maintenanceMode() ? "This node is offline for maintenance." : "The steward has paused recording intake.")
+      : "You are ready, but not yet recording.";
     stageCopy.textContent = intakePaused()
-      ? "This take can be reset, but a new recording cannot begin until intake resumes."
+      ? (maintenanceMode()
+        ? "This take can be reset, but recording cannot begin until the node returns to service."
+        : "This take can be reset, but a new recording cannot begin until intake resumes.")
       : "Speak a little if you want to watch the meter. Begin when the moment feels settled.";
     micStatus.textContent = micLabel;
-    recStatus.textContent = intakePaused() ? "Recording intake paused" : "Standing by";
-    shortcutHint.textContent = intakePaused() ? "Recording is paused by the steward" : "Space or Enter: start recording";
+    recStatus.textContent = intakePaused()
+      ? (maintenanceMode() ? "Node in maintenance mode" : "Recording intake paused")
+      : "Standing by";
+    shortcutHint.textContent = intakePaused()
+      ? (maintenanceMode() ? "Node temporarily offline" : "Recording is paused by the steward")
+      : "Space or Enter: start recording";
     meterText.textContent = hasMic ? "Listening for room sound" : "Microphone unavailable";
   } else if (flowState === FLOW.COUNTDOWN) {
     stageBadge.textContent = "Get ready";
@@ -501,12 +522,14 @@ function updateStage() {
       stageTitle.textContent = "This take arrived very softly.";
       stageCopy.textContent = "Listen once. Keep it if that softness is right, or retake it before choosing what happens next.";
     } else {
-      stageBadge.textContent = intakePaused() ? "Paused" : "Review";
+      stageBadge.textContent = intakePaused() ? (maintenanceMode() ? "Maintenance" : "Paused") : "Review";
       stageTitle.textContent = intakePaused()
-        ? "This take is waiting while intake is paused."
+        ? (maintenanceMode() ? "This take is waiting while the node is offline." : "This take is waiting while intake is paused.")
         : (selectedMode ? `Ready to ${MODE_COPY[selectedMode].submitLabel.toLowerCase()}.` : "Listen back, then choose what follows.");
       stageCopy.textContent = intakePaused()
-        ? "A steward paused intake before this take was submitted. You can keep the screen open or reset for the next person once intake resumes."
+        ? (maintenanceMode()
+          ? "A steward put this node into maintenance mode before the take was submitted. Reset for the next person after the node returns to service."
+          : "A steward paused intake before this take was submitted. You can keep the screen open or reset for the next person once intake resumes.")
         : (selectedMode
           ? MODE_COPY[selectedMode].reviewCopy
           : "Use the preview if you want. Then choose 1, 2, or 3 for the next step.");
@@ -516,7 +539,7 @@ function updateStage() {
     shortcutHint.textContent = quietTakeNeedsDecision
       ? "Space or Enter: keep this take"
       : (intakePaused()
-        ? "Submission is paused by the steward"
+        ? (maintenanceMode() ? "Node temporarily offline" : "Submission is paused by the steward")
         : (selectedMode ? "Space or Enter: submit selection" : "Press 1, 2, or 3 to choose a memory mode"));
     meterText.textContent = quietTakeNeedsDecision ? "Preview this take before deciding" : (hasMic ? "Microphone still armed" : "Microphone asleep");
     setMicCheckStatus(
@@ -902,7 +925,9 @@ function describeMicError(err) {
 
 function describeSubmitError(err) {
   if (err && /423/.test(err.message || "")) {
-    return "Recording intake is paused by the steward right now.";
+    return surfaceState.maintenance_mode
+      ? "This node is in maintenance mode right now."
+      : "Recording intake is paused by the steward right now.";
   }
   return err && err.message ? err.message : "Something went wrong while submitting the take.";
 }

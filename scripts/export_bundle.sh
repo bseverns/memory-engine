@@ -1,0 +1,95 @@
+#!/usr/bin/env sh
+set -eu
+
+# Package an existing backup snapshot into a single archival tarball with a
+# manifest and checksums for easier handoff or migration.
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO_ROOT=$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)
+BACKUP_ROOT="${REPO_ROOT}/backups"
+EXPORT_ROOT="${REPO_ROOT}/exports"
+
+. "${SCRIPT_DIR}/_common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  scripts/export_bundle.sh --from /path/to/backup-dir
+  scripts/export_bundle.sh --latest
+
+Behavior:
+  - packages one backup snapshot into exports/
+  - writes a bundle manifest and file checksums
+  - produces a .tgz that can be moved off-machine
+EOF
+}
+
+BACKUP_DIR=""
+USE_LATEST=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --from)
+      [ "$#" -ge 2 ] || fail "--from requires a value"
+      BACKUP_DIR="$2"
+      shift 2
+      ;;
+    --latest)
+      USE_LATEST=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      fail "unknown argument: $1"
+      ;;
+  esac
+done
+
+if [ "${USE_LATEST}" -eq 1 ]; then
+  BACKUP_DIR=$(find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)
+fi
+
+[ -n "${BACKUP_DIR}" ] || fail "provide --from or --latest"
+[ -d "${BACKUP_DIR}" ] || fail "backup directory does not exist: ${BACKUP_DIR}"
+[ -f "${BACKUP_DIR}/postgres.sql.gz" ] || fail "missing postgres.sql.gz in ${BACKUP_DIR}"
+[ -f "${BACKUP_DIR}/minio-data.tgz" ] || fail "missing minio-data.tgz in ${BACKUP_DIR}"
+
+STAMP=$(date +"%Y%m%d-%H%M%S")
+BUNDLE_DIR="${EXPORT_ROOT}/memory-engine-export-${STAMP}"
+ARCHIVE_PATH="${BUNDLE_DIR}.tgz"
+
+mkdir -p "${BUNDLE_DIR}"
+cp "${BACKUP_DIR}/postgres.sql.gz" "${BUNDLE_DIR}/"
+cp "${BACKUP_DIR}/minio-data.tgz" "${BUNDLE_DIR}/"
+if [ -f "${BACKUP_DIR}/manifest.txt" ]; then
+  cp "${BACKUP_DIR}/manifest.txt" "${BUNDLE_DIR}/source-manifest.txt"
+fi
+
+GIT_HEAD=$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || printf '%s' "unknown")
+
+cat > "${BUNDLE_DIR}/bundle-manifest.txt" <<EOF
+created_at=${STAMP}
+source_backup_dir=${BACKUP_DIR}
+source_git_head=${GIT_HEAD}
+postgres_dump=postgres.sql.gz
+minio_archive=minio-data.tgz
+EOF
+
+(
+  cd "${BUNDLE_DIR}"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum postgres.sql.gz minio-data.tgz bundle-manifest.txt > CHECKSUMS.txt
+  else
+    shasum -a 256 postgres.sql.gz minio-data.tgz bundle-manifest.txt > CHECKSUMS.txt
+  fi
+)
+
+tar -C "${EXPORT_ROOT}" -czf "${ARCHIVE_PATH}" "$(basename "${BUNDLE_DIR}")"
+
+COMPOSE_BIN=$(detect_compose_bin)
+log_operator_event "export_bundle.created" "export-script" "Created export bundle ${ARCHIVE_PATH}"
+
+info "Export bundle created: ${ARCHIVE_PATH}"

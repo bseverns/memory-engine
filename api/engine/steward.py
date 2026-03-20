@@ -5,6 +5,15 @@ from django.db import transaction
 from .models import StewardAction, StewardState
 
 
+def record_steward_action(*, action: str, actor: str, detail: str = "", payload: dict | None = None) -> StewardAction:
+    return StewardAction.objects.create(
+        action=action,
+        actor=actor or "operator",
+        detail=detail,
+        payload=payload or {},
+    )
+
+
 def load_steward_state() -> StewardState:
     return StewardState.load()
 
@@ -15,6 +24,7 @@ def steward_state_payload(state: StewardState | None = None) -> dict:
         "intake_paused": bool(state.intake_paused),
         "playback_paused": bool(state.playback_paused),
         "quieter_mode": bool(state.quieter_mode),
+        "maintenance_mode": bool(state.maintenance_mode),
         "updated_at": state.updated_at,
     }
 
@@ -33,7 +43,14 @@ def recent_steward_actions(limit: int = 8) -> list[dict]:
 
 
 @transaction.atomic
-def update_steward_state(*, intake_paused: bool, playback_paused: bool, quieter_mode: bool, actor: str) -> tuple[StewardState, list[dict]]:
+def update_steward_state(
+    *,
+    intake_paused: bool,
+    playback_paused: bool,
+    quieter_mode: bool,
+    maintenance_mode: bool,
+    actor: str,
+) -> tuple[StewardState, list[dict]]:
     state = StewardState.objects.select_for_update().get_or_create(singleton_key="default")[0]
 
     changes = []
@@ -41,6 +58,7 @@ def update_steward_state(*, intake_paused: bool, playback_paused: bool, quieter_
         "intake_paused": bool(intake_paused),
         "playback_paused": bool(playback_paused),
         "quieter_mode": bool(quieter_mode),
+        "maintenance_mode": bool(maintenance_mode),
     }
 
     for field_name, next_value in next_values.items():
@@ -56,7 +74,7 @@ def update_steward_state(*, intake_paused: bool, playback_paused: bool, quieter_
             "action": action_name,
             "detail": f"{field_name.replace('_', ' ')} {detail}",
         })
-        StewardAction.objects.create(
+        record_steward_action(
             action=action_name,
             actor=actor or "operator",
             detail=f"{field_name.replace('_', ' ')} {detail}",
@@ -64,6 +82,6 @@ def update_steward_state(*, intake_paused: bool, playback_paused: bool, quieter_
         )
 
     if changes:
-        state.save(update_fields=["intake_paused", "playback_paused", "quieter_mode", "updated_at"])
+        state.save(update_fields=["intake_paused", "playback_paused", "quieter_mode", "maintenance_mode", "updated_at"])
 
     return state, changes

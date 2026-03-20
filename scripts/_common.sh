@@ -25,6 +25,60 @@ detect_compose_bin() {
   fail "docker compose is not installed on this machine"
 }
 
+run_compose() {
+  if [ -z "${COMPOSE_BIN:-}" ]; then
+    COMPOSE_BIN=$(detect_compose_bin)
+  fi
+
+  if [ "${COMPOSE_BIN}" = "docker compose" ]; then
+    docker compose "$@"
+    return
+  fi
+
+  docker-compose "$@"
+}
+
+compose_service_running() {
+  service_name="$1"
+  run_compose ps --services --filter status=running | grep -qx "${service_name}"
+}
+
+log_operator_event() {
+  action="$1"
+  actor="$2"
+  detail="$3"
+
+  if ! compose_service_running "api"; then
+    return 0
+  fi
+
+  run_compose exec -T api python manage.py log_operator_event \
+    --action "${action}" \
+    --actor "${actor}" \
+    --detail "${detail}" >/dev/null 2>&1 || true
+}
+
+write_redacted_env() {
+  env_file="$1"
+  output_file="$2"
+  awk -F= '
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { print; next }
+    {
+      key = $1
+      value = substr($0, index($0, "=") + 1)
+      if (
+        key ~ /(SECRET|PASSWORD|TOKEN|KEY)$/ ||
+        key == "OPS_SHARED_SECRET" ||
+        key == "DJANGO_SECRET_KEY"
+      ) {
+        print key "=***REDACTED***"
+      } else {
+        print key "=" value
+      }
+    }
+  ' "${env_file}" > "${output_file}"
+}
+
 get_env_value() {
   env_file="$1"
   key="$2"

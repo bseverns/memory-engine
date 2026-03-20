@@ -25,6 +25,8 @@ EOF
 }
 
 BACKUP_DIR=""
+CONFIRMED=0
+SKIP_SNAPSHOT=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -32,6 +34,14 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] || fail "--from requires a value"
       BACKUP_DIR="$2"
       shift 2
+      ;;
+    --yes)
+      CONFIRMED=1
+      shift
+      ;;
+    --skip-snapshot)
+      SKIP_SNAPSHOT=1
+      shift
       ;;
     -h|--help)
       usage
@@ -53,6 +63,22 @@ COMPOSE_BIN=$(detect_compose_bin)
 POSTGRES_USER=$(get_env_value "${ENV_FILE}" POSTGRES_USER)
 POSTGRES_DB=$(get_env_value "${ENV_FILE}" POSTGRES_DB)
 
+if [ "${CONFIRMED}" -ne 1 ]; then
+  info "Restore will replace the current Postgres database and MinIO object data."
+  printf '%s' "Type RESTORE to continue: "
+  read -r confirmation
+  [ "${confirmation}" = "RESTORE" ] || fail "restore cancelled"
+fi
+
+PRE_RESTORE_SNAPSHOT=""
+if [ "${SKIP_SNAPSHOT}" -ne 1 ]; then
+  info "Creating a pre-restore snapshot of the current stack"
+  PRE_RESTORE_SNAPSHOT=$("${REPO_ROOT}/scripts/backup.sh" --print-path | tail -n 1)
+  info "Pre-restore snapshot: ${PRE_RESTORE_SNAPSHOT}"
+fi
+
+log_operator_event "restore.started" "restore-script" "Restoring backup ${BACKUP_DIR}"
+
 info "Stopping worker services during restore"
 sh -c "${COMPOSE_BIN} stop worker beat proxy"
 
@@ -67,4 +93,9 @@ sh -c "${COMPOSE_BIN} exec -T minio sh -c 'rm -rf /data/* && tar -C /data -xzf -
 info "Restarting services"
 sh -c "${COMPOSE_BIN} up -d"
 
+log_operator_event "restore.completed" "restore-script" "Restored backup ${BACKUP_DIR}"
+
 info "Restore finished."
+if [ -n "${PRE_RESTORE_SNAPSHOT}" ]; then
+  info "Pre-restore snapshot saved at: ${PRE_RESTORE_SNAPSHOT}"
+fi

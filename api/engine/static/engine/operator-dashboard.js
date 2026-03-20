@@ -91,8 +91,8 @@
       return [{
         tagName: "article",
         className: "component-card ready",
-        title: "No steward changes yet",
-        detail: "Control changes will appear here as they are applied.",
+        title: "No operator events yet",
+        detail: "Steward controls, restores, exports, and revocations will appear here.",
       }];
     }
 
@@ -108,6 +108,43 @@
     const timestamp = action.created_at ? new Date(action.created_at).toLocaleString() : "Unknown time";
     const actor = action.actor || "operator";
     return `${actor} · ${timestamp}`;
+  }
+
+  function retentionCards(retention) {
+    if (!retention) {
+      return [{
+        tagName: "article",
+        className: "component-card degraded",
+        title: "Retention data unavailable",
+        detail: "The node did not report raw-expiry or fossil-retention details.",
+      }];
+    }
+
+    const cards = [];
+    const soonHours = retention.soon_window_hours ?? 24;
+    cards.push({
+      tagName: "article",
+      className: "component-card ready",
+      title: `Raw audio expiring in ${soonHours}h`,
+      detail: `${retention.raw_expiring_soon ?? 0} recording(s) are due to shed raw audio soon.`,
+    });
+    cards.push({
+      tagName: "article",
+      className: "component-card ready",
+      title: "Next raw expiry",
+      detail: retention.next_raw_expiry_at
+        ? new Date(retention.next_raw_expiry_at).toLocaleString()
+        : "No raw-audio expiry is currently scheduled.",
+    });
+    cards.push({
+      tagName: "article",
+      className: "component-card ready",
+      title: "Next fossil retention edge",
+      detail: retention.next_fossil_expiry_at
+        ? new Date(retention.next_fossil_expiry_at).toLocaleString()
+        : "No active fossil retention window is currently scheduled.",
+    });
+    return cards;
   }
 
   function makeCard(doc, card) {
@@ -168,10 +205,16 @@
       opsMid: doc.getElementById("opsMid"),
       opsWorn: doc.getElementById("opsWorn"),
       opsStorage: doc.getElementById("opsStorage"),
+      opsRetentionRawHeld: doc.getElementById("opsRetentionRawHeld"),
+      opsRetentionRawSoon: doc.getElementById("opsRetentionRawSoon"),
+      opsRetentionFossils: doc.getElementById("opsRetentionFossils"),
+      opsRetentionResidue: doc.getElementById("opsRetentionResidue"),
+      opsRetentionSummary: doc.getElementById("opsRetentionSummary"),
       opsWarnings: doc.getElementById("opsWarnings"),
       opsComponents: doc.getElementById("opsComponents"),
       opsRefreshed: doc.getElementById("opsRefreshed"),
       opsControlsForm: doc.getElementById("opsControlsForm"),
+      opsMaintenanceMode: doc.getElementById("opsMaintenanceMode"),
       opsIntakePaused: doc.getElementById("opsIntakePaused"),
       opsPlaybackPaused: doc.getElementById("opsPlaybackPaused"),
       opsQuieterMode: doc.getElementById("opsQuieterMode"),
@@ -182,9 +225,10 @@
   }
 
   function renderOperatorState(dom, operatorState) {
-    if (!dom.opsIntakePaused || !dom.opsPlaybackPaused || !dom.opsQuieterMode) {
+    if (!dom.opsMaintenanceMode || !dom.opsIntakePaused || !dom.opsPlaybackPaused || !dom.opsQuieterMode) {
       return;
     }
+    dom.opsMaintenanceMode.checked = Boolean(operatorState.maintenance_mode);
     dom.opsIntakePaused.checked = Boolean(operatorState.intake_paused);
     dom.opsPlaybackPaused.checked = Boolean(operatorState.playback_paused);
     dom.opsQuieterMode.checked = Boolean(operatorState.quieter_mode);
@@ -205,7 +249,12 @@
     dom.opsMid.textContent = String(payload.lanes?.mid ?? "-");
     dom.opsWorn.textContent = String(payload.lanes?.worn ?? "-");
     dom.opsStorage.textContent = payload.storage ? `${payload.storage.free_gb} GB` : "-";
+    dom.opsRetentionRawHeld.textContent = String(payload.retention?.raw_held ?? "-");
+    dom.opsRetentionRawSoon.textContent = String(payload.retention?.raw_expiring_soon ?? "-");
+    dom.opsRetentionFossils.textContent = String(payload.retention?.fossil_retained ?? "-");
+    dom.opsRetentionResidue.textContent = String(payload.retention?.fossil_residue_only ?? "-");
     replaceCardList(doc, dom.opsWarnings, warningCards(payload.warnings || []));
+    replaceCardList(doc, dom.opsRetentionSummary, retentionCards(payload.retention));
     replaceCardList(doc, dom.opsComponents, componentCards(payload.components || {}));
     renderOperatorState(dom, payload.operator_state || {});
     dom.opsRefreshed.textContent = `Last refreshed ${new Date().toLocaleTimeString()}`;
@@ -217,6 +266,7 @@
     if (dom.opsControlStatus) {
       const state = payload.operator_state || {};
       const labels = [];
+      if (state.maintenance_mode) labels.push("maintenance mode");
       if (state.intake_paused) labels.push("intake paused");
       if (state.playback_paused) labels.push("playback paused");
       if (state.quieter_mode) labels.push("quieter mode");
@@ -293,6 +343,7 @@
             "X-CSRFToken": readCookie(doc, "csrftoken"),
           },
           body: JSON.stringify({
+            maintenance_mode: Boolean(dom.opsMaintenanceMode?.checked),
             intake_paused: Boolean(dom.opsIntakePaused?.checked),
             playback_paused: Boolean(dom.opsPlaybackPaused?.checked),
             quieter_mode: Boolean(dom.opsQuieterMode?.checked),
@@ -338,6 +389,7 @@
     renderControlPayload,
     renderError,
     renderPayload,
+    retentionCards,
     start,
     warningCards,
   };

@@ -53,10 +53,22 @@ Create a backup:
 ./scripts/backup.sh
 ```
 
+Create a portable export bundle from the latest backup:
+
+```bash
+./scripts/export_bundle.sh --latest
+```
+
 Restore a backup:
 
 ```bash
 ./scripts/restore.sh --from backups/20260317-120000
+```
+
+Create a remote-friendly support bundle with logs and health snapshots:
+
+```bash
+./scripts/support_bundle.sh
 ```
 
 ## What each script is for
@@ -69,7 +81,9 @@ Restore a backup:
 - `scripts/doctor.sh` checks `.env`, compose state, MinIO reachability through `/healthz`, and browser/TLS constraints that affect recording.
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.
-- `scripts/restore.sh` restores one of those snapshots into the current stack.
+- `scripts/restore.sh` restores one of those snapshots into the current stack and now asks for explicit confirmation plus a fresh pre-restore snapshot by default.
+- `scripts/export_bundle.sh` packages one backup snapshot into a portable `.tgz` with a manifest and checksums.
+- `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, compose status, doctor output, and recent logs into a single handoff archive.
 - `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
 - Django also validates runtime config relationships at startup now, so bad threshold ordering or insecure origin posture fails fast before the stack enters service.
 
@@ -110,7 +124,8 @@ There are three practical health surfaces:
 - `docker compose ps` tells you whether the containers are running and whether Docker thinks health checks are passing.
 - `/healthz` is the backend readiness view and is the source used by the API container health check.
 - `/ops/` is the human-facing dashboard for steward use during install or troubleshooting.
-- `/ops/` is now the authenticated steward surface. It exposes pause-intake, pause-playback, and quieter-mode controls once the steward secret is accepted.
+- `/ops/` is now the authenticated steward surface. It exposes maintenance mode, pause-intake, pause-playback, and quieter-mode controls once the steward secret is accepted.
+- `/ops/` also reports retention posture: raw audio still held, raw audio expiring soon, fossils retained, and fossils that now exist only as residue.
 
 Expected healthy services:
 
@@ -150,8 +165,21 @@ Restore cautions:
 
 - `scripts/restore.sh` replaces the current database contents.
 - `scripts/restore.sh` replaces the current MinIO object store.
-- Take a fresh backup before restoring if there is any chance the current state matters.
+- `scripts/restore.sh` now takes that fresh pre-restore backup automatically unless you pass `--skip-snapshot`.
+- `scripts/restore.sh` also asks you to type `RESTORE` unless you pass `--yes`.
 - Expect active playback and ingest to be interrupted during restore.
+
+Export bundle notes:
+
+- `scripts/export_bundle.sh --latest` packages the newest backup into `exports/`.
+- Each export includes the Postgres dump, MinIO archive, source manifest, a bundle manifest, and `CHECKSUMS.txt`.
+- Use export bundles for migration, archival handoff, or off-machine storage where a single file is easier to manage than a backup folder.
+
+Support bundle notes:
+
+- `scripts/support_bundle.sh` writes into `support-bundles/`.
+- It includes redacted environment values, compose status, doctor output, `/healthz`, and recent logs for the main services.
+- It is meant for remote troubleshooting without handing over shell access or the raw `.env`.
 
 ## MinIO setup notes
 
@@ -175,6 +203,12 @@ Current repo behavior:
 - The simplest supported path is to keep `MINIO_SECRET_KEY` equal to `MINIO_ROOT_PASSWORD`.
 - In that mode, `minio_init` uses those credentials to create the bucket on first boot, and the Django/Celery services use the same credentials to read and write objects afterward.
 
+Current recommendation:
+
+- For the simplest single-node installation, reusing the root-backed credentials is still acceptable.
+- For a production or longer-lived installation, prefer a separate MinIO service identity for `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY`.
+- That keeps the app off the MinIO admin identity and makes later credential rotation cleaner.
+
 If you want to provision MinIO manually:
 
 - You can create a separate MinIO user or service account yourself because you have root on the server.
@@ -189,6 +223,28 @@ When to change what:
 - When rotating only the app/service identity: update `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY`, then re-run deployment so `api`, `worker`, `beat`, and `minio_init` pick up the new values.
 - When changing `MINIO_BUCKET`: create the new bucket first or let `minio_init` create it, then redeploy the stack so all services point at the same place.
 - When moving MinIO outside this compose stack: change `MINIO_ENDPOINT` to the external S3-compatible endpoint and verify network reachability from the `api` container.
+
+Rotation notes:
+
+- Django secret rotation: update `DJANGO_SECRET_KEY` in `.env`, redeploy, and expect session invalidation.
+- Steward secret rotation: update `OPS_SHARED_SECRET` in `.env`, redeploy, and expect current `/ops/` sessions to sign in again.
+- Postgres password rotation: rotate `POSTGRES_PASSWORD` in both the `db` service and the application `.env`, then redeploy together.
+- MinIO app/service credential rotation: update `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY`, ensure the MinIO identity already exists with bucket read/write/list/delete access, then redeploy.
+- MinIO root/admin credential rotation: update `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`, and also update app credentials if the app still shares that same identity.
+
+External S3-compatible migration notes:
+
+- Pre-create the destination bucket and grant the app identity read, write, list, and delete permissions there.
+- Copy object data from the existing MinIO bucket before changing `.env`.
+- Update `MINIO_ENDPOINT`, `MINIO_BUCKET`, `MINIO_ACCESS_KEY`, and `MINIO_SECRET_KEY`.
+- Run `./scripts/check.sh`, then redeploy and confirm `/healthz` plus a real playback request from `/room/`.
+- Keep the old MinIO data untouched until `/ops/` reports healthy storage and the room has successfully played migrated audio.
+
+Versioning and object-locking notes:
+
+- Leave MinIO bucket versioning and object locking disabled by default in this stack.
+- The current retention and revocation model expects real deletes to succeed for raw audio and derivatives.
+- If policy ever requires object locking, treat that as a deeper storage-policy project rather than a flip-the-switch operator task.
 
 Practical verification after deploy:
 

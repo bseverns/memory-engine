@@ -97,6 +97,7 @@ class StewardState(models.Model):
     intake_paused = models.BooleanField(default=False)
     playback_paused = models.BooleanField(default=False)
     quieter_mode = models.BooleanField(default=False)
+    maintenance_mode = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
 
     @classmethod

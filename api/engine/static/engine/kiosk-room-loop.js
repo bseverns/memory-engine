@@ -43,6 +43,7 @@
         intake_paused: false,
         playback_paused: false,
         quieter_mode: false,
+        maintenance_mode: false,
       },
       roomLoopConfig: defaultRoomLoopConfig(),
     };
@@ -203,6 +204,7 @@
       intake_paused: false,
       playback_paused: false,
       quieter_mode: false,
+      maintenance_mode: false,
       ...(config.operatorState || {}),
     };
 
@@ -597,6 +599,9 @@
           ...surfaceState,
           ...nextState,
         };
+      },
+      getSurfaceState() {
+        return { ...surfaceState };
       },
       stop,
       teardown,

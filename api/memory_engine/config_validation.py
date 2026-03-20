@@ -57,6 +57,7 @@ def validate_runtime_settings(settings_obj) -> None:
     ensure_non_negative(errors, settings_obj, "OPS_DISK_WARNING_FREE_GB")
     ensure_between(errors, settings_obj, "OPS_DISK_CRITICAL_FREE_PERCENT", 0.0, 100.0)
     ensure_between(errors, settings_obj, "OPS_DISK_WARNING_FREE_PERCENT", 0.0, 100.0)
+    ensure_positive(errors, settings_obj, "OPS_RETENTION_SOON_HOURS")
 
     fresh_max_age = float(getattr(settings_obj, "POOL_FRESH_MAX_AGE_HOURS", 0.0))
     worn_min_age = float(getattr(settings_obj, "POOL_WORN_MIN_AGE_HOURS", 0.0))

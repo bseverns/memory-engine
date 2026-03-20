@@ -1,9 +1,12 @@
 import shutil
+from datetime import timedelta
 
 import redis
 from django.conf import settings
 from django.db import connection
+from django.utils import timezone
 
+from .models import Artifact, Derivative
 from .storage import s3_client
 
 
@@ -112,3 +115,59 @@ def pool_warnings(active_count: int, lane_counts: dict, mood_counts: dict, playa
             })
 
     return warnings
+
+
+def retention_summary(*, now=None) -> dict:
+    now = now or timezone.now()
+    soon_window_hours = int(getattr(settings, "OPS_RETENTION_SOON_HOURS", 24))
+    soon_cutoff = now + timedelta(hours=soon_window_hours)
+
+    raw_held = 0
+    raw_expiring_soon = 0
+    fossil_retained = 0
+    fossil_residue_only = 0
+    next_raw_expiry_at = None
+    next_fossil_expiry_at = None
+
+    active_artifacts = list(
+        Artifact.objects.filter(status=Artifact.STATUS_ACTIVE, expires_at__gt=now)
+        .select_related("consent")
+        .prefetch_related("derivative_set")
+    )
+
+    for artifact in active_artifacts:
+        consent_json = artifact.consent.json or {}
+        retention = consent_json.get("retention", {})
+        raw_ttl_hours = retention.get("raw_ttl_hours")
+        mode = str(consent_json.get("mode") or "").upper()
+
+        if artifact.raw_uri and raw_ttl_hours is not None:
+            raw_expiry_at = artifact.created_at + timedelta(hours=int(raw_ttl_hours))
+            if raw_expiry_at > now:
+                raw_held += 1
+                if raw_expiry_at <= soon_cutoff:
+                    raw_expiring_soon += 1
+                if next_raw_expiry_at is None or raw_expiry_at < next_raw_expiry_at:
+                    next_raw_expiry_at = raw_expiry_at
+
+        if mode == "FOSSIL":
+            fossil_retained += 1
+            if next_fossil_expiry_at is None or artifact.expires_at < next_fossil_expiry_at:
+                next_fossil_expiry_at = artifact.expires_at
+            has_live_essence = any(
+                derivative.kind == Derivative.KIND_ESSENCE_WAV
+                and (derivative.expires_at is None or derivative.expires_at > now)
+                for derivative in artifact.derivative_set.all()
+            )
+            if not artifact.raw_uri and has_live_essence:
+                fossil_residue_only += 1
+
+    return {
+        "soon_window_hours": soon_window_hours,
+        "raw_held": raw_held,
+        "raw_expiring_soon": raw_expiring_soon,
+        "fossil_retained": fossil_retained,
+        "fossil_residue_only": fossil_residue_only,
+        "next_raw_expiry_at": next_raw_expiry_at,
+        "next_fossil_expiry_at": next_fossil_expiry_at,
+    }

@@ -10,8 +10,37 @@ ENV_FILE="${REPO_ROOT}/.env"
 BACKUP_ROOT="${REPO_ROOT}/backups"
 STAMP=$(date +"%Y%m%d-%H%M%S")
 DEST_DIR="${BACKUP_ROOT}/${STAMP}"
+PRINT_PATH=0
 
 . "${SCRIPT_DIR}/_common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  scripts/backup.sh [--print-path]
+
+Behavior:
+  - dumps Postgres into a timestamped folder under backups/
+  - archives MinIO object data into the same folder
+  - writes a simple manifest for later restore or export
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --print-path)
+      PRINT_PATH=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      fail "unknown argument: $1"
+      ;;
+  esac
+done
 
 COMPOSE_BIN=$(detect_compose_bin)
 
@@ -34,3 +63,6 @@ minio_archive=minio-data.tgz
 EOF
 
 info "Backup finished: ${DEST_DIR}"
+if [ "${PRINT_PATH}" -eq 1 ]; then
+  printf '%s\n' "${DEST_DIR}"
+fi

@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from .consent import consent_manifest, default_node_from_env, hash_token, make_revocation_token
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative
 from .operator_auth import operator_secret_configured, operator_session_active
-from .ops import disk_status, health_component_status, pool_warnings
+from .ops import disk_status, health_component_status, pool_warnings, retention_summary
 from .pool import (
     artifact_age_hours,
     artifact_density,
@@ -27,7 +27,13 @@ from .pool import (
 )
 from .serializers import ArtifactSerializer, DerivativeSerializer
 from .storage import delete_key, put_bytes, stream_key
-from .steward import load_steward_state, recent_steward_actions, steward_state_payload, update_steward_state
+from .steward import (
+    load_steward_state,
+    recent_steward_actions,
+    record_steward_action,
+    steward_state_payload,
+    update_steward_state,
+)
 from .tasks import generate_essence_audio, generate_spectrogram
 
 
@@ -51,10 +57,23 @@ def parse_boolish(value) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def intake_suspended() -> bool:
+    state = load_steward_state()
+    return bool(state.maintenance_mode or state.intake_paused)
+
+
+def playback_suspended() -> bool:
+    state = load_steward_state()
+    return bool(state.maintenance_mode or state.playback_paused)
+
+
 @api_view(["POST"])
 @parser_classes([MultiPartParser, FormParser])
 def create_audio_artifact(request):
-    if load_steward_state().intake_paused:
+    state = load_steward_state()
+    if state.maintenance_mode:
+        return Response({"error": "node is in maintenance mode"}, status=423)
+    if state.intake_paused:
         return Response({"error": "intake is paused by the steward"}, status=423)
 
     consent_mode = (request.data.get("consent_mode") or "ROOM").upper()
@@ -104,7 +123,10 @@ def create_audio_artifact(request):
 @api_view(["POST"])
 @parser_classes([MultiPartParser, FormParser])
 def create_ephemeral_audio(request):
-    if load_steward_state().intake_paused:
+    state = load_steward_state()
+    if state.maintenance_mode:
+        return Response({"error": "node is in maintenance mode"}, status=423)
+    if state.intake_paused:
         return Response({"error": "intake is paused by the steward"}, status=423)
 
     upload = request.data.get("file")
@@ -202,12 +224,18 @@ def revoke(request):
             except Exception:
                 pass
             derivative.delete()
+    record_steward_action(
+        action="revocation.completed",
+        actor=request_operator_label(request) if operator_session_active(request) else "participant",
+        detail=f"Revoked {artifacts.count()} artifact(s) via receipt token.",
+        payload={"revoked_artifacts": artifacts.count()},
+    )
     return Response({"ok": True, "revoked_artifacts": artifacts.count()})
 
 
 @api_view(["GET"])
 def pool_next(request):
-    if load_steward_state().playback_paused:
+    if playback_suspended():
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     now = timezone.now()
@@ -313,7 +341,15 @@ def node_status(request):
 
     playable_count = len(playable_artifacts)
     storage = disk_status(settings.OPS_STORAGE_PATH)
+    retention = retention_summary(now=now)
     warnings = []
+    operator_state = steward_state_payload()
+    if operator_state["maintenance_mode"]:
+        warnings.append({
+            "level": "warning",
+            "title": "Node is in maintenance mode",
+            "detail": "Audience playback and recording intake are suspended until maintenance mode is cleared.",
+        })
     if storage["state"] == "critical":
         warnings.append({
             "level": "critical",
@@ -331,12 +367,13 @@ def node_status(request):
     return Response({
         "ok": ok,
         "components": components,
-        "operator_state": steward_state_payload(),
+        "operator_state": operator_state,
         "active": active,
         "lanes": lane_counts,
         "moods": mood_counts,
         "playable": playable_count,
         "storage": storage,
+        "retention": retention,
         "warnings": warnings,
         "expired": expired,
         "revoked": revoked,
@@ -368,6 +405,7 @@ def operator_controls(request):
         intake_paused=parse_boolish(request.data.get("intake_paused", state.intake_paused)),
         playback_paused=parse_boolish(request.data.get("playback_paused", state.playback_paused)),
         quieter_mode=parse_boolish(request.data.get("quieter_mode", state.quieter_mode)),
+        maintenance_mode=parse_boolish(request.data.get("maintenance_mode", state.maintenance_mode)),
         actor=request_operator_label(request),
     )
     return Response({
