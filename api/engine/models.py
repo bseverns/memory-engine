@@ -70,12 +70,20 @@ class Artifact(models.Model):
         ]
 
 class Derivative(models.Model):
+    KIND_SPECTROGRAM_PNG = "spectrogram_png"
+    KIND_ESSENCE_WAV = "essence_wav"
+
     artifact = models.ForeignKey(Artifact, on_delete=models.CASCADE)
     kind = models.CharField(max_length=64)  # spectrogram_png
     uri = models.CharField(max_length=512)  # s3 key
     created_at = models.DateTimeField(default=timezone.now)
     expires_at = models.DateTimeField(null=True, blank=True)
     publishable = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["artifact", "kind", "expires_at"], name="derivative_kind_idx"),
+        ]
 
 class AccessEvent(models.Model):
     artifact = models.ForeignKey(Artifact, on_delete=models.CASCADE)

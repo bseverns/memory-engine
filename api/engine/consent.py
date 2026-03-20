@@ -51,7 +51,7 @@ def consent_manifest(consent_mode: str) -> dict:
             "mode": "FOSSIL",
             "capture": {"audio": True},
             "publish": {"raw": False, "derivatives": False},
-            "derive_allowed": ["spectrogram_png"],
+            "derive_allowed": ["spectrogram_png", "essence_wav"],
             "retention": {
                 "raw_ttl_hours": settings.RAW_TTL_HOURS_FOSSIL,
                 "derivative_ttl_days": settings.DERIVATIVE_TTL_DAYS_FOSSIL,

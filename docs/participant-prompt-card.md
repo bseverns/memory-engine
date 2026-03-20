@@ -31,7 +31,7 @@ Please avoid names or identifying details.
 #### Fossil Only
 
 - Raw sound kept only briefly
-- A spectrogram image may remain locally for longer
+- A spectrogram image and low-storage audio residue may remain locally for longer
 - Can be revoked later with the receipt code
 
 #### Don't Save

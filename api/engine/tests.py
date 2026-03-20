@@ -1,3 +1,4 @@
+import io
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -59,9 +60,10 @@ class EngineBehaviorTests(TestCase):
         self.assertEqual(len(response.json()["revocation_token"]), 10)
         put_bytes_mock.assert_called_once()
 
+    @patch("engine.api_views.generate_essence_audio.delay")
     @patch("engine.api_views.generate_spectrogram.delay")
     @patch("engine.api_views.put_bytes")
-    def test_fossil_save_queues_spectrogram_generation(self, put_bytes_mock, delay_mock):
+    def test_fossil_save_queues_derivative_generation(self, put_bytes_mock, delay_mock, essence_mock):
         upload = SimpleUploadedFile("audio.wav", b"RIFFtest-fossil-audio", content_type="audio/wav")
 
         response = self.client.post(
@@ -74,6 +76,7 @@ class EngineBehaviorTests(TestCase):
         self.assertEqual(artifact.consent.json["mode"], "FOSSIL")
         put_bytes_mock.assert_called_once()
         delay_mock.assert_called_once_with(artifact.id)
+        essence_mock.assert_called_once_with(artifact.id)
 
     @patch("engine.api_views.delete_key")
     @patch("engine.api_views.put_bytes")
@@ -113,7 +116,7 @@ class EngineBehaviorTests(TestCase):
         artifact = self.make_active_artifact(consent=consent, raw_uri="raw/1/audio.wav")
         derivative = Derivative.objects.create(
             artifact=artifact,
-            kind="spectrogram_png",
+            kind=Derivative.KIND_SPECTROGRAM_PNG,
             uri="derivatives/1/spectrogram.png",
         )
 
@@ -129,6 +132,23 @@ class EngineBehaviorTests(TestCase):
         self.assertEqual(artifact.raw_uri, "")
         self.assertFalse(Derivative.objects.filter(id=derivative.id).exists())
         self.assertEqual(delete_key_mock.call_count, 2)
+
+    @patch("engine.api_views.stream_key")
+    def test_blob_proxy_uses_essence_derivative_when_raw_is_gone(self, stream_key_mock):
+        consent = self.make_consent("FOSSIL")
+        artifact = self.make_active_artifact(consent=consent, raw_uri="")
+        Derivative.objects.create(
+            artifact=artifact,
+            kind=Derivative.KIND_ESSENCE_WAV,
+            uri="derivatives/1/essence.wav",
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+        stream_key_mock.return_value = (io.BytesIO(b"RIFFessence"), "audio/wav")
+
+        response = self.client.get(f"/api/v1/blob/{artifact.id}/raw")
+
+        self.assertEqual(response.status_code, 200)
+        stream_key_mock.assert_called_once_with("derivatives/1/essence.wav")
 
     def test_pool_next_advances_wear_and_honors_excluded_ids_when_possible(self):
         consent = self.make_consent("ROOM")
@@ -284,6 +304,63 @@ class EngineBehaviorTests(TestCase):
         response = self.client.get(f"/api/v1/pool/next?exclude_ids={artifact.id}")
 
         self.assertEqual(response.status_code, 204)
+
+    @patch("engine.tasks.delete_key")
+    def test_fossil_artifact_stays_active_on_essence_after_raw_expiry(self, delete_key_mock):
+        from .tasks import expire_raw
+
+        consent = ConsentManifest.objects.create(
+            json={
+                "mode": "FOSSIL",
+                "retention": {"raw_ttl_hours": 1, "derivative_ttl_days": 30},
+            },
+            revocation_token_hash=ConsentManifest.hash_token("TOKEN12345"),
+        )
+        artifact = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/fossil.wav",
+            created_at=timezone.now() - timedelta(hours=2),
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+        Derivative.objects.create(
+            artifact=artifact,
+            kind=Derivative.KIND_ESSENCE_WAV,
+            uri="derivatives/fossil/essence.wav",
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+
+        expire_raw()
+
+        artifact.refresh_from_db()
+        self.assertEqual(artifact.status, Artifact.STATUS_ACTIVE)
+        self.assertEqual(artifact.raw_uri, "")
+        delete_key_mock.assert_called_once_with("raw/fossil.wav")
+
+    def test_pool_next_can_select_essence_only_fossil(self):
+        consent = ConsentManifest.objects.create(
+            json={
+                "mode": "FOSSIL",
+                "retention": {"raw_ttl_hours": 1, "derivative_ttl_days": 30},
+            },
+            revocation_token_hash=ConsentManifest.hash_token("TOKEN12345"),
+        )
+        artifact = self.make_active_artifact(
+            consent=consent,
+            raw_uri="",
+            created_at=timezone.now() - timedelta(days=2),
+            expires_at=timezone.now() + timedelta(days=10),
+        )
+        Derivative.objects.create(
+            artifact=artifact,
+            kind=Derivative.KIND_ESSENCE_WAV,
+            uri="derivatives/fossil/essence.wav",
+            expires_at=timezone.now() + timedelta(days=10),
+        )
+
+        response = self.client.get("/api/v1/pool/next")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["artifact_id"], artifact.id)
 
     @patch("engine.api_views.health_component_status")
     def test_node_status_reports_empty_pool_warning(self, health_mock):

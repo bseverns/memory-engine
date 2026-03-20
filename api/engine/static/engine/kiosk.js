@@ -28,7 +28,7 @@ const MODE_COPY = {
   FOSSIL: {
     name: "Fossil Only",
     submitLabel: "Save as a fossil",
-    reviewCopy: "The raw recording expires in about 48 hours. A spectrogram image may remain locally for longer.",
+    reviewCopy: "The raw recording expires in about 48 hours. A spectrogram image and a low-storage audio residue may remain locally for longer.",
     completeTitle: "Saved as a local fossil.",
     completeStatus: "Saved locally as a fossil.",
   },

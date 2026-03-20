@@ -16,11 +16,19 @@ from .consent import consent_manifest, default_node_from_env, hash_token, make_r
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative
 from .operator_auth import operator_secret_configured, operator_session_active
 from .ops import disk_status, health_component_status, pool_warnings
-from .pool import artifact_age_hours, artifact_density, artifact_lane, artifact_mood, select_pool_artifact
+from .pool import (
+    artifact_age_hours,
+    artifact_density,
+    artifact_lane,
+    artifact_mood,
+    artifact_playback_key,
+    playable_artifact_queryset,
+    select_pool_artifact,
+)
 from .serializers import ArtifactSerializer, DerivativeSerializer
 from .storage import delete_key, put_bytes, stream_key
 from .steward import load_steward_state, recent_steward_actions, steward_state_payload, update_steward_state
-from .tasks import generate_spectrogram
+from .tasks import generate_essence_audio, generate_spectrogram
 
 
 def operator_api_denied():
@@ -68,7 +76,11 @@ def create_audio_artifact(request):
         consent=consent,
         status=Artifact.STATUS_ACTIVE,
         raw_sha256=hashlib.sha256(data).hexdigest(),
-        expires_at=timezone.now() + timedelta(hours=int(manifest["retention"]["raw_ttl_hours"])),
+        expires_at=(
+            timezone.now() + timedelta(days=int(manifest["retention"]["derivative_ttl_days"]))
+            if consent_mode == "FOSSIL"
+            else timezone.now() + timedelta(hours=int(manifest["retention"]["raw_ttl_hours"]))
+        ),
         duration_ms=int(request.data.get("duration_ms") or 0),
     )
 
@@ -79,6 +91,8 @@ def create_audio_artifact(request):
 
     if "spectrogram_png" in manifest.get("derive_allowed", []):
         generate_spectrogram.delay(artifact.id)
+    if "essence_wav" in manifest.get("derive_allowed", []):
+        generate_essence_audio.delay(artifact.id)
 
     return Response({
         "artifact": ArtifactSerializer(artifact).data,
@@ -197,10 +211,7 @@ def pool_next(request):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     now = timezone.now()
-    playable_count = Artifact.objects.filter(
-        status=Artifact.STATUS_ACTIVE,
-        expires_at__gt=now,
-    ).exclude(raw_uri="").count()
+    playable_count = playable_artifact_queryset(now).count()
     requested_lane = (request.query_params.get("lane") or "any").strip().lower()
     if requested_lane not in {"any", "fresh", "mid", "worn"}:
         requested_lane = "any"
@@ -287,7 +298,7 @@ def node_status(request):
     active = active_qs.count()
     expired = Artifact.objects.filter(status=Artifact.STATUS_EXPIRED).count()
     revoked = Artifact.objects.filter(status=Artifact.STATUS_REVOKED).count()
-    playable_artifacts = list(active_qs.exclude(raw_uri=""))
+    playable_artifacts = list(playable_artifact_queryset(now).prefetch_related("derivative_set"))
     lane_counts = {"fresh": 0, "mid": 0, "worn": 0}
     mood_counts = {
         "clear": 0,
@@ -371,9 +382,10 @@ def blob_proxy_raw(request, artifact_id: int):
         artifact = Artifact.objects.get(id=int(artifact_id))
     except Artifact.DoesNotExist:
         raise Http404("Artifact not found")
-    if not artifact.raw_uri:
-        raise Http404("No raw blob")
-    stream, content_type = stream_key(artifact.raw_uri)
+    media_key = artifact_playback_key(artifact, timezone.now())
+    if not media_key:
+        raise Http404("No playable audio")
+    stream, content_type = stream_key(media_key)
     response = FileResponse(stream, content_type=content_type)
     response["Cache-Control"] = "no-store"
     return response

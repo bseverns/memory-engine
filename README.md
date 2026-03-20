@@ -5,8 +5,8 @@ Local-first “room memory” appliance: record a short sound offering, choose c
 ## What you get in this skeleton
 - Django + DRF API (Artifacts, Pool playback, Revocation, Node status)
 - Postgres for metadata
-- MinIO for blob storage (raw audio + spectrogram PNG fossils)
-- Redis + Celery (+ Beat) for background jobs (spectrogram generation + expiry)
+- MinIO for blob storage (raw audio + spectrogram / essence fossils)
+- Redis + Celery (+ Beat) for background jobs (derivative generation + expiry)
 - Separate client surfaces: `/kiosk/` for recording and `/room/` for dedicated playback
 - “Don’t save” = **play once immediately, then discard**
 

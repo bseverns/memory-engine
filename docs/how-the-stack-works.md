@@ -174,8 +174,13 @@ Important fields:
 
 ### `Derivative`
 
-Currently used for `spectrogram_png` only. The important policy distinction is
-that derivatives can outlive raw audio when the consent mode allows that.
+Currently used for two fossil-side derivative types:
+
+- `spectrogram_png`
+- `essence_wav`
+
+The important policy distinction is that derivatives can outlive raw audio when
+the consent mode allows that.
 
 ### `AccessEvent`
 
@@ -267,7 +272,7 @@ There are three practical modes:
 ### `FOSSIL`
 
 - raw audio stored locally
-- a spectrogram derivative is allowed
+- spectrogram and low-storage audio-residue derivatives are allowed
 - raw expires after `RAW_TTL_HOURS_FOSSIL`
 - derivative expires after `DERIVATIVE_TTL_DAYS_FOSSIL`
 - revocation is allowed
@@ -300,7 +305,8 @@ This is the normal path for `ROOM` and `FOSSIL`.
 5. Django writes the WAV bytes to MinIO under `raw/<artifact_id>/audio.wav`.
 6. Django stores the resulting object key in `artifact.raw_uri`.
 7. If the consent mode permits derivatives, Django queues
-   `generate_spectrogram.delay(artifact.id)`.
+   `generate_spectrogram.delay(artifact.id)` and
+   `generate_essence_audio.delay(artifact.id)` as needed.
 8. Django returns the serialized artifact plus the plain revocation token.
 
 Why this is structured this way:
@@ -320,7 +326,7 @@ flowchart TD
     artifact --> store["Write WAV to MinIO and save raw_uri"]
     store --> branch{"Consent mode"}
     branch -->|ROOM| room["Return artifact + revocation token"]
-    branch -->|FOSSIL| queue["Queue generate_spectrogram"]
+    branch -->|FOSSIL| queue["Queue derivative generation"]
     queue --> fossil["Return artifact + revocation token"]
 
     nosaveStart["Recording kiosk captures one-time WAV"] --> nosaveUpload["POST /api/v1/ephemeral/audio"]
@@ -372,7 +378,8 @@ stateDiagram-v2
     [*] --> ACTIVE: ROOM / FOSSIL ingest
     [*] --> EPHEMERAL: NOSAVE ingest
     ACTIVE --> ACTIVE: playback increments wear + play_count
-    ACTIVE --> EXPIRED: expire_raw task clears raw blob
+    ACTIVE --> ACTIVE: FOSSIL raw expires but essence remains playable
+    ACTIVE --> EXPIRED: raw and derivative eligibility both end
     ACTIVE --> REVOKED: revoke endpoint clears raw + derivatives
     EPHEMERAL --> REVOKED: consume_ephemeral clears raw blob
     EPHEMERAL --> REVOKED: expire_raw safety sweep
@@ -384,9 +391,11 @@ stateDiagram-v2
 
 The browser does not talk to MinIO directly.
 
-`GET /api/v1/blob/<artifact_id>/raw` in `api/engine/api_views.py` loads the
-artifact, opens the object stream through `storage.stream_key`, and returns it
-as a Django `FileResponse` with `Cache-Control: no-store`.
+`GET /api/v1/blob/<artifact_id>/raw` in `api/engine/api_views.py` resolves the
+best playable media for that artifact, preferring the raw WAV when it still
+exists and falling back to `essence_wav` when the raw fossil has expired. It
+then opens the object stream through `storage.stream_key` and returns it as a
+Django `FileResponse` with `Cache-Control: no-store`.
 
 This keeps the browser-facing trust model simple:
 
@@ -445,7 +454,8 @@ Current moods are:
 
 `select_pool_artifact` does the following:
 
-1. start from `ACTIVE`, unexpired artifacts that still have a `raw_uri`
+1. start from `ACTIVE`, unexpired artifacts that still have either a raw WAV or
+   a valid `essence_wav` derivative
 2. apply any anti-repetition exclusions from the client when possible
 3. prefer artifacts outside the recent-play cooldown window
 4. fall back to a broader candidate set if the pool is small
@@ -486,8 +496,8 @@ sequenceDiagram
     API-->>Loop: artifact_id, wear, audio_url, pool_size
     Loop->>Local: persist selected artifact_id
     Loop->>Blob: GET /blob/<id>/raw
-    Blob->>MinIO: stream object bytes
-    MinIO-->>Blob: WAV stream
+    Blob->>MinIO: stream raw WAV or essence residue
+    MinIO-->>Blob: playable audio stream
     Blob-->>Loop: no-store audio response
     Loop->>Audio: apply wear-based playback chain
     Audio-->>Loop: finish cue / continue movement
@@ -618,13 +628,28 @@ This is why the Python dependency surface is heavier than a basic Django app:
 the project includes `numpy`, `scipy`, and `matplotlib` specifically for this
 derivative path.
 
+### `generate_essence_audio`
+
+This task:
+
+1. downloads the stored WAV bytes from MinIO
+2. decodes mono PCM samples
+3. builds a short, low-storage residue by low-pass filtering, resampling, and
+   shaping noise with the source contour
+4. uploads that residue back to MinIO as `essence.wav`
+5. creates or updates a `Derivative` row
+
+The important design intent is that this is not "extra wear." It is an
+explicit second-life derivative for `FOSSIL` consent.
+
 ### `expire_raw`
 
 This task:
 
-- finds expired active artifacts
-- deletes raw objects when present
-- marks those artifacts `EXPIRED`
+- removes raw objects once their raw TTL has passed
+- keeps `FOSSIL` artifacts `ACTIVE` when an `essence_wav` derivative still
+  exists and the derivative TTL has not ended
+- marks artifacts `EXPIRED` once no playable raw or essence remains
 
 It also includes a safety sweep for stale ephemeral artifacts that somehow were
 not explicitly consumed.

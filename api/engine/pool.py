@@ -4,7 +4,45 @@ from datetime import timedelta
 from django.conf import settings
 from django.db.models import Q
 
-from .models import Artifact
+from .models import Artifact, Derivative
+
+
+def playable_artifact_queryset(now):
+    return Artifact.objects.filter(
+        status=Artifact.STATUS_ACTIVE,
+        expires_at__gt=now,
+    ).filter(
+        Q(raw_uri__gt="")
+        | Q(derivative__kind=Derivative.KIND_ESSENCE_WAV, derivative__expires_at__gt=now)
+    ).distinct()
+
+
+def artifact_essence_derivative(artifact: Artifact, now):
+    prefetched = getattr(artifact, "_prefetched_objects_cache", {})
+    derivatives = prefetched.get("derivative_set")
+    if derivatives is not None:
+        candidates = [
+            derivative for derivative in derivatives
+            if derivative.kind == Derivative.KIND_ESSENCE_WAV
+            and derivative.expires_at
+            and derivative.expires_at > now
+        ]
+        if not candidates:
+            return None
+        candidates.sort(key=lambda derivative: derivative.created_at, reverse=True)
+        return candidates[0]
+
+    return artifact.derivative_set.filter(
+        kind=Derivative.KIND_ESSENCE_WAV,
+        expires_at__gt=now,
+    ).order_by("-created_at").first()
+
+
+def artifact_playback_key(artifact: Artifact, now):
+    if artifact.raw_uri:
+        return artifact.raw_uri
+    essence = artifact_essence_derivative(artifact, now)
+    return essence.uri if essence else ""
 
 
 def artifact_age_hours(artifact: Artifact, now) -> float:
@@ -106,10 +144,7 @@ def select_pool_artifact(
     cooldown_threshold = now - timedelta(seconds=cooldown_seconds)
     candidate_limit = max(5, int(settings.POOL_CANDIDATE_LIMIT))
 
-    base_qs = Artifact.objects.filter(
-        status=Artifact.STATUS_ACTIVE,
-        expires_at__gt=now,
-    ).exclude(raw_uri="")
+    base_qs = playable_artifact_queryset(now)
     preferred_base_qs = base_qs
     if excluded_ids:
         preferred_base_qs = preferred_base_qs.exclude(id__in=excluded_ids)
