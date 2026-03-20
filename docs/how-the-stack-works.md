@@ -732,6 +732,38 @@ GitHub Actions runs the same `scripts/check.sh` path from
 `.github/workflows/check.yml`, using a repo-local `.venv` so CI follows the same
 Python dependency layout as local maintenance.
 
+## Capacity and decay posture
+
+There is no explicit application-level "maximum memories" cap in the current
+stack. The real limits are:
+
+- available object storage for raw WAV files and derivatives
+- database/query performance for active-pool selection
+- the retention windows that decide how long raw material stays eligible
+
+Practically, the room does not try to keep every recording forever as active
+audio. The default posture is:
+
+- raw audio remains in the playable pool while it is `ACTIVE` and within its
+  TTL
+- wear changes playback texture, not storage size
+- once raw expires, playback eligibility ends and the room falls back to the
+  synthetic room-tone bed plus whatever other active material still exists
+
+Important design detail: the current degradation path does not ever fully
+collapse a contribution into room tone. Even at maximum wear, playback still
+keeps an intelligible, deliberately audible trace of the source. The room tone
+is a separate synthetic layer, not a final stage of a fully worn voice.
+
+If the installation eventually needs a more storage-practical "essence only"
+stage, the safer design is to make that an explicit second-life derivative
+rather than letting wear implicitly destroy intelligibility. In other words:
+
+- keep the current wear path as audible patina
+- add a distinct archival derivative later if you want a memory to become more
+  like spectral residue, filtered grain, or site-specific bed material
+- then retire the raw sample by policy, not by overdriving the decay effect
+
 ## Deployment and update model
 
 The repo now has two different operator entrypoints on purpose.

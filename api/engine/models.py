@@ -53,6 +53,22 @@ class Artifact(models.Model):
     def __str__(self):
         return f"{self.kind} {self.id} ({self.status})"
 
+    class Meta:
+        indexes = [
+            # Fast path for "is this artifact still active and eligible by time?"
+            models.Index(fields=["status", "expires_at"], name="artifact_active_idx"),
+            # Supports the cooled-down candidate ordering used by pool selection.
+            models.Index(
+                fields=["status", "expires_at", "play_count", "wear", "-created_at"],
+                name="artifact_pool_rank_idx",
+            ),
+            # Supports recent-access fallback ordering when cooldown filtering applies.
+            models.Index(
+                fields=["status", "expires_at", "last_access_at", "play_count", "wear", "-created_at"],
+                name="artifact_pool_cool_idx",
+            ),
+        ]
+
 class Derivative(models.Model):
     artifact = models.ForeignKey(Artifact, on_delete=models.CASCADE)
     kind = models.CharField(max_length=64)  # spectrogram_png

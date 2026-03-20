@@ -81,6 +81,9 @@
 - Push beyond metadata-derived mood shaping into a room state that responds to context
   - learn from time-of-day or room activity patterns
   - explore whether semantic or transcript-aware grouping is worth the complexity
+- Decide whether older memories should gain an explicit "essence only" afterlife
+  - extract a low-storage archival derivative for room tone or residue
+  - retire raw audio by policy once that derivative exists
 - Add daypart scheduling so movement pacing and density can vary across morning, afternoon, and evening
 - Add steward-tunable room-tone options, including the ability to swap the synthetic bed for site-specific ambience
 - Add rare overlap or layering events so the room can occasionally feel accumulative instead of strictly sequential
@@ -134,6 +137,7 @@
 - Whether the pool should learn from time-of-day or room activity patterns
 - Whether the kiosk should expose revocation and moderation tools directly, or keep those fully steward-side
 - Whether transcripts, embeddings, or other semantic grouping would meaningfully improve scene composition
+- Whether the room should eventually extract a low-storage "essence" derivative from older recordings instead of keeping every raw sample playable until expiry
 - Whether the audience experience should remain audio-only or eventually include light, projection, or fossil visuals
 - Whether multiple kiosks should share a pool or remain strictly room-local
 - Whether revocation should stay steward-mediated or gain a participant-facing path using the receipt code
