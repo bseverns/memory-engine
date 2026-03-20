@@ -60,6 +60,7 @@ assigned the right URL and role.
 ## Operator Acceptance Pass
 
 - Run `./scripts/check.sh`.
+- Run `./scripts/clean_local.sh` if this machine was used for setup or testing and you want to clear local cache noise before handoff.
 - Run `./scripts/doctor.sh`.
 - Run `./scripts/status.sh`.
 - Open `/ops/`, sign in with `OPS_SHARED_SECRET`, and confirm the node reports `ready` or an understood `degraded` state.

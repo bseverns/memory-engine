@@ -22,6 +22,13 @@ Run the fast repo checks before deploy:
 ./scripts/check.sh
 ```
 
+Clear local cache and test/browser noise when this clone has been used for
+setup or diagnostics:
+
+```bash
+./scripts/clean_local.sh
+```
+
 Run the operator doctor for env, browser, and storage posture:
 
 ```bash
@@ -77,6 +84,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/deploy.sh` writes host and TLS settings into `.env`, refuses obvious development secrets, and runs compose.
 - `scripts/update.sh` is the normal existing-server path: fast-forward pull, checks, doctor, backup, deploy, and final status.
 - `scripts/check.sh` is the quick sanity pass for browser JavaScript syntax, frontend smoke tests, Python, the Django behavior suite, shell syntax, and `git diff --check`.
+- `scripts/clean_local.sh` removes regenerable local caches such as `api/.test-cache`, `__pycache__`, and Playwright output. Pass `--include-screenshots` if you also want to clear generated screenshots.
 - `.github/workflows/check.yml` runs that same `scripts/check.sh` gate in GitHub Actions using a repo-local `.venv`, so CI stays aligned with the local check path.
 - `scripts/doctor.sh` checks `.env`, compose state, MinIO reachability through `/healthz`, and browser/TLS constraints that affect recording.
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` from inside the API container.

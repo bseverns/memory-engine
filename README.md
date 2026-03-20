@@ -265,6 +265,7 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 - `docs/installation-checklist.md` — hardware, browser kiosk mode, audio, and auto-start install checklist
 - `docs/roadmap.md` — landed changes and the next likely improvements
 - `scripts/check.sh` — browser syntax, frontend smoke tests, Django behavior tests, and patch-hygiene validation
+- `scripts/clean_local.sh` — clear regenerable local caches such as `api/.test-cache`, `__pycache__`, and Playwright output
 - `scripts/doctor.sh` — operator-focused env, compose, storage, and browser-constraint checks
 - `scripts/deploy.sh` — server-side deploy helper for IP-now / domain-later rollout
 - `scripts/update.sh` — server-side pull, verify, backup, deploy, and status helper for existing installs
