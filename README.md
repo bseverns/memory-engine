@@ -33,6 +33,27 @@ For a real multi-machine install, the intended role split is:
 - playback machine opens `/room/`
 - steward/operator machine opens `/ops/`
 
+## Supported Runtime
+
+The official supported runtime for this repo is:
+
+- Docker Compose for the full stack
+- the `api` container defined by [api/Dockerfile](/Users/bseverns/Documents/GitHub/memory-engine-kiosk/api/Dockerfile), which is pinned to Python `3.12`
+
+That is the path the deployment scripts, compose stack, and production posture
+are designed around.
+
+Local `.venv` use is still supported as a maintenance and CI convenience path,
+but it is best-effort rather than the primary contract. Browser tooling,
+scientific dependencies, and host Python packaging may behave differently
+outside the container lane.
+
+Practical rule:
+
+- if you want the canonical runtime, use `docker compose up --build`
+- if you want the canonical repo gate, run `./scripts/check.sh`
+- if local host Python differs from `3.12`, treat it as a convenience path, not the source of truth
+
 ## Server deployment: public IP now, domain later
 The compose stack is set up for a reverse proxy in front of Django:
 - `caddy` is the public entrypoint on `80/443`
@@ -117,6 +138,9 @@ Fast maintenance helpers are also included:
 GitHub Actions runs that same `./scripts/check.sh` gate from a repo-local
 `.venv`, so CI matches the local maintenance path instead of using a different
 test command.
+
+`./scripts/check.sh` now prints which Python it is using so it is obvious when
+you are on the official `3.12` lane versus a local convenience interpreter.
 
 At process startup, Django now also validates the runtime config shape beyond
 secret presence: threshold ordering, secure-origin posture, MinIO endpoint

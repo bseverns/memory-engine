@@ -16,6 +16,12 @@ if [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
   PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
 fi
 
+PYTHON_VERSION=$("${PYTHON_BIN}" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+info "Using Python ${PYTHON_VERSION} via ${PYTHON_BIN}"
+if [ "${PYTHON_VERSION}" != "3.12" ]; then
+  info "Note: the officially supported runtime is Docker / the api image on Python 3.12. Local host Python ${PYTHON_VERSION} is a best-effort maintenance path."
+fi
+
 info "Checking browser script syntax"
 find api/engine/static -type f -name '*.js' | sort | while IFS= read -r script_path; do
   node --check "${script_path}"

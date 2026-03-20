@@ -97,6 +97,22 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `INSTALLATION_PROFILE` can provide a named starting posture for room behavior and kiosk defaults. Explicit env vars still override profile defaults.
 - Public write paths are also guarded by server-side WAV validation and DRF throttling. If you tune those limits, update `INGEST_MAX_UPLOAD_BYTES`, `INGEST_MAX_DURATION_SECONDS`, `PUBLIC_INGEST_RATE`, and `PUBLIC_REVOKE_RATE` together.
 
+## Runtime contract
+
+The official supported runtime is the Docker Compose stack, with the API image
+from [api/Dockerfile](/Users/bseverns/Documents/GitHub/memory-engine-kiosk/api/Dockerfile) pinned to Python `3.12`.
+
+What that means in practice:
+
+- deployment and operator guidance assume the containerized stack
+- `docker compose up --build` is the source-of-truth runtime
+- `./scripts/check.sh` is the source-of-truth repo gate
+- local `.venv` usage is still useful, but it is a convenience path rather than the primary support contract
+
+If `./scripts/check.sh` reports a host Python other than `3.12`, treat that as
+best-effort local maintenance. It may still work, but the repo does not promise
+that every dependency will install or behave identically outside the container.
+
 Current bundled installation profiles:
 
 - `custom`: no bundled behavior defaults beyond the normal repo baseline

@@ -778,6 +778,17 @@ GitHub Actions runs the same `scripts/check.sh` path from
 `.github/workflows/check.yml`, using a repo-local `.venv` so CI follows the same
 Python dependency layout as local maintenance.
 
+The runtime contract is intentionally narrower than “any Python that happens to
+work on a laptop”:
+
+- the official supported runtime is the Docker / Compose stack
+- the API container is pinned to Python `3.12` in `api/Dockerfile`
+- local `.venv` runs are useful for maintenance and CI parity, but they are
+  best-effort rather than the primary support promise
+
+That is why `scripts/check.sh` now prints the active Python version before it
+runs the gate.
+
 ## Capacity and decay posture
 
 There is no explicit application-level "maximum memories" cap in the current
