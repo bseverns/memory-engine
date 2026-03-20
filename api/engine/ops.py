@@ -1,13 +1,84 @@
 import shutil
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import redis
 from django.conf import settings
+from django.core.cache import cache
 from django.db import connection
 from django.utils import timezone
 
 from .models import Artifact, Derivative
 from .storage import s3_client
+
+WORKER_HEARTBEAT_CACHE_KEY = "memory_engine_worker_heartbeat"
+BEAT_HEARTBEAT_CACHE_KEY = "memory_engine_beat_heartbeat"
+
+
+def record_worker_heartbeat(*, at=None) -> None:
+    now = at or timezone.now()
+    cache.set(
+        WORKER_HEARTBEAT_CACHE_KEY,
+        now.isoformat(),
+        timeout=max(300, int(getattr(settings, "OPS_WORKER_HEARTBEAT_MAX_AGE_SECONDS", 180)) * 4),
+    )
+
+
+def record_beat_heartbeat(*, at=None) -> None:
+    now = at or timezone.now()
+    cache.set(
+        BEAT_HEARTBEAT_CACHE_KEY,
+        now.isoformat(),
+        timeout=max(300, int(getattr(settings, "OPS_BEAT_HEARTBEAT_MAX_AGE_SECONDS", 180)) * 4),
+    )
+
+
+def heartbeat_component(name: str, cache_key: str, max_age_seconds: int, *, now=None) -> dict:
+    now = now or timezone.now()
+    raw_value = cache.get(cache_key)
+    if not raw_value:
+        return {
+            "ok": False,
+            "error": f"No recent heartbeat from {name}.",
+        }
+    try:
+        seen_at = datetime.fromisoformat(str(raw_value))
+        if timezone.is_naive(seen_at):
+            seen_at = timezone.make_aware(seen_at, timezone.get_current_timezone())
+    except ValueError:
+        return {
+            "ok": False,
+            "error": f"Heartbeat timestamp for {name} is unreadable.",
+        }
+    age_seconds = max(0.0, (now - seen_at).total_seconds())
+    if age_seconds > max_age_seconds:
+        return {
+            "ok": False,
+            "last_seen_at": seen_at,
+            "stale_seconds": round(age_seconds, 1),
+            "error": f"{name.title()} heartbeat is stale.",
+        }
+    return {
+        "ok": True,
+        "last_seen_at": seen_at,
+        "stale_seconds": round(age_seconds, 1),
+    }
+
+
+def component_health_warnings(components: dict) -> list[dict]:
+    warnings = []
+    if not components.get("worker", {}).get("ok", True):
+        warnings.append({
+            "level": "critical",
+            "title": "Worker heartbeat is stale",
+            "detail": "Derivative generation and playback housekeeping tasks may no longer be running.",
+        })
+    if not components.get("beat", {}).get("ok", True):
+        warnings.append({
+            "level": "warning",
+            "title": "Beat heartbeat is stale",
+            "detail": "Scheduled expiry and pruning tasks may no longer be advancing on time.",
+        })
+    return warnings
 
 
 def health_component_status() -> tuple[bool, dict]:
@@ -32,6 +103,17 @@ def health_component_status() -> tuple[bool, dict]:
         components["storage"] = {"ok": True}
     except Exception as exc:
         components["storage"] = {"ok": False, "error": str(exc)}
+
+    components["worker"] = heartbeat_component(
+        "celery worker",
+        WORKER_HEARTBEAT_CACHE_KEY,
+        int(getattr(settings, "OPS_WORKER_HEARTBEAT_MAX_AGE_SECONDS", 180)),
+    )
+    components["beat"] = heartbeat_component(
+        "celery beat",
+        BEAT_HEARTBEAT_CACHE_KEY,
+        int(getattr(settings, "OPS_BEAT_HEARTBEAT_MAX_AGE_SECONDS", 180)),
+    )
 
     ok = all(component["ok"] for component in components.values())
     return ok, components

@@ -155,6 +155,10 @@ sh -c "${COMPOSE_BIN} ps"
 
 info "Deployment finished."
 info "Kiosk URL: ${EXTERNAL_SCHEME}://${PUBLIC_HOST}/kiosk/"
+info "Room URL: ${EXTERNAL_SCHEME}://${PUBLIC_HOST}/room/"
 if [ "${EXTERNAL_SCHEME}" = "http" ]; then
   info "Note: browser microphone access may still be blocked over plain HTTP on a remote IP."
 fi
+info "Browser launcher helper:"
+info "  ./scripts/browser_kiosk.sh --role kiosk --base-url ${EXTERNAL_SCHEME}://${PUBLIC_HOST}"
+info "  ./scripts/browser_kiosk.sh --role room --base-url ${EXTERNAL_SCHEME}://${PUBLIC_HOST}"

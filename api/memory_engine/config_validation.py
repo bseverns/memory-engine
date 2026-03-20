@@ -50,6 +50,7 @@ def validate_runtime_settings(settings_obj) -> None:
     room_tone_source_url = str(getattr(settings_obj, "ROOM_TONE_SOURCE_URL", "") or "").strip()
     kiosk_default_language_code = str(getattr(settings_obj, "KIOSK_DEFAULT_LANGUAGE_CODE", "en") or "").strip().lower()
     installation_profile = str(getattr(settings_obj, "INSTALLATION_PROFILE", "custom") or "").strip().lower()
+    ops_session_binding_mode = str(getattr(settings_obj, "OPS_SESSION_BINDING_MODE", "user_agent") or "").strip().lower()
     if room_tone_source_mode not in {"synthetic", "site_ambience"}:
         errors.append("ROOM_TONE_SOURCE_MODE must be 'synthetic' or 'site_ambience'.")
     if room_tone_source_mode == "site_ambience":
@@ -94,6 +95,9 @@ def validate_runtime_settings(settings_obj) -> None:
     ensure_positive(errors, settings_obj, "OPS_SESSION_TTL_SECONDS")
     ensure_positive(errors, settings_obj, "OPS_LOGIN_MAX_ATTEMPTS")
     ensure_positive(errors, settings_obj, "OPS_LOGIN_LOCKOUT_SECONDS")
+    ensure_positive(errors, settings_obj, "OPS_WORKER_HEARTBEAT_MAX_AGE_SECONDS")
+    ensure_positive(errors, settings_obj, "OPS_BEAT_HEARTBEAT_MAX_AGE_SECONDS")
+    ensure_positive(errors, settings_obj, "OPS_THROTTLE_EVENT_WINDOW_SECONDS")
     ensure_positive(errors, settings_obj, "MEDIA_ACCESS_TOKEN_TTL_SECONDS")
     ensure_positive(errors, settings_obj, "SURFACE_ACCESS_TOKEN_TTL_SECONDS")
     ensure_positive(errors, settings_obj, "INGEST_MAX_UPLOAD_BYTES")
@@ -112,6 +116,8 @@ def validate_runtime_settings(settings_obj) -> None:
     if installation_profile not in set(available_installation_profiles()):
         joined_profiles = ", ".join(available_installation_profiles())
         errors.append(f"INSTALLATION_PROFILE must be one of: {joined_profiles}.")
+    if ops_session_binding_mode not in {"strict", "user_agent", "none"}:
+        errors.append("OPS_SESSION_BINDING_MODE must be 'strict', 'user_agent', or 'none'.")
     for network in list(getattr(settings_obj, "OPS_ALLOWED_NETWORKS", []) or []):
         try:
             ipaddress.ip_network(str(network), strict=False)

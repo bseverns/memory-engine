@@ -32,7 +32,7 @@ from .media_access import (
 )
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative
 from .operator_auth import operator_secret_configured, operator_session_active
-from .ops import disk_status, health_component_status, pool_warnings, retention_summary
+from .ops import component_health_warnings, disk_status, health_component_status, pool_warnings, retention_summary
 from .pool import (
     artifact_age_hours,
     artifact_density,
@@ -59,13 +59,14 @@ from .throttling import (
     PublicIngestThrottle,
     PublicRevokeAbuseThrottle,
     PublicRevokeThrottle,
+    public_throttle_snapshots,
 )
 
 
 def operator_api_denied():
     if not operator_secret_configured():
         return Response({"error": "operator secret is not configured"}, status=503)
-    return Response({"error": "operator authentication required or session no longer matches this network/browser"}, status=403)
+    return Response({"error": "operator authentication required or session no longer matches the configured binding policy"}, status=403)
 
 
 def request_operator_label(request) -> str:
@@ -519,8 +520,22 @@ def node_status(request):
     playable_count = len(playable_artifacts)
     storage = disk_status(settings.OPS_STORAGE_PATH)
     retention = retention_summary(now=now)
+    throttles = public_throttle_snapshots()
     warnings = []
     operator_state = steward_state_payload()
+    warnings.extend(component_health_warnings(components))
+    if throttles["public_ingest"]["recent_denials"] > 0 or throttles["public_ingest_ip"]["recent_denials"] > 0:
+        warnings.append({
+            "level": "warning",
+            "title": "Recent ingest throttling detected",
+            "detail": "The recording station has recently hit its public ingest budget. Consider raising the limit for this installation if busy periods are expected.",
+        })
+    if throttles["public_revoke"]["recent_denials"] > 0 or throttles["public_revoke_ip"]["recent_denials"] > 0:
+        warnings.append({
+            "level": "warning",
+            "title": "Recent revoke throttling detected",
+            "detail": "Receipt revocation requests have recently hit their public rate limit.",
+        })
     if operator_state["maintenance_mode"]:
         warnings.append({
             "level": "warning",
@@ -551,6 +566,7 @@ def node_status(request):
         "playable": playable_count,
         "storage": storage,
         "retention": retention,
+        "throttles": throttles,
         "warnings": warnings,
         "expired": expired,
         "revoked": revoked,

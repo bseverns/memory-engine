@@ -154,6 +154,44 @@
     return cards;
   }
 
+  function throttleCards(throttles) {
+    if (!throttles) {
+      return [{
+        tagName: "article",
+        className: "component-card degraded",
+        title: "Throttle data unavailable",
+        detail: "The node did not report current public ingest and revoke budgets.",
+      }];
+    }
+
+    const lastEvent = throttles.public_ingest?.last_denied_at
+      || throttles.public_revoke?.last_denied_at
+      || throttles.public_ingest_ip?.last_denied_at
+      || throttles.public_revoke_ip?.last_denied_at;
+    const windowMinutes = Math.max(1, Math.round((Number(throttles.public_ingest?.window_seconds || 3600) / 60)));
+
+    return [
+      {
+        tagName: "article",
+        className: `component-card ${Number(throttles.public_ingest?.recent_denials || 0) > 0 ? "degraded" : "ready"}`,
+        title: "Recent ingest denials",
+        detail: `${throttles.public_ingest?.recent_denials || 0} kiosk-level and ${throttles.public_ingest_ip?.recent_denials || 0} IP-level denials in the last ${windowMinutes} minute(s).`,
+      },
+      {
+        tagName: "article",
+        className: `component-card ${Number(throttles.public_revoke?.recent_denials || 0) > 0 ? "degraded" : "ready"}`,
+        title: "Recent revoke denials",
+        detail: `${throttles.public_revoke?.recent_denials || 0} kiosk-level and ${throttles.public_revoke_ip?.recent_denials || 0} IP-level denials in the last ${windowMinutes} minute(s).`,
+      },
+      {
+        tagName: "article",
+        className: "component-card ready",
+        title: "Last throttle event",
+        detail: lastEvent ? new Date(lastEvent).toLocaleString() : "No recent public throttling events.",
+      },
+    ];
+  }
+
   function makeCard(doc, card) {
     const el = doc.createElement(card.tagName || "article");
     el.className = card.className || "";
@@ -216,7 +254,12 @@
       opsRetentionRawSoon: doc.getElementById("opsRetentionRawSoon"),
       opsRetentionFossils: doc.getElementById("opsRetentionFossils"),
       opsRetentionResidue: doc.getElementById("opsRetentionResidue"),
+      opsIngestRate: doc.getElementById("opsIngestRate"),
+      opsIngestIpRate: doc.getElementById("opsIngestIpRate"),
+      opsRevokeRate: doc.getElementById("opsRevokeRate"),
+      opsRevokeIpRate: doc.getElementById("opsRevokeIpRate"),
       opsRetentionSummary: doc.getElementById("opsRetentionSummary"),
+      opsThrottleSummary: doc.getElementById("opsThrottleSummary"),
       opsWarnings: doc.getElementById("opsWarnings"),
       opsComponents: doc.getElementById("opsComponents"),
       opsRefreshed: doc.getElementById("opsRefreshed"),
@@ -280,8 +323,13 @@
     dom.opsRetentionRawSoon.textContent = String(payload.retention?.raw_expiring_soon ?? "-");
     dom.opsRetentionFossils.textContent = String(payload.retention?.fossil_retained ?? "-");
     dom.opsRetentionResidue.textContent = String(payload.retention?.fossil_residue_only ?? "-");
+    dom.opsIngestRate.textContent = String(payload.throttles?.public_ingest?.rate || "-");
+    dom.opsIngestIpRate.textContent = String(payload.throttles?.public_ingest_ip?.rate || "-");
+    dom.opsRevokeRate.textContent = String(payload.throttles?.public_revoke?.rate || "-");
+    dom.opsRevokeIpRate.textContent = String(payload.throttles?.public_revoke_ip?.rate || "-");
     replaceCardList(doc, dom.opsWarnings, warningCards(payload.warnings || []));
     replaceCardList(doc, dom.opsRetentionSummary, retentionCards(payload.retention));
+    replaceCardList(doc, dom.opsThrottleSummary, throttleCards(payload.throttles));
     replaceCardList(doc, dom.opsComponents, componentCards(payload.components || {}));
     renderOperatorState(dom, payload.operator_state || {});
     dom.opsRefreshed.textContent = `Last refreshed ${new Date().toLocaleTimeString()}`;
@@ -430,6 +478,7 @@
     renderPayload,
     retentionCards,
     start,
+    throttleCards,
     warningCards,
   };
 }));

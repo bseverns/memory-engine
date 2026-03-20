@@ -32,6 +32,7 @@ assigned the right URL and role.
 
 - On the recording machine, configure Chromium to open directly to `/kiosk/`.
 - On the playback machine, configure Chromium to open directly to `/room/`.
+- If you are scripting browser launch, use `./scripts/browser_kiosk.sh --role kiosk --base-url ...` for the recorder and `./scripts/browser_kiosk.sh --role room --base-url ...` for the listening machine.
 - Hide browser chrome, tabs, and address bar. The participant path should not depend on visible browser controls.
 - Disable sleep or screen blanking during open hours.
 - Disable first-run prompts, update nags, restore-session prompts, and crash restore prompts.

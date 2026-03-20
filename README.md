@@ -34,6 +34,20 @@ For a real multi-machine install, the intended role split is:
 - playback machine opens `/room/`
 - steward/operator machine opens `/ops/`
 
+### Surface snapshots
+
+Recording kiosk idle:
+
+![Recording kiosk idle](artifacts/screenshots/recording-kiosk-idle.png)
+
+Listening surface:
+
+![Room playback surface](artifacts/screenshots/room-playback.png)
+
+Operator dashboard:
+
+![Operator dashboard ready state](artifacts/screenshots/ops-ready.png)
+
 ## Supported Runtime
 
 The official supported runtime for this repo is:
@@ -100,14 +114,21 @@ For stronger steward posture on a real server, also set:
 
 ```env
 OPS_ALLOWED_NETWORKS=127.0.0.1/32,10.0.0.0/8
+OPS_SESSION_BINDING_MODE=user_agent
 OPS_LOGIN_MAX_ATTEMPTS=6
 OPS_LOGIN_LOCKOUT_SECONDS=900
 ```
 
 That adds a trusted-network allowlist and temporary lockout after repeated bad
-secret guesses. Operator sessions are also bound to the originating
-network/browser tuple, so replaying the cookie from somewhere else is not
-enough to keep `/ops/` open.
+secret guesses. Operator sessions are browser-bound by default, without forcing
+the operator IP to stay fixed across the session. If you want the older stricter
+posture, set `OPS_SESSION_BINDING_MODE=strict`. For a trusted single-site
+install where proxy/IP churn is more annoying than helpful, `none` is also
+available.
+
+`/healthz` and `/ops/` now also track Celery worker and beat heartbeats, so a
+node can show degraded if Redis is reachable but scheduled maintenance or
+derivative work is no longer advancing.
 
 If the app sits behind a reverse proxy and you want throttling / operator
 allowlisting to trust `X-Forwarded-For`, also set:
@@ -133,6 +154,17 @@ That wrapper will:
 - create a backup
 - deploy the stack
 - print final status and readiness
+
+For dedicated client machines, the repo now also includes a Chromium launcher
+helper:
+
+```bash
+./scripts/browser_kiosk.sh --role kiosk --base-url https://memory.example.com
+./scripts/browser_kiosk.sh --role room --base-url https://memory.example.com
+```
+
+The `/room/` launch path automatically adds autoplay-hardening flags so the
+listening surface is less likely to wake up visually alive but mute after boot.
 
 Useful flags:
 
@@ -173,8 +205,10 @@ ambiguous runtime behavior.
 
 Public ingest is also hardened server-side now: the API enforces a maximum WAV
 upload size, a maximum recording duration, PCM 16-bit mono WAV validation, and
-IP-based throttling on ingest and revoke endpoints instead of trusting the
-browser's reported duration alone.
+public throttling on ingest and revoke endpoints instead of trusting the
+browser's reported duration alone. `/ops/` now exposes both the configured
+budgets and recent throttle hits so a busy installation can see the ceiling
+before it feels arbitrary.
 
 For common installs, you can also start from a named behavior preset:
 
@@ -205,6 +239,14 @@ the dedicated playback surface, and the operator dashboard in headless
 Chromium, and writes example screenshots under `artifacts/screenshots/`.
 The browser walkthrough now also signs into `/ops/`, applies live steward
 controls, and captures how `/kiosk/` and `/room/` react to those changes.
+
+More captured states:
+
+- Accessible recording mode: ![Accessible recording kiosk](artifacts/screenshots/recording-kiosk-accessible.png)
+- Spanish recording mode: ![Spanish recording kiosk](artifacts/screenshots/recording-kiosk-spanish.png)
+- Playback info lightbox: ![Playback info lightbox](artifacts/screenshots/room-playback-info.png)
+- Quieter listening mode: ![Room playback quieter mode](artifacts/screenshots/room-playback-quieter.png)
+- Live operator controls: ![Operator dashboard live controls](artifacts/screenshots/ops-controls-live.png)
 
 Longer operator notes live in `docs/maintenance.md`.
 That includes a MinIO section covering which credentials live where, what is set before first deploy, and how manual MinIO provisioning changes the `.env` values.
@@ -335,6 +377,7 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 - `scripts/check.sh` — browser syntax, frontend smoke tests, Django behavior tests, and patch-hygiene validation
 - `scripts/clean_local.sh` — clear regenerable local caches such as `api/.test-cache`, `__pycache__`, and Playwright output
 - `scripts/doctor.sh` — operator-focused env, compose, storage, and browser-constraint checks
+- `scripts/browser_kiosk.sh` — Chromium kiosk launcher for `/kiosk/`, `/room/`, or `/ops/`, with autoplay-safe flags for the listening surface
 - `scripts/deploy.sh` — server-side deploy helper for IP-now / domain-later rollout
 - `scripts/update.sh` — server-side pull, verify, backup, deploy, and status helper for existing installs
 - `scripts/first_boot.sh` — bootstrap strong secrets and node identity before deployment

@@ -109,6 +109,8 @@ be treated as a steward task, not the public-facing install posture.
 - launch Chromium directly to `/kiosk/`
 - ensure microphone permission is already granted for that URL
 - verify a page reload returns to the quiet idle state
+- helper form:
+  `./scripts/browser_kiosk.sh --role kiosk --base-url https://memory.example.com`
 
 ### Playback machine
 
@@ -117,6 +119,8 @@ be treated as a steward task, not the public-facing install posture.
 - verify autoplay succeeds after boot; for unattended installs, prefer a launch
   policy such as Chromium's `--autoplay-policy=no-user-gesture-required`
   instead of relying on a one-tap recovery
+- helper form:
+  `./scripts/browser_kiosk.sh --role room --base-url https://memory.example.com`
 
 ### Operator machine
 

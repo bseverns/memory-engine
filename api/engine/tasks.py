@@ -8,11 +8,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from celery import shared_task
+from celery.signals import before_task_publish
 from django.utils import timezone
 from django.conf import settings
 from django.db import transaction
 
 from .models import Artifact, Derivative
+from .ops import record_beat_heartbeat, record_worker_heartbeat
 from .storage import get_bytes, put_bytes, delete_key
 
 ESSENCE_SAMPLE_RATE = 12000
@@ -20,6 +22,13 @@ ESSENCE_DURATION_SECONDS = 8
 ESSENCE_LOW_PASS_HZ = 2200
 ESSENCE_TARGET_PEAK = 0.28
 ESSENCE_ENVELOPE_WINDOW = 601
+HEARTBEAT_TASK_NAME = "engine.tasks.heartbeat_tick"
+
+
+@before_task_publish.connect
+def record_beat_publish(sender=None, **kwargs):
+    if str(sender or "") == HEARTBEAT_TASK_NAME:
+        record_beat_heartbeat()
 
 def _wav_to_mono_float32(wav_bytes: bytes):
     # Minimal WAV PCM 16-bit mono decoder (for kiosk WAV output).
@@ -124,6 +133,7 @@ def _essence_from_samples(sample_rate: int, samples: np.ndarray) -> tuple[int, n
 
 @shared_task
 def generate_spectrogram(artifact_id: int) -> None:
+    record_worker_heartbeat()
     art = Artifact.objects.get(id=artifact_id)
     if not art.raw_uri:
         return
@@ -158,6 +168,7 @@ def generate_spectrogram(artifact_id: int) -> None:
 
 @shared_task
 def generate_essence_audio(artifact_id: int) -> None:
+    record_worker_heartbeat()
     art = Artifact.objects.get(id=artifact_id)
     if not art.raw_uri:
         return
@@ -179,6 +190,7 @@ def generate_essence_audio(artifact_id: int) -> None:
 
 @shared_task
 def expire_raw() -> None:
+    record_worker_heartbeat()
     now = timezone.now()
     qs = Artifact.objects.filter(status=Artifact.STATUS_ACTIVE)
     for art in qs.iterator():
@@ -221,6 +233,7 @@ def expire_raw() -> None:
 
 @shared_task
 def prune_derivatives() -> None:
+    record_worker_heartbeat()
     now = timezone.now()
     qs = Derivative.objects.filter(expires_at__isnull=False, expires_at__lt=now)
     for d in qs.iterator():
@@ -229,3 +242,8 @@ def prune_derivatives() -> None:
         except Exception:
             pass
         d.delete()
+
+
+@shared_task(name=HEARTBEAT_TASK_NAME)
+def heartbeat_tick() -> None:
+    record_worker_heartbeat()

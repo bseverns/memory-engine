@@ -703,7 +703,7 @@ It combines:
 - lane distribution
 - mood distribution
 - disk headroom
-- warnings for low pool size or lane/mood imbalance
+- warnings for low pool size, lane/mood imbalance, or stale worker/beat heartbeats
 
 ### `/ops/`
 
@@ -714,7 +714,8 @@ The HTML dashboard is rendered by Django and hydrated by
 
 `/ops/` is no longer a public status page. It now requires the shared steward
 secret from `OPS_SHARED_SECRET`, can optionally be restricted by
-`OPS_ALLOWED_NETWORKS`, stores that access in a browser-bound session, and then
+`OPS_ALLOWED_NETWORKS`, stores that access in a browser-bound session (by
+default user-agent-bound rather than IP-bound), and then
 exposes live controls for:
 
 - pausing intake

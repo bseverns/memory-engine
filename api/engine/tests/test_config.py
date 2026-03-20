@@ -73,6 +73,14 @@ class RuntimeConfigValidationTests(EngineTestCase):
 
         self.assertIn("OPS_ALLOWED_NETWORKS", str(ctx.exception))
 
+    def test_runtime_config_validation_rejects_unknown_operator_session_binding_mode(self):
+        config = default_runtime_config(OPS_SESSION_BINDING_MODE="mystery")
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("OPS_SESSION_BINDING_MODE", str(ctx.exception))
+
     def test_installation_profile_defaults_return_expected_values(self):
         self.assertEqual(
             installation_profile_default("shared_lab", "KIOSK_DEFAULT_MAX_RECORDING_SECONDS", 120),

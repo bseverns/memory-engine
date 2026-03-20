@@ -87,6 +87,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/clean_local.sh` removes regenerable local caches such as `api/.test-cache`, `__pycache__`, and Playwright output. Pass `--include-screenshots` if you also want to clear generated screenshots.
 - `.github/workflows/check.yml` runs that same `scripts/check.sh` gate in GitHub Actions using a repo-local `.venv`, so CI stays aligned with the local check path.
 - `scripts/doctor.sh` checks `.env`, compose state, MinIO reachability through `/healthz`, and browser/TLS constraints that affect recording.
+- `scripts/browser_kiosk.sh` launches Chromium into `/kiosk/`, `/room/`, or `/ops/` with a repeatable kiosk-safe flag set. The `/room/` role adds autoplay-hardening flags automatically.
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.
 - `scripts/restore.sh` restores one of those snapshots into the current stack and now asks for explicit confirmation plus a fresh pre-restore snapshot by default.
@@ -97,6 +98,8 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `INSTALLATION_PROFILE` can provide a named starting posture for room behavior and kiosk defaults. Explicit env vars still override profile defaults.
 - Public write paths are also guarded by server-side WAV validation and two-layer DRF throttling: a kiosk-friendly client limit plus a broader IP abuse ceiling. If you tune those limits, update `INGEST_MAX_UPLOAD_BYTES`, `INGEST_MAX_DURATION_SECONDS`, `PUBLIC_INGEST_RATE`, `PUBLIC_INGEST_IP_RATE`, `PUBLIC_REVOKE_RATE`, and `PUBLIC_REVOKE_IP_RATE` together.
 - Leave `DJANGO_TRUST_X_FORWARDED_FOR=0` unless your reverse proxy strips and rewrites forwarded headers correctly. If you turn it on, throttling and steward network allowlists will trust that header.
+- `/healthz` and `/ops/` now also expect fresh Celery worker and beat heartbeats. If Redis is up but those heartbeats go stale, the node should show degraded rather than falsely green.
+- Operator sessions now default to `OPS_SESSION_BINDING_MODE=user_agent`, which is less brittle than pinning to the steward IP. Use `strict` if you explicitly want IP+browser binding, or `none` for a very trusted single-site install.
 
 ## Runtime contract
 
@@ -162,6 +165,7 @@ There are three practical health surfaces:
 - `/ops/` can also be narrowed to trusted IPs or CIDR ranges with `OPS_ALLOWED_NETWORKS`.
 - repeated bad sign-in attempts now lock out temporarily based on `OPS_LOGIN_MAX_ATTEMPTS` and `OPS_LOGIN_LOCKOUT_SECONDS`.
 - `/ops/` also reports retention posture: raw audio still held, raw audio expiring soon, fossils retained, and fossils that now exist only as residue.
+- For unattended listening machines, launch Chromium through `./scripts/browser_kiosk.sh --role room --base-url ...` so the browser picks up the autoplay-safe flags instead of relying on a one-tap recovery after every reboot.
 
 Expected healthy services:
 

@@ -33,6 +33,13 @@ def operator_allowed_networks() -> list[str]:
     return [str(entry).strip() for entry in configured if str(entry).strip()]
 
 
+def operator_session_binding_mode() -> str:
+    mode = str(getattr(settings, "OPS_SESSION_BINDING_MODE", "user_agent") or "").strip().lower()
+    if mode in {"strict", "user_agent", "none"}:
+        return mode
+    return "user_agent"
+
+
 def operator_request_allowed(request) -> bool:
     allowed_networks = operator_allowed_networks()
     if not allowed_networks:
@@ -56,7 +63,13 @@ def operator_request_allowed(request) -> bool:
 
 
 def operator_session_binding(request) -> str:
-    payload = f"{request_operator_ip(request)}|{request_operator_user_agent(request)}"
+    mode = operator_session_binding_mode()
+    if mode == "none":
+        payload = "operator-session"
+    elif mode == "strict":
+        payload = f"{request_operator_ip(request)}|{request_operator_user_agent(request)}"
+    else:
+        payload = request_operator_user_agent(request)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

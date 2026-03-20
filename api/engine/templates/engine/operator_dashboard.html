@@ -100,6 +100,34 @@
     <section class="panel dashboard-panel">
       <div class="panel-head">
         <div>
+          <p class="section-kicker">Public budgets</p>
+          <h3>Ingest and revoke rate posture</h3>
+        </div>
+      </div>
+      <div class="status-grid">
+        <article class="status-card">
+          <p class="section-kicker">Ingest / kiosk</p>
+          <div id="opsIngestRate" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Ingest / IP</p>
+          <div id="opsIngestIpRate" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Revoke / kiosk</p>
+          <div id="opsRevokeRate" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Revoke / IP</p>
+          <div id="opsRevokeIpRate" class="status-number">-</div>
+        </article>
+      </div>
+      <div id="opsThrottleSummary" class="component-list"></div>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
           <p class="section-kicker">Dependencies</p>
           <h3>Readiness checks</h3>
         </div>

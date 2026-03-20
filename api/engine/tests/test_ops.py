@@ -1,15 +1,31 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.core.cache import cache
 from django.test import override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 
 from .base import EngineTestCase, make_test_wav_bytes
+from ..ops import (
+    BEAT_HEARTBEAT_CACHE_KEY,
+    WORKER_HEARTBEAT_CACHE_KEY,
+    health_component_status,
+    record_beat_heartbeat,
+    record_worker_heartbeat,
+)
+from ..throttling import public_throttle_snapshots, record_throttle_denial
 from ..models import ConsentManifest, Derivative, StewardAction, StewardState
+from ..tasks import heartbeat_tick
 
 
 class OperatorBehaviorTests(EngineTestCase):
+    def setUp(self):
+        super().setUp()
+        cache.delete(WORKER_HEARTBEAT_CACHE_KEY)
+        cache.delete(BEAT_HEARTBEAT_CACHE_KEY)
+        cache.clear()
+
     @patch("engine.api_views.health_component_status")
     def test_healthz_returns_503_when_dependency_check_fails(self, health_mock):
         health_mock.return_value = (
@@ -52,6 +68,21 @@ class OperatorBehaviorTests(EngineTestCase):
         response = self.client.get("/api/v1/node/status", REMOTE_ADDR="127.0.0.1", HTTP_USER_AGENT="browser-b")
 
         self.assertEqual(response.status_code, 403)
+
+    def test_operator_session_survives_ip_change_when_binding_mode_is_user_agent(self):
+        self.client.post("/ops/", {"secret": "test-ops-secret"}, REMOTE_ADDR="127.0.0.1", HTTP_USER_AGENT="browser-a")
+
+        response = self.client.get("/api/v1/node/status", REMOTE_ADDR="127.0.0.2", HTTP_USER_AGENT="browser-a")
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(OPS_SESSION_BINDING_MODE="none")
+    def test_operator_session_can_be_relaxed_for_trusted_single_site_installs(self):
+        self.client.post("/ops/", {"secret": "test-ops-secret"}, REMOTE_ADDR="127.0.0.1", HTTP_USER_AGENT="browser-a")
+
+        response = self.client.get("/api/v1/node/status", REMOTE_ADDR="127.0.0.2", HTTP_USER_AGENT="browser-b")
+
+        self.assertEqual(response.status_code, 200)
 
     def test_operator_controls_toggle_persisted_state_and_audit(self):
         self.login_operator()
@@ -258,3 +289,101 @@ class OperatorBehaviorTests(EngineTestCase):
         response = self.client.get("/api/v1/node/status")
 
         self.assertEqual(response.status_code, 403)
+
+    @patch("engine.ops.s3_client")
+    @patch("engine.ops.redis.Redis.from_url")
+    @patch("engine.ops.connection.cursor")
+    def test_health_component_status_reports_stale_worker_and_beat_heartbeats(
+        self,
+        cursor_mock,
+        redis_from_url_mock,
+        s3_client_mock,
+    ):
+        cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
+        redis_from_url_mock.return_value.ping.return_value = True
+        s3_client_mock.return_value.head_bucket.return_value = {}
+
+        ok, components = health_component_status()
+
+        self.assertFalse(ok)
+        self.assertFalse(components["worker"]["ok"])
+        self.assertFalse(components["beat"]["ok"])
+
+    @patch("engine.ops.s3_client")
+    @patch("engine.ops.redis.Redis.from_url")
+    @patch("engine.ops.connection.cursor")
+    def test_health_component_status_is_ok_with_fresh_worker_and_beat_heartbeats(
+        self,
+        cursor_mock,
+        redis_from_url_mock,
+        s3_client_mock,
+    ):
+        cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
+        redis_from_url_mock.return_value.ping.return_value = True
+        s3_client_mock.return_value.head_bucket.return_value = {}
+        record_worker_heartbeat()
+        record_beat_heartbeat()
+
+        ok, components = health_component_status()
+
+        self.assertTrue(ok)
+        self.assertTrue(components["worker"]["ok"])
+        self.assertTrue(components["beat"]["ok"])
+
+    def test_heartbeat_tick_records_worker_liveness(self):
+        heartbeat_tick()
+
+        self.assertTrue(cache.get(WORKER_HEARTBEAT_CACHE_KEY))
+
+    @patch("engine.api_views.health_component_status")
+    def test_node_status_warns_when_worker_and_beat_heartbeats_are_stale(self, health_mock):
+        health_mock.return_value = (
+            False,
+            {
+                "database": {"ok": True},
+                "redis": {"ok": True},
+                "storage": {"ok": True},
+                "worker": {"ok": False, "error": "stale"},
+                "beat": {"ok": False, "error": "stale"},
+            },
+        )
+        self.login_operator()
+
+        response = self.client.get("/api/v1/node/status")
+
+        self.assertEqual(response.status_code, 200)
+        titles = {warning["title"] for warning in response.json()["warnings"]}
+        self.assertIn("Worker heartbeat is stale", titles)
+        self.assertIn("Beat heartbeat is stale", titles)
+
+    def test_public_throttle_snapshots_track_recent_denials(self):
+        record_throttle_denial("public_ingest")
+        record_throttle_denial("public_ingest_ip")
+
+        payload = public_throttle_snapshots()
+
+        self.assertEqual(payload["public_ingest"]["recent_denials"], 1)
+        self.assertEqual(payload["public_ingest_ip"]["recent_denials"], 1)
+        self.assertEqual(payload["public_ingest"]["rate"], "180/hour")
+
+    @patch("engine.api_views.health_component_status")
+    def test_node_status_warns_when_public_ingest_is_recently_throttled(self, health_mock):
+        health_mock.return_value = (
+            True,
+            {
+                "database": {"ok": True},
+                "redis": {"ok": True},
+                "storage": {"ok": True},
+                "worker": {"ok": True},
+                "beat": {"ok": True},
+            },
+        )
+        self.login_operator()
+        record_throttle_denial("public_ingest")
+
+        response = self.client.get("/api/v1/node/status")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["throttles"]["public_ingest"]["recent_denials"], 1)
+        titles = {warning["title"] for warning in response.json()["warnings"]}
+        self.assertIn("Recent ingest throttling detected", titles)
