@@ -1,4 +1,7 @@
 from datetime import timedelta
+import io
+import math
+import wave
 from types import SimpleNamespace
 
 from django.test import TestCase
@@ -81,6 +84,8 @@ def default_runtime_config(**overrides):
         "OPS_SESSION_TTL_SECONDS": 43200,
         "MEDIA_ACCESS_TOKEN_TTL_SECONDS": 900,
         "SURFACE_ACCESS_TOKEN_TTL_SECONDS": 86400,
+        "INGEST_MAX_UPLOAD_BYTES": 32 * 1024 * 1024,
+        "INGEST_MAX_DURATION_SECONDS": 300,
         "KIOSK_DEFAULT_LANGUAGE_CODE": "en",
         "KIOSK_DEFAULT_MAX_RECORDING_SECONDS": 120,
         "OPS_POOL_LOW_COUNT": 6,
@@ -95,8 +100,25 @@ def default_runtime_config(**overrides):
     return SimpleNamespace(**payload)
 
 
+def make_test_wav_bytes(*, seconds: float = 0.5, sample_rate: int = 8000, amplitude: float = 0.2) -> bytes:
+    frame_count = max(1, int(round(seconds * sample_rate)))
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        frames = bytearray()
+        for index in range(frame_count):
+            sample = math.sin((index / sample_rate) * 2 * math.pi * 330.0)
+            pcm = int(max(-1.0, min(1.0, sample * amplitude)) * 32767.0)
+            frames.extend(int(pcm).to_bytes(2, "little", signed=True))
+        wav_file.writeframes(bytes(frames))
+    return buffer.getvalue()
+
+
 __all__ = [
     "EngineTestCase",
     "default_runtime_config",
+    "make_test_wav_bytes",
     "validate_runtime_settings",
 ]

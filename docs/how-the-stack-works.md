@@ -303,7 +303,8 @@ This is the normal path for `ROOM` and `FOSSIL`.
 
 1. The browser records mono audio, processes it locally, and uploads a WAV
    file plus `consent_mode` and `duration_ms`.
-2. Django validates the mode and presence of the uploaded file.
+2. Django validates the mode, WAV structure, mono/bit-depth contract, upload
+   size, and server-side duration ceiling before accepting the file.
 3. Django generates a revocation token and stores only its hash in
    `ConsentManifest`.
 4. Django creates an `Artifact` row in `ACTIVE` state with a retention deadline.
@@ -325,7 +326,7 @@ Visually, the ingest branch looks like this:
 ```mermaid
 flowchart TD
     start["Recording kiosk captures mono WAV"] --> upload["POST /api/v1/artifacts/audio"]
-    upload --> validate["Django validates file + consent mode"]
+    upload --> validate["Django validates file + consent + WAV contract"]
     validate --> consent["Create ConsentManifest + hashed revoke token"]
     consent --> artifact["Create ACTIVE Artifact with retention deadline"]
     artifact --> store["Write WAV to MinIO and save raw_uri"]
@@ -335,26 +336,26 @@ flowchart TD
     queue --> fossil["Return artifact + revocation token"]
 
     nosaveStart["Recording kiosk captures one-time WAV"] --> nosaveUpload["POST /api/v1/ephemeral/audio"]
-    nosaveUpload --> eph["Create EPHEMERAL Artifact + consume token"]
+    nosaveUpload --> eph["Create EPHEMERAL Artifact + one-time access token"]
     eph --> ephStore["Write WAV to MinIO"]
     ephStore --> once["Recording kiosk plays once"]
-    once --> consume["POST /api/v1/ephemeral/consume"]
-    consume --> purge["Delete blob and mark artifact REVOKED"]
+    once --> purge["First media fetch deletes blob and marks artifact REVOKED"]
 ```
 
 ### Ephemeral one-time flow: `POST /api/v1/ephemeral/audio`
 
 This exists for "Don't Save."
 
-1. Django creates a `ConsentManifest` for `NOSAVE`.
-2. Django creates an `Artifact` in `EPHEMERAL` state with a very short TTL.
-3. Django writes the WAV bytes to MinIO under `ephemeral/<artifact_id>/audio.wav`.
-4. Django creates a one-time consume token, stores its hash inside the consent
-   JSON, and returns the `play_url` and plain consume token.
-5. The browser plays the file once.
-6. The browser calls `POST /api/v1/ephemeral/consume`.
-7. Django validates the consume token, deletes the MinIO object, blanks the
-   URI, and marks the artifact `REVOKED`.
+1. Django validates the WAV with the same server-side checks used for saved
+   audio.
+2. Django creates a `ConsentManifest` for `NOSAVE`.
+3. Django creates an `Artifact` in `EPHEMERAL` state with a very short TTL.
+4. Django writes the WAV bytes to MinIO under `ephemeral/<artifact_id>/audio.wav`.
+5. Django creates a one-time access token, stores its hash inside the consent
+   JSON, and returns the `play_url`.
+6. The browser plays the file once.
+7. First media access validates that token, deletes the MinIO object, blanks
+   the URI, and marks the artifact `REVOKED`.
 
 This is a deliberate tradeoff: the ephemeral path is still traceable in the DB
 briefly, but it avoids inventing a second playback mechanism only for one-time

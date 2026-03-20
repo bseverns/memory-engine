@@ -8,11 +8,12 @@ from django.http import FileResponse, Http404
 from django.utils import timezone
 
 from rest_framework import status
-from rest_framework.decorators import api_view, parser_classes
+from rest_framework.decorators import api_view, parser_classes, throttle_classes
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from .consent import consent_manifest, default_node_from_env, hash_token, make_revocation_token
+from .ingest_validation import UploadValidationError, validate_wav_upload
 from .media_access import (
     PURPOSE_EPHEMERAL_AUDIO,
     PURPOSE_POOL_AUDIO,
@@ -48,6 +49,7 @@ from .steward import (
     update_steward_state,
 )
 from .tasks import generate_essence_audio, generate_spectrogram
+from .throttling import PublicIngestThrottle, PublicRevokeThrottle
 
 
 def operator_api_denied():
@@ -134,6 +136,7 @@ def serialize_surface_spectrogram(derivative: Derivative) -> dict:
 
 @api_view(["POST"])
 @parser_classes([MultiPartParser, FormParser])
+@throttle_classes([PublicIngestThrottle])
 def create_audio_artifact(request):
     state = load_steward_state()
     if state.maintenance_mode:
@@ -148,8 +151,15 @@ def create_audio_artifact(request):
     upload = request.data.get("file")
     if not upload:
         return Response({"error": "file required"}, status=400)
-
-    data = upload.read()
+    try:
+        validated_upload = validate_wav_upload(
+            upload,
+            max_bytes=int(settings.INGEST_MAX_UPLOAD_BYTES),
+            max_duration_seconds=int(settings.INGEST_MAX_DURATION_SECONDS),
+        )
+    except UploadValidationError as exc:
+        return Response({"error": exc.message}, status=exc.status_code)
+    data = validated_upload.data
     token = make_revocation_token()
     manifest = consent_manifest(consent_mode)
     consent = ConsentManifest.objects.create(json=manifest, revocation_token_hash=hash_token(token))
@@ -165,7 +175,7 @@ def create_audio_artifact(request):
             if consent_mode == "FOSSIL"
             else timezone.now() + timedelta(hours=int(manifest["retention"]["raw_ttl_hours"]))
         ),
-        duration_ms=int(request.data.get("duration_ms") or 0),
+        duration_ms=validated_upload.duration_ms,
     )
 
     key = f"raw/{artifact.id}/audio.wav"
@@ -187,6 +197,7 @@ def create_audio_artifact(request):
 
 @api_view(["POST"])
 @parser_classes([MultiPartParser, FormParser])
+@throttle_classes([PublicIngestThrottle])
 def create_ephemeral_audio(request):
     state = load_steward_state()
     if state.maintenance_mode:
@@ -197,8 +208,15 @@ def create_ephemeral_audio(request):
     upload = request.data.get("file")
     if not upload:
         return Response({"error": "file required"}, status=400)
-
-    data = upload.read()
+    try:
+        validated_upload = validate_wav_upload(
+            upload,
+            max_bytes=int(settings.INGEST_MAX_UPLOAD_BYTES),
+            max_duration_seconds=int(settings.INGEST_MAX_DURATION_SECONDS),
+        )
+    except UploadValidationError as exc:
+        return Response({"error": exc.message}, status=exc.status_code)
+    data = validated_upload.data
     consent = ConsentManifest.objects.create(
         json=consent_manifest("NOSAVE"),
         revocation_token_hash=hash_token("NOSAVE"),
@@ -211,7 +229,7 @@ def create_ephemeral_audio(request):
         status=Artifact.STATUS_EPHEMERAL,
         raw_sha256=hashlib.sha256(data).hexdigest(),
         expires_at=timezone.now() + timedelta(minutes=5),
-        duration_ms=int(request.data.get("duration_ms") or 0),
+        duration_ms=validated_upload.duration_ms,
     )
     key = f"ephemeral/{artifact.id}/audio.wav"
     put_bytes(key, data, "audio/wav")
@@ -268,6 +286,7 @@ def consume_ephemeral(request):
 
 @api_view(["POST"])
 @parser_classes([JSONParser])
+@throttle_classes([PublicRevokeThrottle])
 def revoke(request):
     token = (request.data.get("token") or "").strip().upper()
     if not token:

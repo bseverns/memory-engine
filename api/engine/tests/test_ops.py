@@ -4,7 +4,7 @@ from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 
-from .base import EngineTestCase
+from .base import EngineTestCase, make_test_wav_bytes
 from ..models import ConsentManifest, Derivative, StewardAction, StewardState
 
 
@@ -78,7 +78,7 @@ class OperatorBehaviorTests(EngineTestCase):
         state.intake_paused = True
         state.save(update_fields=["intake_paused"])
 
-        upload = SimpleUploadedFile("audio.wav", b"RIFFtest-room-audio", content_type="audio/wav")
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=3.21), content_type="audio/wav")
         response = self.client.post(
             "/api/v1/artifacts/audio",
             {"file": upload, "consent_mode": "ROOM", "duration_ms": "3210"},
@@ -93,7 +93,7 @@ class OperatorBehaviorTests(EngineTestCase):
         state.maintenance_mode = True
         state.save(update_fields=["maintenance_mode"])
 
-        upload = SimpleUploadedFile("audio.wav", b"RIFFtest-room-audio", content_type="audio/wav")
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=3.21), content_type="audio/wav")
         response = self.client.post(
             "/api/v1/artifacts/audio",
             {"file": upload, "consent_mode": "ROOM", "duration_ms": "3210"},

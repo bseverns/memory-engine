@@ -2,10 +2,12 @@ import io
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.utils import timezone
 
-from .base import EngineTestCase
+from .base import EngineTestCase, make_test_wav_bytes
 from ..media_access import (
     PURPOSE_POOL_AUDIO,
     PURPOSE_SPECTROGRAM_IMAGE,
@@ -17,7 +19,7 @@ from ..models import AccessEvent, Artifact, ConsentManifest, Derivative, Steward
 class ArtifactBehaviorTests(EngineTestCase):
     @patch("engine.api_views.put_bytes")
     def test_room_save_creates_active_artifact_and_revocation_token(self, put_bytes_mock):
-        upload = SimpleUploadedFile("audio.wav", b"RIFFtest-room-audio", content_type="audio/wav")
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=3.21), content_type="audio/wav")
 
         response = self.client.post(
             "/api/v1/artifacts/audio",
@@ -37,7 +39,7 @@ class ArtifactBehaviorTests(EngineTestCase):
     @patch("engine.api_views.generate_spectrogram.delay")
     @patch("engine.api_views.put_bytes")
     def test_fossil_save_queues_derivative_generation(self, put_bytes_mock, delay_mock, essence_mock):
-        upload = SimpleUploadedFile("audio.wav", b"RIFFtest-fossil-audio", content_type="audio/wav")
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=2.0), content_type="audio/wav")
 
         response = self.client.post(
             "/api/v1/artifacts/audio",
@@ -55,7 +57,7 @@ class ArtifactBehaviorTests(EngineTestCase):
     @patch("engine.api_views.delete_key")
     @patch("engine.api_views.put_bytes")
     def test_ephemeral_audio_can_be_consumed_and_revoked(self, put_bytes_mock, delete_key_mock, stream_key_mock):
-        upload = SimpleUploadedFile("audio.wav", b"RIFFtest-ephemeral", content_type="audio/wav")
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=1.111), content_type="audio/wav")
         stream_key_mock.return_value = (io.BytesIO(b"RIFFtest-ephemeral"), "audio/wav")
 
         create_response = self.client.post(
@@ -77,6 +79,92 @@ class ArtifactBehaviorTests(EngineTestCase):
         self.assertEqual(artifact.raw_uri, "")
         stream_key_mock.assert_called_once_with(f"ephemeral/{artifact.id}/audio.wav")
         delete_key_mock.assert_called_once_with(f"ephemeral/{artifact.id}/audio.wav")
+
+    @patch("engine.api_views.put_bytes")
+    def test_room_save_rejects_non_wav_upload(self, put_bytes_mock):
+        upload = SimpleUploadedFile("audio.raw", b"not-a-wav", content_type="application/octet-stream")
+
+        response = self.client.post(
+            "/api/v1/artifacts/audio",
+            {"file": upload, "consent_mode": "ROOM"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("RIFF/WAVE", response.json()["error"])
+        put_bytes_mock.assert_not_called()
+
+    @patch("engine.api_views.put_bytes")
+    def test_room_save_rejects_stereo_wav(self, put_bytes_mock):
+        import wave
+
+        stereo_bytes = io.BytesIO()
+        with wave.open(stereo_bytes, "wb") as wav_file:
+            wav_file.setnchannels(2)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(8000)
+            wav_file.writeframes((b"\x00\x00\x00\x00") * 200)
+        upload = SimpleUploadedFile("audio.wav", stereo_bytes.getvalue(), content_type="audio/wav")
+
+        response = self.client.post(
+            "/api/v1/artifacts/audio",
+            {"file": upload, "consent_mode": "ROOM"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("mono", response.json()["error"])
+        put_bytes_mock.assert_not_called()
+
+    @override_settings(INGEST_MAX_DURATION_SECONDS=1)
+    @patch("engine.api_views.put_bytes")
+    def test_room_save_rejects_wav_longer_than_server_limit(self, put_bytes_mock):
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=1.5), content_type="audio/wav")
+
+        response = self.client.post(
+            "/api/v1/artifacts/audio",
+            {"file": upload, "consent_mode": "ROOM"},
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertIn("1 second", response.json()["error"])
+        put_bytes_mock.assert_not_called()
+
+    @override_settings(INGEST_MAX_UPLOAD_BYTES=128)
+    @patch("engine.api_views.put_bytes")
+    def test_room_save_rejects_upload_larger_than_server_limit(self, put_bytes_mock):
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=0.5), content_type="audio/wav")
+
+        response = self.client.post(
+            "/api/v1/artifacts/audio",
+            {"file": upload, "consent_mode": "ROOM"},
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertIn("byte limit", response.json()["error"])
+        put_bytes_mock.assert_not_called()
+
+    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"public_ingest": "1/min", "public_revoke": "1/min"}})
+    @patch("engine.api_views.put_bytes")
+    def test_audio_ingest_is_rate_limited(self, put_bytes_mock):
+        cache.clear()
+        first_upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=0.5), content_type="audio/wav")
+        second_upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=0.5), content_type="audio/wav")
+
+        first = self.client.post("/api/v1/artifacts/audio", {"file": first_upload, "consent_mode": "ROOM"})
+        second = self.client.post("/api/v1/artifacts/audio", {"file": second_upload, "consent_mode": "ROOM"})
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 429)
+        cache.clear()
+
+    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"public_ingest": "1/min", "public_revoke": "1/min"}})
+    def test_revoke_is_rate_limited(self):
+        cache.clear()
+        first = self.client.post("/api/v1/revoke", data={"token": "MISSING0000"}, content_type="application/json")
+        second = self.client.post("/api/v1/revoke", data={"token": "MISSING0000"}, content_type="application/json")
+
+        self.assertEqual(first.status_code, 404)
+        self.assertEqual(second.status_code, 429)
+        cache.clear()
 
     def test_raw_media_route_rejects_direct_access_without_token(self):
         artifact = self.make_active_artifact(raw_uri="raw/private.wav")

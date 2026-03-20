@@ -95,6 +95,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
 - Django also validates runtime config relationships at startup now, so bad threshold ordering or insecure origin posture fails fast before the stack enters service.
 - `INSTALLATION_PROFILE` can provide a named starting posture for room behavior and kiosk defaults. Explicit env vars still override profile defaults.
+- Public write paths are also guarded by server-side WAV validation and DRF throttling. If you tune those limits, update `INGEST_MAX_UPLOAD_BYTES`, `INGEST_MAX_DURATION_SECONDS`, `PUBLIC_INGEST_RATE`, and `PUBLIC_REVOKE_RATE` together.
 
 Current bundled installation profiles:
 

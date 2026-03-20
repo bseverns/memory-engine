@@ -123,6 +123,11 @@ secret presence: threshold ordering, secure-origin posture, MinIO endpoint
 scheme, and other range relationships fail fast instead of surfacing later as
 ambiguous runtime behavior.
 
+Public ingest is also hardened server-side now: the API enforces a maximum WAV
+upload size, a maximum recording duration, PCM 16-bit mono WAV validation, and
+IP-based throttling on ingest and revoke endpoints instead of trusting the
+browser's reported duration alone.
+
 For common installs, you can also start from a named behavior preset:
 
 ```env
