@@ -1,4 +1,42 @@
 (function initMemoryEngineRoomLoopPolicy(global) {
+  function historyPolicy(loopConfig = {}) {
+    return loopConfig.policy?.history || {};
+  }
+
+  function loopHistoryWindowSize(loopConfig = {}) {
+    const configured = Number(historyPolicy(loopConfig).loopWindow || 6);
+    return Math.max(1, Number.isFinite(configured) ? Math.floor(configured) : 6);
+  }
+
+  function densityHistoryWindowSize(loopConfig = {}) {
+    const configured = Number(historyPolicy(loopConfig).densityWindow || 4);
+    return Math.max(1, Number.isFinite(configured) ? Math.floor(configured) : 4);
+  }
+
+  function sceneHistoryWindowSize(loopConfig = {}) {
+    const configured = Number(historyPolicy(loopConfig).sceneWindow || 3);
+    return Math.max(1, Number.isFinite(configured) ? Math.floor(configured) : 3);
+  }
+
+  function scarcityConfig(loopConfig = {}) {
+    return loopConfig.policy?.scarcity || {};
+  }
+
+  function archiveGapTiers(loopConfig = {}) {
+    const tiers = Array.isArray(loopConfig.policy?.archiveGapTiers) ? loopConfig.policy.archiveGapTiers : [];
+    return tiers
+      .map((tier) => ({
+        minPoolSize: Number(tier.minPoolSize || 0),
+        multiplier: Number(tier.multiplier || 1.0),
+      }))
+      .filter((tier) => Number.isFinite(tier.minPoolSize) && Number.isFinite(tier.multiplier))
+      .sort((a, b) => b.minPoolSize - a.minPoolSize);
+  }
+
+  function surfaceOverlayConfig(loopConfig = {}) {
+    return loopConfig.policy?.surfaceOverlays || {};
+  }
+
   function antiRepetitionWindowSize(config) {
     const configured = Number(config.roomAntiRepetitionWindowSize || 0);
     return Math.max(0, Math.min(50, Number.isFinite(configured) ? Math.floor(configured) : 0));
@@ -100,33 +138,52 @@
     }, date.getHours());
   }
 
-  function scarcityProfile(config, poolSize) {
+  function scarcityProfile(config, loopConfig, poolSize) {
+    const configured = scarcityConfig(loopConfig);
+    const normal = configured.normal || {
+      gapMultiplier: 1.0,
+      pauseMultiplier: 1.0,
+      toneMultiplier: 1.0,
+      label: "",
+    };
+    const low = configured.low || {
+      gapMultiplier: 1.35,
+      pauseMultiplier: 1.55,
+      toneMultiplier: 1.2,
+      label: "thin",
+    };
+    const severe = configured.severe || {
+      gapMultiplier: 1.8,
+      pauseMultiplier: 2.1,
+      toneMultiplier: 1.45,
+      label: "scarce",
+    };
     if (!config.roomScarcityEnabled) {
-      return { gapMultiplier: 1.0, pauseMultiplier: 1.0, toneMultiplier: 1.0, label: "" };
+      return normal;
     }
     if (poolSize <= 0 || poolSize <= config.roomScarcitySevereThreshold) {
-      return { gapMultiplier: 1.8, pauseMultiplier: 2.1, toneMultiplier: 1.45, label: "scarce" };
+      return severe;
     }
     if (poolSize <= config.roomScarcityLowThreshold) {
-      return { gapMultiplier: 1.35, pauseMultiplier: 1.55, toneMultiplier: 1.2, label: "thin" };
+      return low;
     }
-    return { gapMultiplier: 1.0, pauseMultiplier: 1.0, toneMultiplier: 1.0, label: "" };
+    return normal;
   }
 
-  function adaptiveGapMultiplier(config, intensity, poolSize, movement, pauseGap) {
-    const scarcity = scarcityProfile(config, poolSize);
-    let archiveMultiplier = 1.0;
+  function archiveGapMultiplier(loopConfig, poolSize) {
+    for (const tier of archiveGapTiers(loopConfig)) {
+      if (poolSize >= tier.minPoolSize) {
+        return tier.multiplier;
+      }
+    }
+    return 1.0;
+  }
 
-    if (poolSize >= 40) {
-      archiveMultiplier = 0.76;
-    } else if (poolSize >= 24) {
-      archiveMultiplier = 0.88;
-    } else if (poolSize >= 12) {
-      archiveMultiplier = 0.96;
-    } else if (poolSize >= 8) {
-      archiveMultiplier = 1.05;
-    } else if (poolSize > 0) {
-      archiveMultiplier = 1.18;
+  function adaptiveGapMultiplier(config, loopConfig, intensity, poolSize, movement, pauseGap) {
+    const scarcity = scarcityProfile(config, loopConfig, poolSize);
+    let archiveMultiplier = 1.0;
+    if (poolSize > 0) {
+      archiveMultiplier = archiveGapMultiplier(loopConfig, poolSize);
     }
 
     return (
@@ -138,9 +195,14 @@
     );
   }
 
-  function roomToneLevelFor(config, intensity, baseLevel, poolSize) {
-    const scarcity = scarcityProfile(config, poolSize);
+  function roomToneLevelFor(config, loopConfig, intensity, baseLevel, poolSize) {
+    const scarcity = scarcityProfile(config, loopConfig, poolSize);
     return baseLevel * intensity.roomToneMultiplier * scarcity.toneMultiplier;
+  }
+
+  function surfaceOverlayMultiplier(loopConfig, overlayName, fieldName, fallback = 1.0) {
+    const value = Number(surfaceOverlayConfig(loopConfig)?.[overlayName]?.[fieldName] || fallback);
+    return Number.isFinite(value) ? value : fallback;
   }
 
   function randomIntBetween(min, max) {
@@ -154,8 +216,10 @@
   global.MemoryEngineRoomLoopPolicy = {
     adaptiveGapMultiplier,
     antiRepetitionWindowSize,
+    densityHistoryWindowSize,
     daypartMatchesHour,
     loadPersistentLoopWindow,
+    loopHistoryWindowSize,
     quietHoursActive,
     randomIntBetween,
     recentArtifactIdsForExclusion,
@@ -164,7 +228,9 @@
     resolveMovement,
     roomToneLevelFor,
     savePersistentLoopWindow,
+    sceneHistoryWindowSize,
     scarcityProfile,
     sleep,
+    surfaceOverlayMultiplier,
   };
 }(typeof window !== "undefined" ? window : globalThis));

@@ -12,16 +12,20 @@
   }
 
   function overlapAllowedForCue({ cue, poolSize, config, loopConfig, quieterModeEnabled }) {
+    const overlapConfig = loopConfig.overlap || {};
+    const quietHoursChanceMultiplier = Number(overlapConfig.quietHoursChanceMultiplier || 0.45);
+    const quieterModeChanceMultiplier = Number(overlapConfig.quieterModeChanceMultiplier || 0.45);
     if (poolSize < Number(config.roomOverlapMinPoolSize || 0)) {
       return false;
     }
     if (quieterModeEnabled() || quietHoursActive(config)) {
-      return Math.random() < (Number(config.roomOverlapChance || 0) * 0.45);
+      const overlayMultiplier = quieterModeEnabled() ? quieterModeChanceMultiplier : quietHoursChanceMultiplier;
+      return Math.random() < (Number(config.roomOverlapChance || 0) * overlayMultiplier);
     }
     if (cue.density === "dense") {
       return false;
     }
-    const densityLimit = String(loopConfig.overlap?.densityLimit || "medium");
+    const densityLimit = String(overlapConfig.densityLimit || "medium");
     if (densityLimit === "light" && cue.density !== "light") {
       return false;
     }

@@ -1,35 +1,51 @@
 (function initMemoryEngineRoomLoopSequencer(global) {
-  function recentDensityWindow(loopHistory) {
+  function densityHistoryWindowSize(loopConfig = {}) {
+    const configured = Number(loopConfig.policy?.history?.densityWindow || 4);
+    return Math.max(1, Number.isFinite(configured) ? Math.floor(configured) : 4);
+  }
+
+  function sceneHistoryWindowSize(loopConfig = {}) {
+    const configured = Number(loopConfig.policy?.history?.sceneWindow || 3);
+    return Math.max(1, Number.isFinite(configured) ? Math.floor(configured) : 3);
+  }
+
+  function sequencerPolicy(loopConfig = {}) {
+    return loopConfig.policy?.sequencer || {};
+  }
+
+  function recentDensityWindow(loopHistory, loopConfig = {}) {
     return loopHistory
-      .slice(-4)
+      .slice(-densityHistoryWindowSize(loopConfig))
       .map((item) => item.density)
       .filter((density) => ["light", "medium", "dense"].includes(density));
   }
 
-  function chooseTargetDensity(movement, recent) {
-    const densities = recent
-      .slice(-4)
-      .map((item) => item.density)
-      .filter((density) => ["light", "medium", "dense"].includes(density));
+  function chooseTargetDensity(movement, recent, loopConfig = {}) {
+    const densities = recentDensityWindow(recent, loopConfig);
     const denseCount = densities.filter((density) => density === "dense").length;
     const lightCount = densities.filter((density) => density === "light").length;
 
     if (denseCount >= 2) {
-      return movement.name === "weathering" ? "medium" : "light";
+      return movement.denseReleaseDensity || movement.defaultDensity || "medium";
     }
     if (lightCount >= 2) {
-      return movement.name === "gathering" ? "dense" : "medium";
+      return movement.lightRecoveryDensity || movement.defaultDensity || "medium";
     }
-    if (movement.name === "weathering" || movement.name === "gathering") {
-      return "medium";
+    if (movement.defaultDensity) {
+      return movement.defaultDensity;
     }
     return densities[densities.length - 1] || "medium";
   }
 
-  function chooseTargetMood({ movement, recent, currentMoodBias, loopMovementProgress }) {
+  function chooseTargetMood({ movement, recent, currentMoodBias, loopMovementProgress, loopConfig = {} }) {
+    const policy = sequencerPolicy(loopConfig);
+    const moodBiasRecentLimit = Number(policy.moodBiasRecentLimit || 2);
+    const moodBiasHoldChance = Number(policy.moodBiasHoldChance || 0.72);
+    const weatheredReleaseThreshold = Number(policy.weatheredReleaseThreshold || 2);
+    const clearReleaseThreshold = Number(policy.clearReleaseThreshold || 2);
     if (currentMoodBias) {
       const recentBiasCount = recent.filter((item) => item.mood === currentMoodBias).length;
-      if (recentBiasCount < 2 || Math.random() < 0.72) {
+      if (recentBiasCount < moodBiasRecentLimit || Math.random() < moodBiasHoldChance) {
         return currentMoodBias;
       }
     }
@@ -38,14 +54,14 @@
     if (!last) {
       return movement.preferredMoods[0];
     }
-    if (recent.filter((item) => item.mood === "weathered").length >= 2) {
+    if (recent.filter((item) => item.mood === "weathered").length >= weatheredReleaseThreshold) {
       return "clear";
     }
-    if (recent.filter((item) => item.mood === "clear").length >= 2) {
-      return movement.name === "weathering" ? "weathered" : "suspended";
+    if (recent.filter((item) => item.mood === "clear").length >= clearReleaseThreshold) {
+      return movement.clearReleaseMood || movement.preferredMoods[0];
     }
     if (last.density === "dense") {
-      return movement.name === "gathering" ? "suspended" : "hushed";
+      return movement.denseAfterMood || movement.preferredMoods[0];
     }
     if (last.mood === "hushed") {
       return movement.preferredMoods.find((mood) => mood !== "hushed") || movement.preferredMoods[0];
@@ -54,7 +70,7 @@
   }
 
   function chooseNextScene({ roomScenes, movement, targetMood, targetDensity, loopHistory }) {
-    const recent = loopHistory.slice(-3);
+    const recent = loopHistory.slice(-sceneHistoryWindowSize(arguments[0].loopConfig || {}));
     const last = recent[recent.length - 1];
 
     let candidates = roomScenes.filter((scene) => movement.sceneNames.includes(scene.name));

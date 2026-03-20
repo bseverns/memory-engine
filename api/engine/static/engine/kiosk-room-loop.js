@@ -2,7 +2,9 @@
   const PERSISTENT_LOOP_WINDOW_KEY = "memory-engine-room-loop-window-v1";
   const {
     adaptiveGapMultiplier,
+    densityHistoryWindowSize,
     loadPersistentLoopWindow,
+    loopHistoryWindowSize,
     quietHoursActive,
     randomIntBetween,
     recentArtifactIdsForExclusion,
@@ -10,8 +12,10 @@
     resolveActiveDaypart,
     resolveMovement,
     roomToneLevelFor,
+    sceneHistoryWindowSize,
     scarcityProfile,
     sleep,
+    surfaceOverlayMultiplier,
   } = global.MemoryEngineRoomLoopPolicy;
   const {
     chooseNextScene,
@@ -53,6 +57,8 @@
       overlap: {
         label: "Layered return",
         densityLimit: "medium",
+        quietHoursChanceMultiplier: 0.45,
+        quieterModeChanceMultiplier: 0.45,
       },
       fossilVisuals: {
         label: "Fossil drift",
@@ -64,6 +70,38 @@
         sparseGain: 0.017,
         duckGain: 0.002,
         fadeSeconds: 1.25,
+      },
+      policy: {
+        history: {
+          densityWindow: 4,
+          sceneWindow: 3,
+          loopWindow: 6,
+        },
+        sequencer: {
+          weatheredReleaseThreshold: 2,
+          clearReleaseThreshold: 2,
+          moodBiasHoldChance: 0.72,
+          moodBiasRecentLimit: 2,
+        },
+        scarcity: {
+          normal: { gapMultiplier: 1.0, pauseMultiplier: 1.0, toneMultiplier: 1.0, label: "" },
+          low: { gapMultiplier: 1.35, pauseMultiplier: 1.55, toneMultiplier: 1.2, label: "thin" },
+          severe: { gapMultiplier: 1.8, pauseMultiplier: 2.1, toneMultiplier: 1.45, label: "scarce" },
+        },
+        archiveGapTiers: [
+          { minPoolSize: 40, multiplier: 0.76 },
+          { minPoolSize: 24, multiplier: 0.88 },
+          { minPoolSize: 12, multiplier: 0.96 },
+          { minPoolSize: 8, multiplier: 1.05 },
+          { minPoolSize: 1, multiplier: 1.18 },
+        ],
+        surfaceOverlays: {
+          quieterMode: {
+            gapMultiplier: 1.18,
+            toneMultiplier: 0.72,
+            outputGainMultiplier: 0.74,
+          },
+        },
       },
     };
   }
@@ -181,17 +219,26 @@
 
     function applySurfaceGapMultiplier(value) {
       const quietHoursMultiplier = quietHoursActive(config) ? Number(config.roomQuietHoursGapMultiplier || 1.0) : 1.0;
-      return value * quietHoursMultiplier * (quieterModeEnabled() ? 1.18 : 1.0);
+      const quieterModeMultiplier = quieterModeEnabled()
+        ? surfaceOverlayMultiplier(loopConfig, "quieterMode", "gapMultiplier", 1.18)
+        : 1.0;
+      return value * quietHoursMultiplier * quieterModeMultiplier;
     }
 
     function applySurfaceToneMultiplier(value) {
       const quietHoursMultiplier = quietHoursActive(config) ? Number(config.roomQuietHoursToneMultiplier || 1.0) : 1.0;
-      return value * quietHoursMultiplier * (quieterModeEnabled() ? 0.72 : 1.0);
+      const quieterModeMultiplier = quieterModeEnabled()
+        ? surfaceOverlayMultiplier(loopConfig, "quieterMode", "toneMultiplier", 0.72)
+        : 1.0;
+      return value * quietHoursMultiplier * quieterModeMultiplier;
     }
 
     function surfaceOutputGainMultiplier() {
       const quietHoursMultiplier = quietHoursActive(config) ? Number(config.roomQuietHoursOutputGainMultiplier || 1.0) : 1.0;
-      return quietHoursMultiplier * (quieterModeEnabled() ? 0.74 : 1.0);
+      const quieterModeMultiplier = quieterModeEnabled()
+        ? surfaceOverlayMultiplier(loopConfig, "quieterMode", "outputGainMultiplier", 0.74)
+        : 1.0;
+      return quietHoursMultiplier * quieterModeMultiplier;
     }
 
     function resolveActiveProfiles() {
@@ -251,14 +298,15 @@
 
     function nextLoopCue() {
       const movement = ensureLoopMovement();
-      const recent = loopHistory.slice(-4);
+      const recent = loopHistory.slice(-densityHistoryWindowSize(loopConfig));
       const targetMood = chooseTargetMood({
         movement,
         recent,
         currentMoodBias: currentMoodBias(),
         loopMovementProgress,
+        loopConfig,
       });
-      const targetDensity = chooseTargetDensity(movement, recent);
+      const targetDensity = chooseTargetDensity(movement, recent, loopConfig);
 
       if (!loopScene || loopSceneCueIndex >= loopScene.cues.length) {
         loopScene = chooseNextScene({
@@ -267,6 +315,7 @@
           targetMood,
           targetDensity,
           loopHistory,
+          loopConfig,
         });
         loopSceneCueIndex = 0;
       }
@@ -292,7 +341,7 @@
         density: payload.density || "medium",
         mood: payload.mood || "suspended",
       });
-      loopHistory = loopHistory.slice(-6);
+      loopHistory = loopHistory.slice(-loopHistoryWindowSize(loopConfig));
     }
 
     async function start() {
@@ -329,7 +378,7 @@
         await toneEngine.stopRoomTone();
         return;
       }
-      toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, startingProfiles.intensity, roomTone.idleGain, loopKnownPoolSize)), 1.0);
+      toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, startingProfiles.intensity, roomTone.idleGain, loopKnownPoolSize)), 1.0);
 
       while (loopRunning) {
         const profiles = resolveActiveProfiles();
@@ -348,15 +397,15 @@
 
           const { movement, scene, cue } = nextLoopCue();
           if (cue.pauseMs) {
-            const pauseMultiplier = applySurfaceGapMultiplier(adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, true));
-            const scarcityLabel = scarcityProfile(config, loopKnownPoolSize).label;
+            const pauseMultiplier = applySurfaceGapMultiplier(adaptiveGapMultiplier(config, loopConfig, roomIntensity, loopKnownPoolSize, movement, true));
+            const scarcityLabel = scarcityProfile(config, loopConfig, loopKnownPoolSize).label;
             setStatus(
               scarcityLabel
                 ? `Holding space in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name} (${scarcityLabel} pool).`
                 : `Holding space in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name}.`,
             );
             toneEngine.setRoomToneLevel(
-              applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, toneLevelForName(roomTone, cue.toneLevel), loopKnownPoolSize)),
+              applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, roomIntensity, toneLevelForName(roomTone, cue.toneLevel), loopKnownPoolSize)),
               1.4,
             );
             await sleep(Math.round(cue.pauseMs * pauseMultiplier));
@@ -367,7 +416,7 @@
           const density = cue.density || "any";
           const mood = cue.mood || "any";
           const excludedIds = recentArtifactIdsForExclusion(config, persistentLoopWindow);
-          const recentDensities = recentDensityWindow(loopHistory);
+          const recentDensities = recentDensityWindow(loopHistory, loopConfig);
           const primaryResult = await fetchPoolPayload({
             lane,
             density,
@@ -379,13 +428,13 @@
           if (primaryResult.hold) {
             loopKnownPoolSize = 0;
             setStatus(`No ${mood} ${density} memory available in ${roomPostureLabel(profiles)} / ${movement.name}. Scarcity mode is holding the room tone.`);
-            toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize)), 1.8);
-            await sleep(Math.round(1500 * applySurfaceGapMultiplier(adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, true))));
+            toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, roomIntensity, roomTone.sparseGain, loopKnownPoolSize)), 1.8);
+            await sleep(Math.round(1500 * applySurfaceGapMultiplier(adaptiveGapMultiplier(config, loopConfig, roomIntensity, loopKnownPoolSize, movement, true))));
             continue;
           }
           if (!primaryResult.payload) {
             setStatus(`Pool error: ${primaryResult.status}`);
-            toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize)), 1.4);
+            toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, roomIntensity, roomTone.sparseGain, loopKnownPoolSize)), 1.4);
             await sleep(1500);
             continue;
           }
@@ -396,7 +445,7 @@
           persistentLoopWindow = rememberPersistentArtifactId(config, PERSISTENT_LOOP_WINDOW_KEY, persistentLoopWindow, payload.artifact_id);
           const laneLabel = payload.lane ? `${payload.lane} ${payload.density || "memory"} memory` : "memory";
           const featuredLabel = payload.featured_return ? " / featured return" : "";
-          const scarcityLabel = scarcityProfile(config, loopKnownPoolSize).label;
+          const scarcityLabel = scarcityProfile(config, loopConfig, loopKnownPoolSize).label;
           let layerPayload = null;
           if (Number(config.roomOverlapMaxLayers || 0) > 1 && overlapAllowedForCue({
             cue,
@@ -423,7 +472,7 @@
               ? `Playing ${laneLabel}${featuredLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name}${layerPayload ? " / layered return" : ""} (${scarcityLabel} pool, wear ${payload.wear.toFixed(3)})`
               : `Playing ${laneLabel}${featuredLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name}${layerPayload ? " / layered return" : ""} (wear ${payload.wear.toFixed(3)})`,
           );
-          toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.duckGain, loopKnownPoolSize)), 0.8);
+          toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, roomIntensity, roomTone.duckGain, loopKnownPoolSize)), 0.8);
           const playbackPromises = [playUrlWithLightChain(payload.audio_url, payload.wear, {
             startMs: payload.playback_start_ms,
             durationMs: payload.playback_duration_ms,
@@ -442,13 +491,13 @@
           await Promise.allSettled(playbackPromises);
           advanceLoopMovement();
           if (loopRunning) {
-            const gapMultiplier = applySurfaceGapMultiplier(adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, false));
-            toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.idleGain, loopKnownPoolSize)), 1.4);
+            const gapMultiplier = applySurfaceGapMultiplier(adaptiveGapMultiplier(config, loopConfig, roomIntensity, loopKnownPoolSize, movement, false));
+            toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, roomIntensity, roomTone.idleGain, loopKnownPoolSize)), 1.4);
             await sleep(Math.round((cue.gapMs || 900) * gapMultiplier));
           }
         } catch (err) {
           setStatus("Room loop interrupted.");
-          toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize)), 1.2);
+          toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, roomIntensity, roomTone.sparseGain, loopKnownPoolSize)), 1.2);
           await sleep(1500);
         }
       }

@@ -3,7 +3,7 @@ from datetime import datetime
 from django.utils import timezone
 
 from .base import EngineTestCase
-from ..room_composer import active_daypart_for_hour, quiet_hours_active_for_hour, room_schedule_snapshot
+from ..room_composer import ROOM_LOOP_CONFIG, active_daypart_for_hour, quiet_hours_active_for_hour, room_schedule_snapshot
 
 
 class RoomScheduleTests(EngineTestCase):
@@ -65,3 +65,11 @@ class RoomScheduleTests(EngineTestCase):
         self.assertTrue(quiet_hours_active_for_hour(23, enabled=True, start_hour=22, end_hour=6))
         self.assertTrue(quiet_hours_active_for_hour(4, enabled=True, start_hour=22, end_hour=6))
         self.assertFalse(quiet_hours_active_for_hour(14, enabled=True, start_hour=22, end_hour=6))
+
+    def test_room_loop_config_declares_runtime_policy_data(self):
+        policy = ROOM_LOOP_CONFIG["policy"]
+        self.assertEqual(policy["history"]["densityWindow"], 4)
+        self.assertIn("severe", policy["scarcity"])
+        self.assertTrue(policy["archiveGapTiers"])
+        self.assertIn("quieterMode", policy["surfaceOverlays"])
+        self.assertEqual(ROOM_LOOP_CONFIG["movements"][0]["denseReleaseDensity"], "light")

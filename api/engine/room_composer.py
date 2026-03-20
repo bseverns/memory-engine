@@ -113,6 +113,11 @@ ROOM_LOOP_CONFIG = {
             "maxItems": 3,
             "gapMultiplier": 1.15,
             "preferredMoods": ["clear", "hushed", "suspended"],
+            "defaultDensity": "medium",
+            "denseReleaseDensity": "light",
+            "lightRecoveryDensity": "medium",
+            "clearReleaseMood": "suspended",
+            "denseAfterMood": "hushed",
             "sceneNames": ["clearings", "hushed drift", "suspension"],
         },
         {
@@ -121,6 +126,11 @@ ROOM_LOOP_CONFIG = {
             "maxItems": 4,
             "gapMultiplier": 0.82,
             "preferredMoods": ["gathering", "clear", "suspended"],
+            "defaultDensity": "medium",
+            "denseReleaseDensity": "light",
+            "lightRecoveryDensity": "dense",
+            "clearReleaseMood": "suspended",
+            "denseAfterMood": "suspended",
             "sceneNames": ["gathering", "suspension"],
         },
         {
@@ -129,6 +139,11 @@ ROOM_LOOP_CONFIG = {
             "maxItems": 4,
             "gapMultiplier": 1.12,
             "preferredMoods": ["weathered", "suspended", "hushed"],
+            "defaultDensity": "medium",
+            "denseReleaseDensity": "medium",
+            "lightRecoveryDensity": "medium",
+            "clearReleaseMood": "weathered",
+            "denseAfterMood": "hushed",
             "sceneNames": ["weathered cluster", "afterimage", "suspension"],
         },
         {
@@ -137,6 +152,11 @@ ROOM_LOOP_CONFIG = {
             "maxItems": 3,
             "gapMultiplier": 1.28,
             "preferredMoods": ["hushed", "clear", "weathered"],
+            "defaultDensity": "medium",
+            "denseReleaseDensity": "light",
+            "lightRecoveryDensity": "medium",
+            "clearReleaseMood": "suspended",
+            "denseAfterMood": "hushed",
             "sceneNames": ["clearings", "hushed drift", "afterimage"],
         },
     ],
@@ -218,11 +238,60 @@ ROOM_LOOP_CONFIG = {
     "overlap": {
         "label": "Layered return",
         "densityLimit": "medium",
+        "quietHoursChanceMultiplier": 0.45,
+        "quieterModeChanceMultiplier": 0.45,
     },
     "fossilVisuals": {
         "label": "Fossil drift",
         "refreshMs": 18000,
         "maxItems": 12,
+    },
+    "policy": {
+        "history": {
+            "densityWindow": 4,
+            "sceneWindow": 3,
+            "loopWindow": 6,
+        },
+        "sequencer": {
+            "weatheredReleaseThreshold": 2,
+            "clearReleaseThreshold": 2,
+            "moodBiasHoldChance": 0.72,
+            "moodBiasRecentLimit": 2,
+        },
+        "scarcity": {
+            "normal": {
+                "gapMultiplier": 1.0,
+                "pauseMultiplier": 1.0,
+                "toneMultiplier": 1.0,
+                "label": "",
+            },
+            "low": {
+                "gapMultiplier": 1.35,
+                "pauseMultiplier": 1.55,
+                "toneMultiplier": 1.2,
+                "label": "thin",
+            },
+            "severe": {
+                "gapMultiplier": 1.8,
+                "pauseMultiplier": 2.1,
+                "toneMultiplier": 1.45,
+                "label": "scarce",
+            },
+        },
+        "archiveGapTiers": [
+            {"minPoolSize": 40, "multiplier": 0.76},
+            {"minPoolSize": 24, "multiplier": 0.88},
+            {"minPoolSize": 12, "multiplier": 0.96},
+            {"minPoolSize": 8, "multiplier": 1.05},
+            {"minPoolSize": 1, "multiplier": 1.18},
+        ],
+        "surfaceOverlays": {
+            "quieterMode": {
+                "gapMultiplier": 1.18,
+                "toneMultiplier": 0.72,
+                "outputGainMultiplier": 0.74,
+            },
+        },
     },
 }
 

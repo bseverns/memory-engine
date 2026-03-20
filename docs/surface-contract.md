@@ -60,6 +60,7 @@ The listening surface may assume:
   - dayparts
   - tone profiles
   - overlap presets
+  - sequencer and scarcity policy tables
 - `/api/v1/surface/state` contains live playback posture such as:
   - `playback_paused`
   - `maintenance_mode`

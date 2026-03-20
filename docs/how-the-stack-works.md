@@ -527,15 +527,17 @@ That split is useful:
 - the browser can make the room feel composed in real time
 - the server remains the policy source for what may play
 
-The scene and movement definitions come from `api/engine/room_composer.py` and
-are embedded into the kiosk page as JSON in `kiosk_view`.
+The scene, movement, and reusable room-policy definitions now come from
+`api/engine/room_composer.py` and are embedded into the kiosk page as JSON in
+`kiosk_view`.
 
 Important browser loop behaviors:
 
 - intensity profiles tune cue gaps, pause gaps, and room-tone level
 - movement presets tune how many items a movement tends to include
-- scarcity mode slows the room down and raises tone presence when the playable
-  archive is small
+- scarcity tiers, archive-gap tiers, overlap posture, and sequencer heuristics
+  are declared in the room composer config rather than hard-coded in the loop
+  runner
 - the anti-repetition window persists recent artifact IDs in `localStorage`
   and sends them back as `exclude_ids` on future `pool/next` requests
 
