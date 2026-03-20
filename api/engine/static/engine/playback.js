@@ -44,6 +44,7 @@
   let fossilVisualInterval = 0;
   let fossilVisualIndex = 0;
   let infoLightboxOpen = false;
+  let fossilFeedUrl = String(config.surfaceFossilFeedUrl || "").trim();
 
   function updateSurfaceNote(message) {
     autostartNote.textContent = message;
@@ -100,6 +101,22 @@
     return `${entry.title || "Recent fossil drift"} · ${createdAt}`;
   }
 
+  async function resolveFossilFeedUrl() {
+    const refreshUrl = String(config.surfaceFossilFeedRefreshUrl || "").trim();
+    if (!refreshUrl) {
+      return fossilFeedUrl;
+    }
+    try {
+      const response = await fetch(refreshUrl, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`Feed refresh failed (${response.status})`);
+      }
+      const payload = await response.json();
+      fossilFeedUrl = String(payload.feed_url || "").trim();
+    } catch (error) {}
+    return fossilFeedUrl;
+  }
+
   async function refreshFossilVisuals() {
     if (!config.roomFossilVisualsEnabled) {
       renderFossilVisualsEnabled(false);
@@ -107,7 +124,7 @@
     }
     renderFossilVisualsEnabled(true);
     try {
-      const feedUrl = String(config.surfaceFossilFeedUrl || "").trim();
+      const feedUrl = await resolveFossilFeedUrl();
       if (!feedUrl) {
         renderNoFossilVisuals("Fossil visuals are not configured for this surface.");
         return;

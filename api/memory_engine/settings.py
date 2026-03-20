@@ -43,6 +43,7 @@ DEBUG = env_bool("DJANGO_DEBUG", False)
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost,http://127.0.0.1").split(",") if o.strip()]
 USE_X_FORWARDED_HOST = env_bool("DJANGO_USE_X_FORWARDED_HOST", True)
+TRUST_X_FORWARDED_FOR = env_bool("DJANGO_TRUST_X_FORWARDED_FOR", False)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
 SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", False)
@@ -115,8 +116,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
-        "public_ingest": os.getenv("PUBLIC_INGEST_RATE", "24/hour"),
-        "public_revoke": os.getenv("PUBLIC_REVOKE_RATE", "12/hour"),
+        "public_ingest": os.getenv("PUBLIC_INGEST_RATE", "180/hour"),
+        "public_ingest_ip": os.getenv("PUBLIC_INGEST_IP_RATE", "600/hour"),
+        "public_revoke": os.getenv("PUBLIC_REVOKE_RATE", "30/hour"),
+        "public_revoke_ip": os.getenv("PUBLIC_REVOKE_IP_RATE", "120/hour"),
     },
 }
 

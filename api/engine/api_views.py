@@ -3,6 +3,7 @@ import secrets
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.http import FileResponse, Http404
 from django.utils import timezone
@@ -17,13 +18,17 @@ from .ingest_validation import UploadValidationError, validate_wav_upload
 from .media_access import (
     PURPOSE_EPHEMERAL_AUDIO,
     PURPOSE_POOL_AUDIO,
+    PURPOSE_POOL_HEARD,
     PURPOSE_SPECTROGRAM_IMAGE,
     PURPOSE_SURFACE_FOSSILS,
     build_media_token,
+    build_surface_token,
+    media_playback_heard_url,
     media_raw_url,
     media_spectrogram_url,
     read_media_token,
     read_surface_token,
+    surface_fossils_url,
 )
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative
 from .operator_auth import operator_secret_configured, operator_session_active
@@ -49,7 +54,12 @@ from .steward import (
     update_steward_state,
 )
 from .tasks import generate_essence_audio, generate_spectrogram
-from .throttling import PublicIngestThrottle, PublicRevokeThrottle
+from .throttling import (
+    PublicIngestAbuseThrottle,
+    PublicIngestThrottle,
+    PublicRevokeAbuseThrottle,
+    PublicRevokeThrottle,
+)
 
 
 def operator_api_denied():
@@ -60,7 +70,11 @@ def operator_api_denied():
 
 def request_operator_label(request) -> str:
     forwarded_for = (request.META.get("HTTP_X_FORWARDED_FOR") or "").strip()
-    remote_addr = (forwarded_for.split(",")[0].strip() if forwarded_for else request.META.get("REMOTE_ADDR", "")).strip()
+    remote_addr = (
+        forwarded_for.split(",")[0].strip()
+        if bool(getattr(settings, "TRUST_X_FORWARDED_FOR", False)) and forwarded_for
+        else request.META.get("REMOTE_ADDR", "")
+    ).strip()
     return f"operator@{remote_addr}" if remote_addr else "operator"
 
 
@@ -87,6 +101,12 @@ def intake_suspended() -> bool:
 def playback_suspended() -> bool:
     state = load_steward_state()
     return bool(state.maintenance_mode or state.playback_paused)
+
+
+def current_surface_fossils_feed_url() -> str:
+    if not bool(getattr(settings, "ROOM_FOSSIL_VISUALS_ENABLED", False)):
+        return ""
+    return surface_fossils_url(build_surface_token(purpose=PURPOSE_SURFACE_FOSSILS))
 
 
 def artifact_latest_spectrogram(artifact: Artifact, now):
@@ -136,7 +156,7 @@ def serialize_surface_spectrogram(derivative: Derivative) -> dict:
 
 @api_view(["POST"])
 @parser_classes([MultiPartParser, FormParser])
-@throttle_classes([PublicIngestThrottle])
+@throttle_classes([PublicIngestThrottle, PublicIngestAbuseThrottle])
 def create_audio_artifact(request):
     state = load_steward_state()
     if state.maintenance_mode:
@@ -162,26 +182,34 @@ def create_audio_artifact(request):
     data = validated_upload.data
     token = make_revocation_token()
     manifest = consent_manifest(consent_mode)
-    consent = ConsentManifest.objects.create(json=manifest, revocation_token_hash=hash_token(token))
     node = default_node_from_env()
+    key = ""
+    with transaction.atomic():
+        consent = ConsentManifest.objects.create(json=manifest, revocation_token_hash=hash_token(token))
+        artifact = Artifact.objects.create(
+            node=node,
+            consent=consent,
+            status=Artifact.STATUS_ACTIVE,
+            raw_sha256=hashlib.sha256(data).hexdigest(),
+            expires_at=(
+                timezone.now() + timedelta(days=int(manifest["retention"]["derivative_ttl_days"]))
+                if consent_mode == "FOSSIL"
+                else timezone.now() + timedelta(hours=int(manifest["retention"]["raw_ttl_hours"]))
+            ),
+            duration_ms=validated_upload.duration_ms,
+        )
 
-    artifact = Artifact.objects.create(
-        node=node,
-        consent=consent,
-        status=Artifact.STATUS_ACTIVE,
-        raw_sha256=hashlib.sha256(data).hexdigest(),
-        expires_at=(
-            timezone.now() + timedelta(days=int(manifest["retention"]["derivative_ttl_days"]))
-            if consent_mode == "FOSSIL"
-            else timezone.now() + timedelta(hours=int(manifest["retention"]["raw_ttl_hours"]))
-        ),
-        duration_ms=validated_upload.duration_ms,
-    )
-
-    key = f"raw/{artifact.id}/audio.wav"
-    put_bytes(key, data, "audio/wav")
-    artifact.raw_uri = key
-    artifact.save(update_fields=["raw_uri"])
+        key = f"raw/{artifact.id}/audio.wav"
+        try:
+            put_bytes(key, data, "audio/wav")
+        except Exception:
+            try:
+                delete_key(key)
+            except Exception:
+                pass
+            raise
+        artifact.raw_uri = key
+        artifact.save(update_fields=["raw_uri"])
 
     if "spectrogram_png" in manifest.get("derive_allowed", []):
         generate_spectrogram.delay(artifact.id)
@@ -197,7 +225,7 @@ def create_audio_artifact(request):
 
 @api_view(["POST"])
 @parser_classes([MultiPartParser, FormParser])
-@throttle_classes([PublicIngestThrottle])
+@throttle_classes([PublicIngestThrottle, PublicIngestAbuseThrottle])
 def create_ephemeral_audio(request):
     state = load_steward_state()
     if state.maintenance_mode:
@@ -217,29 +245,36 @@ def create_ephemeral_audio(request):
     except UploadValidationError as exc:
         return Response({"error": exc.message}, status=exc.status_code)
     data = validated_upload.data
-    consent = ConsentManifest.objects.create(
-        json=consent_manifest("NOSAVE"),
-        revocation_token_hash=hash_token("NOSAVE"),
-    )
     node = default_node_from_env()
+    with transaction.atomic():
+        consent = ConsentManifest.objects.create(
+            json=consent_manifest("NOSAVE"),
+            revocation_token_hash=hash_token("NOSAVE"),
+        )
+        artifact = Artifact.objects.create(
+            node=node,
+            consent=consent,
+            status=Artifact.STATUS_EPHEMERAL,
+            raw_sha256=hashlib.sha256(data).hexdigest(),
+            expires_at=timezone.now() + timedelta(minutes=5),
+            duration_ms=validated_upload.duration_ms,
+        )
+        key = f"ephemeral/{artifact.id}/audio.wav"
+        try:
+            put_bytes(key, data, "audio/wav")
+        except Exception:
+            try:
+                delete_key(key)
+            except Exception:
+                pass
+            raise
+        artifact.raw_uri = key
+        artifact.save(update_fields=["raw_uri"])
 
-    artifact = Artifact.objects.create(
-        node=node,
-        consent=consent,
-        status=Artifact.STATUS_EPHEMERAL,
-        raw_sha256=hashlib.sha256(data).hexdigest(),
-        expires_at=timezone.now() + timedelta(minutes=5),
-        duration_ms=validated_upload.duration_ms,
-    )
-    key = f"ephemeral/{artifact.id}/audio.wav"
-    put_bytes(key, data, "audio/wav")
-    artifact.raw_uri = key
-    artifact.save(update_fields=["raw_uri"])
-
-    consume_token = secrets.token_urlsafe(16)
-    consent.json["consume_token_hash"] = hash_token(consume_token)
-    consent.json["ephemeral_access_hash"] = hash_token(consume_token)
-    consent.save(update_fields=["json"])
+        consume_token = secrets.token_urlsafe(16)
+        consent.json["consume_token_hash"] = hash_token(consume_token)
+        consent.json["ephemeral_access_hash"] = hash_token(consume_token)
+        consent.save(update_fields=["json"])
 
     return Response({
         "artifact_id": artifact.id,
@@ -286,7 +321,7 @@ def consume_ephemeral(request):
 
 @api_view(["POST"])
 @parser_classes([JSONParser])
-@throttle_classes([PublicRevokeThrottle])
+@throttle_classes([PublicRevokeThrottle, PublicRevokeAbuseThrottle])
 def revoke(request):
     token = (request.data.get("token") or "").strip().upper()
     if not token:
@@ -377,14 +412,11 @@ def pool_next(request):
     mood = artifact_mood(artifact, now)
     featured_return = artifact_is_featured_return(artifact, now)
     playback_window = artifact_playback_window(artifact, now, variant=segment_variant)
-
-    with transaction.atomic():
-        artifact = Artifact.objects.select_for_update().get(id=artifact.id)
-        artifact.play_count += 1
-        artifact.wear = min(1.0, artifact.wear + float(settings.WEAR_EPSILON_PER_PLAY))
-        artifact.last_access_at = timezone.now()
-        artifact.save(update_fields=["play_count", "wear", "last_access_at"])
-        AccessEvent.objects.create(artifact=artifact, context="kiosk", action="play")
+    playback_ack_token = build_media_token(
+        purpose=PURPOSE_POOL_HEARD,
+        artifact_id=artifact.id,
+        nonce=secrets.token_urlsafe(18),
+    )
 
     return Response({
         "artifact_id": artifact.id,
@@ -405,6 +437,7 @@ def pool_next(request):
         "featured_return": featured_return,
         "play_count": artifact.play_count,
         "pool_size": playable_count,
+        "playback_ack_url": media_playback_heard_url(playback_ack_token),
         "audio_url": media_raw_url(
             build_media_token(
                 purpose=PURPOSE_POOL_AUDIO,
@@ -413,6 +446,37 @@ def pool_next(request):
         ),
         "expires_at": artifact.expires_at,
     })
+
+
+@api_view(["POST"])
+def pool_heard(request, access_token: str):
+    token_payload = read_media_token(access_token)
+    if not token_payload or str(token_payload.get("purpose") or "") != PURPOSE_POOL_HEARD:
+        raise Http404("Playback acknowledgement not found")
+
+    artifact_id = token_payload.get("artifact_id")
+    nonce = str(token_payload.get("nonce") or "")
+    if not artifact_id or not nonce:
+        raise Http404("Playback acknowledgement is incomplete")
+
+    cache_key = f"memory_engine_playback_heard:{nonce}"
+    if not cache.add(cache_key, True, timeout=int(getattr(settings, "MEDIA_ACCESS_TOKEN_TTL_SECONDS", 900))):
+        return Response({"ok": True, "duplicate": True})
+
+    try:
+        with transaction.atomic():
+            artifact = Artifact.objects.select_for_update().get(id=int(artifact_id))
+            if artifact.status == Artifact.STATUS_REVOKED:
+                return Response({"ok": True, "ignored": True})
+            artifact.play_count += 1
+            artifact.wear = min(1.0, artifact.wear + float(settings.WEAR_EPSILON_PER_PLAY))
+            artifact.last_access_at = timezone.now()
+            artifact.save(update_fields=["play_count", "wear", "last_access_at"])
+            AccessEvent.objects.create(artifact=artifact, context="room", action="heard")
+    except Artifact.DoesNotExist:
+        raise Http404("Artifact not found")
+
+    return Response({"ok": True})
 
 
 @api_view(["GET"])
@@ -644,3 +708,8 @@ def surface_fossils(request, access_token: str):
         for derivative in queryset
         if not derivative.expires_at or derivative.expires_at > now
     ])
+
+
+@api_view(["GET"])
+def surface_fossils_feed_url(request):
+    return Response({"feed_url": current_surface_fossils_feed_url()})

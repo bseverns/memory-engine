@@ -8,6 +8,7 @@ MEDIA_TOKEN_SALT = "memory_engine.media_access"
 SURFACE_TOKEN_SALT = "memory_engine.surface_access"
 
 PURPOSE_POOL_AUDIO = "pool_audio"
+PURPOSE_POOL_HEARD = "pool_heard"
 PURPOSE_EPHEMERAL_AUDIO = "ephemeral_audio"
 PURPOSE_SPECTROGRAM_IMAGE = "spectrogram_image"
 PURPOSE_SURFACE_FOSSILS = "surface_fossils"
@@ -62,6 +63,10 @@ def media_raw_url(access_token: str) -> str:
 
 def media_spectrogram_url(access_token: str) -> str:
     return f"/api/v1/media/spectrogram/{access_token}"
+
+
+def media_playback_heard_url(access_token: str) -> str:
+    return f"/api/v1/pool/heard/{access_token}"
 
 
 def surface_fossils_url(access_token: str) -> str:

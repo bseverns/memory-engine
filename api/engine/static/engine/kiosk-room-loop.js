@@ -24,6 +24,7 @@
     recentDensityWindow,
   } = global.MemoryEngineRoomLoopSequencer;
   const {
+    acknowledgeAudiblePlayback,
     fetchLayerPayload,
     fetchPoolPayload,
     overlapAllowedForCue,
@@ -473,11 +474,14 @@
               : `Playing ${laneLabel}${featuredLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name}${layerPayload ? " / layered return" : ""} (wear ${payload.wear.toFixed(3)})`,
           );
           toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, roomIntensity, roomTone.duckGain, loopKnownPoolSize)), 0.8);
-          const playbackPromises = [playUrlWithLightChain(payload.audio_url, payload.wear, {
-            startMs: payload.playback_start_ms,
-            durationMs: payload.playback_duration_ms,
-            outputGainMultiplier: surfaceOutputGainMultiplier(),
-          })];
+          const playbackPromises = [(async () => {
+            await playUrlWithLightChain(payload.audio_url, payload.wear, {
+              startMs: payload.playback_start_ms,
+              durationMs: payload.playback_duration_ms,
+              outputGainMultiplier: surfaceOutputGainMultiplier(),
+            });
+            await acknowledgeAudiblePlayback(payload.playback_ack_url);
+          })()];
           if (layerPayload) {
             playbackPromises.push(playLayeredPayload({
               payload: layerPayload,

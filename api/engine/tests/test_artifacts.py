@@ -10,8 +10,11 @@ from django.utils import timezone
 from .base import EngineTestCase, make_test_wav_bytes
 from ..media_access import (
     PURPOSE_POOL_AUDIO,
+    PURPOSE_POOL_HEARD,
     PURPOSE_SPECTROGRAM_IMAGE,
+    PURPOSE_SURFACE_FOSSILS,
     build_media_token,
+    build_surface_token,
 )
 from ..models import AccessEvent, Artifact, ConsentManifest, Derivative, StewardAction
 
@@ -142,7 +145,12 @@ class ArtifactBehaviorTests(EngineTestCase):
         self.assertIn("byte limit", response.json()["error"])
         put_bytes_mock.assert_not_called()
 
-    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"public_ingest": "1/min", "public_revoke": "1/min"}})
+    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {
+        "public_ingest": "1/min",
+        "public_ingest_ip": "10/min",
+        "public_revoke": "1/min",
+        "public_revoke_ip": "10/min",
+    }})
     @patch("engine.api_views.put_bytes")
     def test_audio_ingest_is_rate_limited(self, put_bytes_mock):
         cache.clear()
@@ -156,7 +164,12 @@ class ArtifactBehaviorTests(EngineTestCase):
         self.assertEqual(second.status_code, 429)
         cache.clear()
 
-    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"public_ingest": "1/min", "public_revoke": "1/min"}})
+    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {
+        "public_ingest": "10/min",
+        "public_ingest_ip": "10/min",
+        "public_revoke": "1/min",
+        "public_revoke_ip": "10/min",
+    }})
     def test_revoke_is_rate_limited(self):
         cache.clear()
         first = self.client.post("/api/v1/revoke", data={"token": "MISSING0000"}, content_type="application/json")
@@ -314,8 +327,6 @@ class ArtifactBehaviorTests(EngineTestCase):
             expires_at=timezone.now() + timedelta(days=30),
         )
 
-        from ..media_access import PURPOSE_SURFACE_FOSSILS, build_surface_token
-
         token = build_surface_token(purpose=PURPOSE_SURFACE_FOSSILS)
         response = self.client.get(f"/api/v1/surface/fossils/{token}")
 
@@ -336,7 +347,7 @@ class ArtifactBehaviorTests(EngineTestCase):
         self.assertEqual(response.status_code, 404)
         stream_key_mock.assert_not_called()
 
-    def test_pool_next_advances_wear_and_honors_excluded_ids_when_possible(self):
+    def test_pool_next_defers_wear_until_playback_is_acknowledged(self):
         consent = self.make_consent("ROOM")
         older = self.make_active_artifact(
             consent=consent,
@@ -354,7 +365,58 @@ class ArtifactBehaviorTests(EngineTestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["artifact_id"], preferred.id)
+        self.assertIn("/api/v1/pool/heard/", payload["playback_ack_url"])
+        preferred.refresh_from_db()
+        self.assertEqual(preferred.play_count, 0)
+        self.assertEqual(preferred.wear, 0.0)
+        self.assertEqual(AccessEvent.objects.filter(artifact=preferred, action="heard").count(), 0)
+
+        ack_response = self.client.post(payload["playback_ack_url"])
+
+        self.assertEqual(ack_response.status_code, 200)
         preferred.refresh_from_db()
         self.assertEqual(preferred.play_count, 1)
         self.assertGreater(preferred.wear, 0.0)
-        self.assertEqual(AccessEvent.objects.filter(artifact=preferred, action="play").count(), 1)
+        self.assertEqual(AccessEvent.objects.filter(artifact=preferred, action="heard").count(), 1)
+
+    def test_pool_playback_acknowledgement_is_one_time(self):
+        artifact = self.make_active_artifact(
+            raw_uri="raw/preferred.wav",
+            created_at=timezone.now() - timedelta(hours=10),
+        )
+        token = build_media_token(
+            purpose=PURPOSE_POOL_HEARD,
+            artifact_id=artifact.id,
+            nonce="nonce-once",
+        )
+
+        first = self.client.post(f"/api/v1/pool/heard/{token}")
+        second = self.client.post(f"/api/v1/pool/heard/{token}")
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        artifact.refresh_from_db()
+        self.assertEqual(artifact.play_count, 1)
+        self.assertEqual(AccessEvent.objects.filter(artifact=artifact, action="heard").count(), 1)
+
+    @patch("engine.api_views.put_bytes", side_effect=RuntimeError("storage offline"))
+    def test_room_save_rolls_back_artifact_when_storage_write_fails(self, put_bytes_mock):
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=0.5), content_type="audio/wav")
+
+        with self.assertRaises(RuntimeError):
+            self.client.post(
+                "/api/v1/artifacts/audio",
+                {"file": upload, "consent_mode": "ROOM"},
+            )
+
+        self.assertEqual(Artifact.objects.count(), 0)
+        self.assertEqual(ConsentManifest.objects.count(), 0)
+        put_bytes_mock.assert_called_once()
+
+    @override_settings(ROOM_FOSSIL_VISUALS_ENABLED=True)
+    def test_surface_fossil_feed_url_endpoint_renews_public_feed_url(self):
+        response = self.client.get("/api/v1/surface/fossils-url")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("/api/v1/surface/fossils/", payload["feed_url"])

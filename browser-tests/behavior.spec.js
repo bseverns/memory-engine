@@ -38,6 +38,12 @@ function minimalWavBuffer({ seconds = 0.5, sampleRate = 8000 } = {}) {
 
 async function mockPlaybackLoop(page) {
   let requestCount = 0;
+  await page.route("**/api/v1/pool/heard/**", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true }),
+    });
+  });
   await page.route("**/api/v1/pool/next**", async (route) => {
     requestCount += 1;
     if (requestCount > 1) {
@@ -49,6 +55,7 @@ async function mockPlaybackLoop(page) {
       body: JSON.stringify({
         artifact_id: 21,
         audio_url: "/test-audio.wav",
+        playback_ack_url: "/api/v1/pool/heard/test-ack-token",
         wear: 0.12,
         lane: "mid",
         density: "medium",

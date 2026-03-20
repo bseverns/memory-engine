@@ -109,6 +109,16 @@ secret guesses. Operator sessions are also bound to the originating
 network/browser tuple, so replaying the cookie from somewhere else is not
 enough to keep `/ops/` open.
 
+If the app sits behind a reverse proxy and you want throttling / operator
+allowlisting to trust `X-Forwarded-For`, also set:
+
+```env
+DJANGO_TRUST_X_FORWARDED_FOR=1
+```
+
+Leave that off unless your proxy strips inbound forwarded headers and rewrites
+them itself.
+
 For a server that is already bootstrapped and just needs the usual
 `pull -> test -> backup -> deploy -> status` cycle, use:
 

@@ -99,6 +99,14 @@ function fossilDataUrl(label = "Fossil Drift") {
 }
 
 async function mockSpectrograms(target) {
+  await target.route("**/api/v1/surface/fossils-url", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        feed_url: "/api/v1/surface/fossils/test-feed-token",
+      }),
+    });
+  });
   await target.route("**/api/v1/surface/fossils/**", async (route) => {
     await route.fulfill({
       contentType: "application/json",

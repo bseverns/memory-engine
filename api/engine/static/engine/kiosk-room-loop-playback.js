@@ -116,9 +116,25 @@
       durationMs: payload.playback_duration_ms,
       outputGainMultiplier,
     });
+    await acknowledgeAudiblePlayback(payload.playback_ack_url);
+  }
+
+  async function acknowledgeAudiblePlayback(ackUrl) {
+    const url = String(ackUrl || "").trim();
+    if (!url) {
+      return;
+    }
+    try {
+      await fetch(url, {
+        method: "POST",
+        cache: "no-store",
+        keepalive: true,
+      });
+    } catch (error) {}
   }
 
   global.MemoryEngineRoomLoopPlayback = {
+    acknowledgeAudiblePlayback,
     fetchLayerPayload,
     fetchPoolPayload,
     overlapAllowedForCue,

@@ -68,6 +68,7 @@ def room_surface_config():
             surface_fossils_url(build_surface_token(purpose=PURPOSE_SURFACE_FOSSILS))
             if bool(settings.ROOM_FOSSIL_VISUALS_ENABLED) else ""
         ),
+        "surfaceFossilFeedRefreshUrl": "/api/v1/surface/fossils-url",
         "operatorState": steward_state_payload(),
         "roomLoopConfig": ROOM_LOOP_CONFIG,
     }

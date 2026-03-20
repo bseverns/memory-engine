@@ -86,6 +86,8 @@ Practical note:
 - `/room/` attempts to start playback automatically by default.
 - If the browser blocks autoplay after boot, tap `Start listening` once and
   then leave the machine alone.
+- Better: launch the playback browser with a site-level autoplay allowance so
+  the machine comes back audibly after reboot without manual rescue.
 
 ## Operator machine instructions
 
@@ -112,8 +114,9 @@ be treated as a steward task, not the public-facing install posture.
 
 - launch Chromium directly to `/room/`
 - route audio to the intended playback hardware
-- verify autoplay succeeds after boot, or document the one-tap manual start
-  if the browser requires gesture activation
+- verify autoplay succeeds after boot; for unattended installs, prefer a launch
+  policy such as Chromium's `--autoplay-policy=no-user-gesture-required`
+  instead of relying on a one-tap recovery
 
 ### Operator machine
 

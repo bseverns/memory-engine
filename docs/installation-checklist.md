@@ -39,6 +39,7 @@ assigned the right URL and role.
 - Verify that reloading `/kiosk/` returns to a clean idle recording state.
 - Verify that reloading `/room/` returns to the dedicated playback surface.
 - Verify that the recording browser has persistent permission to use the chosen microphone on `/kiosk/`.
+- On the playback machine, grant or launch with autoplay permission for the site if the browser supports it. In Chromium kiosk installs, a launch flag such as `--autoplay-policy=no-user-gesture-required` is often the practical fix.
 
 ## Audio Device Selection
 
@@ -56,6 +57,7 @@ assigned the right URL and role.
 - Configure Docker and the compose stack to start automatically on boot.
 - Configure Chromium kiosk mode to launch automatically after login on each dedicated client machine.
 - Ensure the browser launch waits until the network stack and display are ready, or it may open to a blank or unreachable page.
+- On the playback machine, prefer a launch command that preserves autoplay allowance rather than relying on a one-tap manual recovery after every reboot.
 - Reboot once as a real test. Do not consider auto-start complete until the recording machine returns to `/kiosk/` and the playback machine returns to `/room/` without operator intervention.
 
 ## Operator Acceptance Pass

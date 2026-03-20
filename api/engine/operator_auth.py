@@ -19,7 +19,7 @@ def operator_secret_configured() -> bool:
 
 def request_operator_ip(request) -> str:
     forwarded_for = str(request.META.get("HTTP_X_FORWARDED_FOR") or "").strip()
-    if forwarded_for:
+    if bool(getattr(settings, "TRUST_X_FORWARDED_FOR", False)) and forwarded_for:
         return forwarded_for.split(",")[0].strip()
     return str(request.META.get("REMOTE_ADDR") or "").strip()
 

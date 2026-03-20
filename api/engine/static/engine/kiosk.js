@@ -105,6 +105,7 @@ const MIC_SIGNAL_THRESHOLD = 0.07;
 const REVIEW_IDLE_TIMEOUT_MS = 90000;
 const ATTRACT_ROTATE_MS = 3600;
 const SURFACE_STATE_POLL_MS = 5000;
+const PUBLIC_CLIENT_STORAGE_KEY = "memory-engine-public-client-id-v1";
 
 const kioskCopyApi = window.MemoryEngineKioskCopy;
 const kioskView = window.MemoryEngineKioskView;
@@ -191,6 +192,26 @@ function processingNoteForKey(noteKey, fallback = "") {
     quiet_warning: copy.processingNoteQuiet,
   };
   return map[noteKey] || fallback;
+}
+
+function publicClientId() {
+  try {
+    const existing = String(window.localStorage.getItem(PUBLIC_CLIENT_STORAGE_KEY) || "").trim();
+    if (existing) {
+      return existing;
+    }
+    const generated = `kiosk-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+    window.localStorage.setItem(PUBLIC_CLIENT_STORAGE_KEY, generated);
+    return generated;
+  } catch (error) {
+    return `kiosk-${Date.now().toString(36)}`;
+  }
+}
+
+function publicClientHeaders() {
+  return {
+    "X-Memory-Client-Id": publicClientId(),
+  };
 }
 
 function setFlowState(nextState, options = {}) {
@@ -625,7 +646,11 @@ async function submitSave(mode) {
   form.append("consent_mode", mode);
   form.append("duration_ms", String(durationMs));
 
-  const res = await fetch("/api/v1/artifacts/audio", { method: "POST", body: form });
+  const res = await fetch("/api/v1/artifacts/audio", {
+    method: "POST",
+    body: form,
+    headers: publicClientHeaders(),
+  });
   if (!res.ok) {
     throw new Error(`Save failed (${res.status})`);
   }
@@ -645,7 +670,11 @@ async function submitNoSave() {
   form.append("file", wavBlob, "audio.wav");
   form.append("duration_ms", String(durationMs));
 
-  const res = await fetch("/api/v1/ephemeral/audio", { method: "POST", body: form });
+  const res = await fetch("/api/v1/ephemeral/audio", {
+    method: "POST",
+    body: form,
+    headers: publicClientHeaders(),
+  });
   if (!res.ok) {
     throw new Error(`Playback failed (${res.status})`);
   }

@@ -68,6 +68,7 @@ The listening surface may assume:
   - `mood_bias`
 - `/api/v1/pool/next` is the source of truth for each playable selection:
   - `audio_url`
+  - `playback_ack_url`
   - `wear`
   - `lane`
   - `density`
@@ -133,6 +134,7 @@ Use this split when deciding where a new field belongs:
 
 - `artifact_id`
 - `audio_url`
+- `playback_ack_url`
 - `wear`
 - `lane`
 - `density`

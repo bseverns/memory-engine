@@ -171,7 +171,7 @@ Important fields:
 - `wear`
   accumulated playback patina from `0.0` to `1.0`
 - `play_count`
-  how often the artifact has been selected by the room loop
+  how often audible playback has been acknowledged by the room loop
 - `last_access_at`
   recent-play cooldown signal
 - `expires_at`
@@ -480,12 +480,12 @@ This gives the room loop a composed feel without hard-coding exact sequences.
 
 ### Wear progression
 
-After a playback selection is returned:
+After the browser finishes a selection and acknowledges it back to the API:
 
 - `play_count` is incremented
 - `wear` is advanced by `WEAR_EPSILON_PER_PLAY`
 - `last_access_at` is updated
-- an `AccessEvent` is recorded
+- an `AccessEvent` with audible-play intent is recorded
 
 The raw object never changes. The wear is metadata only. The browser applies the
 audible patina at playback time.
@@ -505,14 +505,15 @@ sequenceDiagram
     Loop->>Local: read recent artifact IDs
     Loop->>API: GET /pool/next?lane=...&mood=...&exclude_ids=...
     API->>DB: query ACTIVE playable artifacts
-    API->>DB: update play_count, wear, last_access_at
-    API-->>Loop: artifact_id, wear, audio_url, pool_size
+    API-->>Loop: artifact_id, wear, audio_url, playback_ack_url, pool_size
     Loop->>Local: persist selected artifact_id
     Loop->>Blob: GET /media/raw/<token>
     Blob->>MinIO: stream raw WAV or essence residue
     MinIO-->>Blob: playable audio stream
     Blob-->>Loop: no-store audio response
     Loop->>Audio: apply wear-based playback chain
+    Loop->>API: POST /pool/heard/<token>
+    API->>DB: update play_count, wear, last_access_at
     Audio-->>Loop: finish cue / continue movement
 ```
 

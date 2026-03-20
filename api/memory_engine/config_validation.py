@@ -29,6 +29,7 @@ def validate_runtime_settings(settings_obj) -> None:
         bool(getattr(settings_obj, "SESSION_COOKIE_SECURE", False)),
         bool(getattr(settings_obj, "CSRF_COOKIE_SECURE", False)),
     ])
+    trust_forwarded_for = bool(getattr(settings_obj, "TRUST_X_FORWARDED_FOR", False))
     if secure_cookies_enabled:
         for origin in csrf_trusted_origins:
             if origin.startswith("https://"):
@@ -39,6 +40,8 @@ def validate_runtime_settings(settings_obj) -> None:
                 "Secure cookie settings require production CSRF trusted origins to use https:// "
                 f"(got '{origin}').",
             )
+    if trust_forwarded_for and not bool(getattr(settings_obj, "USE_X_FORWARDED_HOST", False)):
+        errors.append("TRUST_X_FORWARDED_FOR should only be enabled when the deployment is actually proxy-aware.")
 
     if not (minio_endpoint.startswith("http://") or minio_endpoint.startswith("https://")):
         errors.append("MINIO_ENDPOINT must start with http:// or https://.")
