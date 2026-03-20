@@ -2,6 +2,14 @@
 
 Use this checklist when turning a development node into a dedicated kiosk installation. It is written for the practical first deployment pass: one trusted operator, one kiosk device, one microphone, one playback output.
 
+If you want the recording screen to stay visually minimal, print the participant
+instructions from `docs/participant-prompt-card.md` and place them beside the
+recording station.
+
+If you are running separate recording and playback machines, use
+`docs/multi-machine-setup.md` alongside this checklist so each device is
+assigned the right URL and role.
+
 ## Hardware
 
 - Choose a kiosk device that can keep Chromium running reliably for long sessions. A Raspberry Pi 3 class device is the minimum posture this repo assumes.
@@ -21,13 +29,15 @@ Use this checklist when turning a development node into a dedicated kiosk instal
 
 ## Browser Kiosk Mode
 
-- Configure Chromium to open directly to `/kiosk/`.
+- On the recording machine, configure Chromium to open directly to `/kiosk/`.
+- On the playback machine, configure Chromium to open directly to `/room/`.
 - Hide browser chrome, tabs, and address bar. The participant path should not depend on visible browser controls.
 - Disable sleep or screen blanking during open hours.
 - Disable first-run prompts, update nags, restore-session prompts, and crash restore prompts.
 - Disable pinch zoom or browser gestures if they can reveal browser UI in the enclosure.
-- Verify that reloading the page returns to a clean idle kiosk state.
-- Verify that the browser has persistent permission to use the chosen microphone on that URL.
+- Verify that reloading `/kiosk/` returns to a clean idle recording state.
+- Verify that reloading `/room/` returns to the dedicated playback surface.
+- Verify that the recording browser has persistent permission to use the chosen microphone on `/kiosk/`.
 
 ## Audio Device Selection
 
@@ -36,16 +46,16 @@ Use this checklist when turning a development node into a dedicated kiosk instal
 - Confirm the playback device is the intended speaker or audio interface, not HDMI or an internal monitor speaker by accident.
 - Open `/kiosk/`, arm the microphone, and watch the meter while speaking at normal distance.
 - Make one test recording and confirm the preview plays through the intended output device.
-- Start the room loop and confirm ambient playback is audible at the intended room level.
+- Open `/room/` and confirm ambient playback is audible at the intended room level.
 - If the input level is too low, fix gain or microphone placement in the OS or hardware before changing app code.
 
 ## Auto-Start On Boot
 
 - Configure the machine to log into the kiosk user automatically after boot.
 - Configure Docker and the compose stack to start automatically on boot.
-- Configure Chromium kiosk mode to launch automatically after login.
+- Configure Chromium kiosk mode to launch automatically after login on each dedicated client machine.
 - Ensure the browser launch waits until the network stack and display are ready, or it may open to a blank or unreachable page.
-- Reboot once as a real test. Do not consider auto-start complete until the device returns to `/kiosk/` without operator intervention.
+- Reboot once as a real test. Do not consider auto-start complete until the recording machine returns to `/kiosk/` and the playback machine returns to `/room/` without operator intervention.
 
 ## Operator Acceptance Pass
 
@@ -56,7 +66,8 @@ Use this checklist when turning a development node into a dedicated kiosk instal
 - Confirm there are no critical storage warnings.
 - Confirm there are no unexpected pool warnings before public use.
 - Test one full participant flow: arm, record, review, choose a mode, receive a receipt if applicable.
-- Test one restart cycle: reboot or restart the kiosk path and confirm the system returns to the idle attract state.
+- Test one playback-only cycle: confirm `/room/` starts or can be resumed with one tap after boot.
+- Test one restart cycle: reboot or restart both browser clients and confirm the recorder returns to `/kiosk/` while the listening surface returns to `/room/`.
 
 ## Steward Handoff
 

@@ -7,7 +7,7 @@ Local-first “room memory” appliance: record a short sound offering, choose c
 - Postgres for metadata
 - MinIO for blob storage (raw audio + spectrogram PNG fossils)
 - Redis + Celery (+ Beat) for background jobs (spectrogram generation + expiry)
-- Kiosk UI: `/kiosk/` (record + consent + immediate playback for “Don’t save” + ambient pool loop)
+- Separate client surfaces: `/kiosk/` for recording and `/room/` for dedicated playback
 - “Don’t save” = **play once immediately, then discard**
 
 ## Quick start
@@ -22,8 +22,14 @@ docker compose up --build
 ```
 4) Open:
 - Kiosk: http://localhost/kiosk/
+- Room playback: http://localhost/room/
 - Admin: http://localhost/admin/  (creates a default superuser in dev; see logs)
 - Ops: http://localhost/ops/
+
+For a real multi-machine install, the intended role split is:
+- recording machine opens `/kiosk/`
+- playback machine opens `/room/`
+- steward/operator machine opens `/ops/`
 
 ## Server deployment: public IP now, domain later
 The compose stack is set up for a reverse proxy in front of Django:
@@ -107,9 +113,24 @@ GitHub Actions runs that same `./scripts/check.sh` gate from a repo-local
 `.venv`, so CI matches the local maintenance path instead of using a different
 test command.
 
+For browser-level simulation and screenshots, the repo also supports a small
+Playwright layer:
+
+```bash
+npm install
+npx playwright install chromium
+npm run screenshots
+```
+
+That starts Django with the browser test settings, opens the recording kiosk,
+the dedicated playback surface, and the operator dashboard in headless
+Chromium, and writes example screenshots under `artifacts/screenshots/`.
+
 Longer operator notes live in `docs/maintenance.md`.
 That includes a MinIO section covering which credentials live where, what is set before first deploy, and how manual MinIO provisioning changes the `.env` values.
 The install-day hardware and kiosk checklist lives in `docs/installation-checklist.md`.
+The explicit recorder/playback/operator role split lives in `docs/multi-machine-setup.md`.
+The printable off-screen participant guidance lives in `docs/participant-prompt-card.md`.
 The architecture and request-flow notes live in `docs/how-the-stack-works.md`.
 
 For a server reachable at `203.0.113.10`, set these values in `.env`:

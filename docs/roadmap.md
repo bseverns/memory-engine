@@ -20,6 +20,7 @@
 - Pool-health warnings in `/ops/` when lanes or moods become too sparse or imbalanced
 
 ### Recording experience
+- Split the browser experience into a dedicated recording station at `/kiosk/` and a separate playback surface at `/room/`
 - Short pre-roll countdown before recording begins
 - Soft pre-roll tone paired with the visual countdown
 - Explicit mic-check feedback using the live meter

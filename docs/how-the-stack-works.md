@@ -8,11 +8,15 @@ playback, expiry, revocation, and operator visibility.
 If you only need deploy and repair steps, use `docs/maintenance.md`. This file
 is for understanding the architecture well enough to modify it safely.
 
+If you need explicit client-role instructions for a real install, use
+`docs/multi-machine-setup.md` alongside this file.
+
 ## Design posture
 
 The stack is intentionally local-first and appliance-shaped.
 
-- A browser kiosk captures audio and talks only to the Django app.
+- A recording kiosk captures audio, while a separate playback surface can run
+  the room loop.
 - Django stores metadata in Postgres and object bytes in MinIO.
 - Celery workers generate long-lived derivatives and run retention cleanup.
 - The room loop is composed in the browser, but it asks the server for one
@@ -55,22 +59,59 @@ services:
 There is also a one-shot `minio_init` helper that ensures the configured bucket
 exists before the app starts using it.
 
-In request terms, the path is:
+In request terms, the paths are:
 
-`browser -> Caddy -> Django -> Postgres/MinIO/Redis`
+- `recording kiosk -> Caddy -> Django -> Postgres/MinIO`
+- `playback surface -> Caddy -> Django -> Postgres/MinIO`
+- `operator browser -> Caddy -> Django -> Postgres/MinIO`
 
 In background-job terms, the path is:
 
 `Django -> Redis -> Celery worker -> MinIO/Postgres`
 
+The shape looks like this in practice:
+
+```mermaid
+flowchart LR
+    recorder["Recording kiosk /kiosk/"]
+    playback["Listening surface /room/"]
+    ops["Operator browser /ops/"]
+    proxy["Caddy proxy"]
+    api["Django API + templates"]
+    db[("Postgres")]
+    redis[("Redis")]
+    minio[("MinIO")]
+    worker["Celery worker"]
+    beat["Celery beat"]
+
+    recorder -->|HTTPS / HTTP| proxy
+    playback -->|HTTPS / HTTP| proxy
+    ops -->|HTTPS / HTTP| proxy
+    proxy --> api
+    api --> db
+    api --> minio
+    api --> redis
+    beat -->|scheduled tasks| redis
+    redis --> worker
+    worker --> minio
+    worker --> db
+```
+
 ## URL surface
 
 The root URL table lives in `api/memory_engine/urls.py`.
 
-- `/kiosk/` renders the participant-facing interface
+- `/kiosk/` renders the recording station
+- `/room/` renders the dedicated playback surface
 - `/ops/` renders the operator dashboard
 - `/healthz` reports dependency readiness
 - `/api/v1/...` exposes the kiosk and ops API surface
+
+In the intended field setup:
+
+- the recording machine opens `/kiosk/`
+- the playback machine opens `/room/`
+- the operator machine opens `/ops/`
 
 The app API routes in `api/engine/urls.py` break down into five groups:
 
@@ -139,6 +180,59 @@ that derivatives can outlive raw audio when the consent mode allows that.
 Records each playback action. Right now the primary use is a lightweight audit
 trail and debugging signal around pool behavior.
 
+The core data shape is:
+
+```mermaid
+erDiagram
+    NODE ||--o{ ARTIFACT : owns
+    CONSENT_MANIFEST ||--o{ ARTIFACT : governs
+    ARTIFACT ||--o{ DERIVATIVE : yields
+    ARTIFACT ||--o{ ACCESS_EVENT : records
+
+    NODE {
+        bigint id
+        string name
+        string location_hint
+        datetime created_at
+    }
+
+    CONSENT_MANIFEST {
+        bigint id
+        json json
+        string revocation_token_hash
+        datetime created_at
+    }
+
+    ARTIFACT {
+        bigint id
+        string status
+        string raw_uri
+        string raw_sha256
+        int duration_ms
+        float wear
+        int play_count
+        datetime last_access_at
+        datetime expires_at
+        datetime created_at
+    }
+
+    DERIVATIVE {
+        bigint id
+        string kind
+        string uri
+        bool publishable
+        datetime expires_at
+        datetime created_at
+    }
+
+    ACCESS_EVENT {
+        bigint id
+        string context
+        string action
+        datetime ts
+    }
+```
+
 ## Consent and retention modes
 
 The consent policy builder lives in `api/engine/consent.py`.
@@ -197,6 +291,28 @@ Why this is structured this way:
 - MinIO holds the bytes.
 - the client gets the revocation token once and only once.
 
+Visually, the ingest branch looks like this:
+
+```mermaid
+flowchart TD
+    start["Recording kiosk captures mono WAV"] --> upload["POST /api/v1/artifacts/audio"]
+    upload --> validate["Django validates file + consent mode"]
+    validate --> consent["Create ConsentManifest + hashed revoke token"]
+    consent --> artifact["Create ACTIVE Artifact with retention deadline"]
+    artifact --> store["Write WAV to MinIO and save raw_uri"]
+    store --> branch{"Consent mode"}
+    branch -->|ROOM| room["Return artifact + revocation token"]
+    branch -->|FOSSIL| queue["Queue generate_spectrogram"]
+    queue --> fossil["Return artifact + revocation token"]
+
+    nosaveStart["Recording kiosk captures one-time WAV"] --> nosaveUpload["POST /api/v1/ephemeral/audio"]
+    nosaveUpload --> eph["Create EPHEMERAL Artifact + consume token"]
+    eph --> ephStore["Write WAV to MinIO"]
+    ephStore --> once["Recording kiosk plays once"]
+    once --> consume["POST /api/v1/ephemeral/consume"]
+    consume --> purge["Delete blob and mark artifact REVOKED"]
+```
+
 ### Ephemeral one-time flow: `POST /api/v1/ephemeral/audio`
 
 This exists for "Don't Save."
@@ -230,6 +346,21 @@ The flow is:
 
 The result is that revocation removes both future playback eligibility and
 stored derivatives on that node.
+
+The long arc of an artifact is:
+
+```mermaid
+stateDiagram-v2
+    [*] --> ACTIVE: ROOM / FOSSIL ingest
+    [*] --> EPHEMERAL: NOSAVE ingest
+    ACTIVE --> ACTIVE: playback increments wear + play_count
+    ACTIVE --> EXPIRED: expire_raw task clears raw blob
+    ACTIVE --> REVOKED: revoke endpoint clears raw + derivatives
+    EPHEMERAL --> REVOKED: consume_ephemeral clears raw blob
+    EPHEMERAL --> REVOKED: expire_raw safety sweep
+    EXPIRED --> [*]
+    REVOKED --> [*]
+```
 
 ## Blob serving and why MinIO is private
 
@@ -318,6 +449,32 @@ After a playback selection is returned:
 The raw object never changes. The wear is metadata only. The browser applies the
 audible patina at playback time.
 
+The room-loop handoff between browser and server looks like this:
+
+```mermaid
+sequenceDiagram
+    participant Loop as Listening surface room loop
+    participant Local as localStorage anti-repeat window
+    participant API as Django /api/v1/pool/next
+    participant DB as Postgres
+    participant Blob as Django blob proxy
+    participant MinIO as MinIO
+    participant Audio as Web Audio playback
+
+    Loop->>Local: read recent artifact IDs
+    Loop->>API: GET /pool/next?lane=...&mood=...&exclude_ids=...
+    API->>DB: query ACTIVE playable artifacts
+    API->>DB: update play_count, wear, last_access_at
+    API-->>Loop: artifact_id, wear, audio_url, pool_size
+    Loop->>Local: persist selected artifact_id
+    Loop->>Blob: GET /blob/<id>/raw
+    Blob->>MinIO: stream object bytes
+    MinIO-->>Blob: WAV stream
+    Blob-->>Loop: no-store audio response
+    Loop->>Audio: apply wear-based playback chain
+    Audio-->>Loop: finish cue / continue movement
+```
+
 ## Browser-side room loop
 
 The room loop controller lives in `api/engine/static/engine/kiosk-room-loop.js`.
@@ -353,8 +510,12 @@ Important browser loop behaviors:
 
 ## Browser capture and playback modules
 
-The participant-facing UI is loaded by `api/engine/templates/engine/kiosk.html`.
-Its JavaScript is intentionally split by responsibility.
+The browser-facing surfaces are split intentionally:
+
+- `api/engine/templates/engine/kiosk.html` is the recording station
+- `api/engine/templates/engine/playback.html` is the dedicated listening surface
+
+The JavaScript is intentionally split by responsibility.
 
 ### `kiosk.js`
 
@@ -377,6 +538,10 @@ It also owns:
 - quiet-take decision gate
 - consent-mode submission
 - handoff to the room loop controller
+
+On the recording station, the room loop controller is present only as a shared
+boundary now; the visible playback controls live on the separate `/room/`
+surface instead of the recorder itself.
 
 ### `kiosk-capture.js`
 
@@ -406,6 +571,15 @@ Holds the AudioWorklet processors used by capture and playback.
 
 The key maintenance implication is that browser audio logic is now modular, but
 it is still custom Web Audio code rather than a framework abstraction.
+
+### `playback.js`
+
+Owns the dedicated listening surface.
+
+- starts the room loop on the `/room/` machine
+- exposes only start/pause playback controls
+- keeps the UX framed as listening, not recording
+- allows screenshot/test mode to disable autostart with `?autostart=0`
 
 ## Background jobs
 
