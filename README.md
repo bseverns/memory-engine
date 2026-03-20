@@ -144,6 +144,7 @@ The install-day hardware and kiosk checklist lives in `docs/installation-checkli
 The explicit recorder/playback/operator role split lives in `docs/multi-machine-setup.md`.
 The printable off-screen participant guidance lives in `docs/participant-prompt-card.md`.
 The architecture and request-flow notes live in `docs/how-the-stack-works.md`.
+The shortest browser/API boundary notes live in `docs/surface-contract.md`.
 
 For a server reachable at `203.0.113.10`, set these values in `.env`:
 

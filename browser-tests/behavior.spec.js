@@ -1,0 +1,149 @@
+const { test, expect } = require("@playwright/test");
+const {
+  applyStewardControls,
+  mockHealthyOpsStatus,
+  mockSpectrograms,
+} = require("./helpers");
+
+function minimalWavBuffer({ seconds = 0.5, sampleRate = 8000 } = {}) {
+  const channelCount = 1;
+  const bitsPerSample = 16;
+  const sampleCount = Math.max(1, Math.floor(sampleRate * seconds));
+  const blockAlign = channelCount * (bitsPerSample / 8);
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = sampleCount * blockAlign;
+  const buffer = Buffer.alloc(44 + dataSize);
+
+  buffer.write("RIFF", 0);
+  buffer.writeUInt32LE(36 + dataSize, 4);
+  buffer.write("WAVE", 8);
+  buffer.write("fmt ", 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(channelCount, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(byteRate, 28);
+  buffer.writeUInt16LE(blockAlign, 32);
+  buffer.writeUInt16LE(bitsPerSample, 34);
+  buffer.write("data", 36);
+  buffer.writeUInt32LE(dataSize, 40);
+
+  for (let index = 0; index < sampleCount; index += 1) {
+    const sample = Math.round(Math.sin((index / sampleRate) * 2 * Math.PI * 330) * 0.2 * 32767);
+    buffer.writeInt16LE(sample, 44 + (index * 2));
+  }
+
+  return buffer;
+}
+
+async function mockPlaybackLoop(page) {
+  let requestCount = 0;
+  await page.route("**/api/v1/pool/next**", async (route) => {
+    requestCount += 1;
+    if (requestCount > 1) {
+      await route.fulfill({ status: 204, body: "" });
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        artifact_id: 21,
+        audio_url: "/test-audio.wav",
+        wear: 0.12,
+        lane: "mid",
+        density: "medium",
+        mood: "clear",
+        pool_size: 7,
+        featured_return: false,
+        playback_start_ms: 0,
+        playback_duration_ms: 400,
+        playback_windowed: false,
+        playback_revolution_index: 0,
+      }),
+    });
+  });
+  await page.route("**/test-audio.wav", async (route) => {
+    await route.fulfill({
+      contentType: "audio/wav",
+      body: minimalWavBuffer(),
+    });
+  });
+}
+
+test.describe("browser behavior contracts", () => {
+  test("playback info lightbox opens and closes cleanly", async ({ page }) => {
+    await mockHealthyOpsStatus(page);
+    await mockSpectrograms(page.context());
+    await applyStewardControls(page, {});
+    await page.goto("/room/?autostart=0");
+
+    await page.getByRole("button", { name: "About this room" }).click();
+    await expect(page.getByRole("heading", { name: "How this surface behaves" })).toBeVisible();
+    await expect(page.locator("#playbackInfoLightbox")).toHaveAttribute("aria-hidden", "false");
+
+    await page.getByRole("button", { name: "Close" }).click();
+    await expect(page.locator("#playbackInfoLightbox")).toHaveAttribute("aria-hidden", "true");
+
+    await page.getByRole("button", { name: "About this room" }).click();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#playbackInfoLightbox")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  test("playback start and stop drive the listening controls", async ({ page }) => {
+    await mockHealthyOpsStatus(page);
+    await mockSpectrograms(page.context());
+    await mockPlaybackLoop(page);
+    await applyStewardControls(page, {});
+    await page.goto("/room/?autostart=0");
+
+    const startButton = page.getByRole("button", { name: "Start listening" });
+    const stopButton = page.getByRole("button", { name: "Pause playback" });
+
+    await expect(startButton).toBeEnabled();
+    await expect(stopButton).toBeDisabled();
+
+    await startButton.click();
+    await expect(stopButton).toBeEnabled();
+    await expect(startButton).toBeDisabled();
+    await expect(page.locator("#playbackAutostartNote")).toContainText("Playback is running here");
+
+    await stopButton.click();
+    await expect(startButton).toBeEnabled();
+    await expect(stopButton).toBeDisabled();
+    await expect(page.locator("#playbackAutostartNote")).toContainText("Playback paused on this surface");
+  });
+
+  test("steward language control propagates to the kiosk surface", async ({ page }) => {
+    await mockHealthyOpsStatus(page);
+    await applyStewardControls(page, { kioskLanguageCode: "es_mx_ca" });
+
+    const kioskPage = await page.context().newPage();
+    await kioskPage.goto("/kiosk/");
+    await expect(kioskPage.getByRole("heading", { name: "Memoria de la sala" })).toBeVisible();
+    await expect(kioskPage.getByRole("button", { name: "Activar micrófono" })).toBeVisible();
+    await kioskPage.close();
+  });
+
+  test("steward controls propagate to kiosk and room without reload-specific hacks", async ({ page }) => {
+    await mockHealthyOpsStatus(page);
+    await mockSpectrograms(page.context());
+    await applyStewardControls(page, {
+      intakePaused: true,
+      quieterMode: true,
+      moodBias: "weathered",
+    });
+
+    const kioskPage = await page.context().newPage();
+    await kioskPage.goto("/kiosk/");
+    await expect(kioskPage.getByText("This recording station is resting.")).toBeVisible();
+    await expect(kioskPage.getByText("Recording intake is paused by the steward.")).toBeVisible();
+
+    const roomPage = await page.context().newPage();
+    await roomPage.goto("/room/?autostart=0");
+    await expect(roomPage.locator("#playbackAutostartNote")).toContainText("Quieter mode is active");
+    await expect(roomPage.locator("#playbackAutostartNote")).toContainText("weathered");
+
+    await kioskPage.close();
+    await roomPage.close();
+  });
+});

@@ -11,6 +11,9 @@ is for understanding the architecture well enough to modify it safely.
 If you need explicit client-role instructions for a real install, use
 `docs/multi-machine-setup.md` alongside this file.
 
+If you need the shortest explicit browser/API boundary notes, use
+`docs/surface-contract.md`.
+
 ## Design posture
 
 The stack is intentionally local-first and appliance-shaped.
