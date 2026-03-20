@@ -39,6 +39,14 @@
       roomDaypartEnabled: true,
       roomDaypartName: "",
       roomDaypartLabel: "",
+      roomQuietHoursEnabled: false,
+      roomQuietHoursActive: false,
+      roomQuietHoursLabel: "Quiet hours",
+      roomQuietHoursStartHour: 22,
+      roomQuietHoursEndHour: 6,
+      roomQuietHoursGapMultiplier: 1.2,
+      roomQuietHoursToneMultiplier: 0.78,
+      roomQuietHoursOutputGainMultiplier: 0.72,
       roomScarcityEnabled: true,
       roomScarcityLowThreshold: 6,
       roomScarcitySevereThreshold: 3,
@@ -156,6 +164,16 @@
     return dayparts.find((daypart) => daypartMatchesHour(daypart, hour)) || null;
   }
 
+  function quietHoursActive(config, date = new Date()) {
+    if (!config.roomQuietHoursEnabled) {
+      return false;
+    }
+    return daypartMatchesHour({
+      startHour: config.roomQuietHoursStartHour ?? 22,
+      endHour: config.roomQuietHoursEndHour ?? 6,
+    }, date.getHours());
+  }
+
   function scarcityProfile(config, poolSize) {
     if (!config.roomScarcityEnabled) {
       return { gapMultiplier: 1.0, pauseMultiplier: 1.0, toneMultiplier: 1.0, label: "" };
@@ -267,15 +285,18 @@
     }
 
     function applySurfaceGapMultiplier(value) {
-      return value * (quieterModeEnabled() ? 1.18 : 1.0);
+      const quietHoursMultiplier = quietHoursActive(config) ? Number(config.roomQuietHoursGapMultiplier || 1.0) : 1.0;
+      return value * quietHoursMultiplier * (quieterModeEnabled() ? 1.18 : 1.0);
     }
 
     function applySurfaceToneMultiplier(value) {
-      return value * (quieterModeEnabled() ? 0.72 : 1.0);
+      const quietHoursMultiplier = quietHoursActive(config) ? Number(config.roomQuietHoursToneMultiplier || 1.0) : 1.0;
+      return value * quietHoursMultiplier * (quieterModeEnabled() ? 0.72 : 1.0);
     }
 
     function surfaceOutputGainMultiplier() {
-      return quieterModeEnabled() ? 0.74 : 1.0;
+      const quietHoursMultiplier = quietHoursActive(config) ? Number(config.roomQuietHoursOutputGainMultiplier || 1.0) : 1.0;
+      return quietHoursMultiplier * (quieterModeEnabled() ? 0.74 : 1.0);
     }
 
     function resolveActiveProfiles() {
@@ -298,6 +319,14 @@
         return "steady";
       }
       return profiles.daypart.label || profiles.daypart.name || "steady";
+    }
+
+    function roomPostureLabel(profiles) {
+      const parts = [daypartLabel(profiles)];
+      if (quietHoursActive(config)) {
+        parts.push(String(config.roomQuietHoursLabel || "Quiet hours"));
+      }
+      return parts.join(" / ");
     }
 
     function startLoopMovement(index, profiles = resolveActiveProfiles()) {
@@ -510,7 +539,7 @@
       persistentLoopWindow = loadPersistentLoopWindow(config);
       updateButtons();
       const startingProfiles = resolveActiveProfiles();
-      setStatus(`Running (${daypartLabel(startingProfiles)} / ${startingProfiles.intensity.name} intensity / ${startingProfiles.movementPreset.name} preset)...`);
+      setStatus(`Running (${roomPostureLabel(startingProfiles)} / ${startingProfiles.intensity.name} intensity / ${startingProfiles.movementPreset.name} preset)...`);
       try {
         await ensureRoomTone();
       } catch (err) {
@@ -528,7 +557,7 @@
           const roomIntensity = profiles.intensity;
           if ((profiles.daypart?.name || "") !== activeDaypartName && roomMovements.length) {
             startLoopMovement(loopMovementIndex, profiles);
-            setStatus(`Shifting into ${daypartLabel(profiles).toLowerCase()} posture...`);
+            setStatus(`Shifting into ${roomPostureLabel(profiles).toLowerCase()} posture...`);
           }
           if (playbackPausedBySteward()) {
             setStatus("Playback is paused by the steward.");
@@ -543,8 +572,8 @@
             const scarcityLabel = scarcityProfile(config, loopKnownPoolSize).label;
             setStatus(
               scarcityLabel
-                ? `Holding space in ${daypartLabel(profiles)} / ${movement.name} / ${scene.name} (${scarcityLabel} pool).`
-                : `Holding space in ${daypartLabel(profiles)} / ${movement.name} / ${scene.name}.`,
+                ? `Holding space in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name} (${scarcityLabel} pool).`
+                : `Holding space in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name}.`,
             );
             setRoomToneLevel(
               applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, toneLevelForName(cue.toneLevel), loopKnownPoolSize)),
@@ -570,7 +599,7 @@
           const response = await fetch(`/api/v1/pool/next?${params.toString()}`, { cache: "no-store" });
           if (response.status === 204) {
             loopKnownPoolSize = 0;
-            setStatus(`No ${mood} ${density} memory available in ${daypartLabel(profiles)} / ${movement.name}. Scarcity mode is holding the room tone.`);
+            setStatus(`No ${mood} ${density} memory available in ${roomPostureLabel(profiles)} / ${movement.name}. Scarcity mode is holding the room tone.`);
             setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize)), 1.8);
             await sleep(Math.round(1500 * applySurfaceGapMultiplier(adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, true))));
             continue;
@@ -590,8 +619,8 @@
           const scarcityLabel = scarcityProfile(config, loopKnownPoolSize).label;
           setStatus(
             scarcityLabel
-              ? `Playing ${laneLabel} in ${daypartLabel(profiles)} / ${movement.name} / ${scene.name} (${scarcityLabel} pool, wear ${payload.wear.toFixed(3)})`
-              : `Playing ${laneLabel} in ${daypartLabel(profiles)} / ${movement.name} / ${scene.name} (wear ${payload.wear.toFixed(3)})`,
+              ? `Playing ${laneLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name} (${scarcityLabel} pool, wear ${payload.wear.toFixed(3)})`
+              : `Playing ${laneLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name} (wear ${payload.wear.toFixed(3)})`,
           );
           setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.duckGain, loopKnownPoolSize)), 0.8);
           await playUrlWithLightChain(payload.audio_url, payload.wear, {

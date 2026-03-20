@@ -69,6 +69,7 @@
 - Persistent anti-repetition window so repetition control survives browser refreshes and restarts
 - Adaptive gap timing based on total pool size so a sparse archive feels spacious and a deep archive feels alive
 - Daypart scheduling so movement pacing and intensity can shift across morning, afternoon, evening, and night
+- Quiet-hours mode so spaces can soften room pacing and playback intensity on a schedule
 - Steward-tunable movement presets so one installation can feel meditative while another feels more active
 - Code comments around playback selection, scene composition, room tone, and wear processing
 - `README.md` audience-experience notes describing the intended listening effect
@@ -98,7 +99,6 @@
 - Add more explicit density balancing so long or heavy material does not cluster too often by accident
 - Add a "featured return" mechanism for older material that should occasionally re-enter the room after long absence
 - Add audience-facing fossil visuals or ambient spectrogram display if the installation benefits from a visual layer
-- Add a quiet-hours mode for spaces that need softer pacing or lower overall playback intensity
 - Add a way to pin or bias certain moods temporarily during performances or steward-led sessions
 
 ### Operator / stewardship

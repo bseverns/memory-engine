@@ -174,6 +174,9 @@ ROOM_LOOP_CONFIG = {
             "movementPreset": "meditative",
         },
     ],
+    "quietHours": {
+        "label": "Quiet hours",
+    },
     "tone": {
         "idleGain": 0.011,
         "sparseGain": 0.017,
@@ -199,17 +202,36 @@ def active_daypart_for_hour(hour: int, loop_config: dict | None = None) -> dict 
     return None
 
 
+def quiet_hours_active_for_hour(hour: int, *, enabled: bool, start_hour: int, end_hour: int) -> bool:
+    if not enabled:
+        return False
+    return daypart_matches_hour({"startHour": start_hour, "endHour": end_hour}, hour)
+
+
 def room_schedule_snapshot(
     *,
     intensity_profile: str,
     movement_preset: str,
     daypart_enabled: bool,
+    quiet_hours_enabled: bool = False,
+    quiet_hours_start_hour: int = 22,
+    quiet_hours_end_hour: int = 6,
+    quiet_hours_gap_multiplier: float = 1.18,
+    quiet_hours_tone_multiplier: float = 0.78,
+    quiet_hours_output_gain_multiplier: float = 0.72,
     now=None,
     loop_config: dict | None = None,
 ) -> dict:
     config = loop_config or ROOM_LOOP_CONFIG
     current_time = timezone.localtime(now or timezone.now())
     active_daypart = active_daypart_for_hour(current_time.hour, config) if daypart_enabled else None
+    quiet_hours_active = quiet_hours_active_for_hour(
+        current_time.hour,
+        enabled=quiet_hours_enabled,
+        start_hour=quiet_hours_start_hour,
+        end_hour=quiet_hours_end_hour,
+    )
+    quiet_hours_config = config.get("quietHours", {})
 
     return {
         "daypartEnabled": bool(daypart_enabled),
@@ -217,4 +239,10 @@ def room_schedule_snapshot(
         "daypartLabel": active_daypart.get("label", "") if active_daypart else "",
         "intensityProfile": active_daypart.get("intensityProfile", intensity_profile) if active_daypart else intensity_profile,
         "movementPreset": active_daypart.get("movementPreset", movement_preset) if active_daypart else movement_preset,
+        "quietHoursEnabled": bool(quiet_hours_enabled),
+        "quietHoursActive": bool(quiet_hours_active),
+        "quietHoursLabel": quiet_hours_config.get("label", "Quiet hours"),
+        "quietHoursGapMultiplier": float(quiet_hours_gap_multiplier),
+        "quietHoursToneMultiplier": float(quiet_hours_tone_multiplier),
+        "quietHoursOutputGainMultiplier": float(quiet_hours_output_gain_multiplier),
     }
