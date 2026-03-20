@@ -433,7 +433,15 @@
       persistentLoopWindow = loadPersistentLoopWindow(config);
       updateButtons();
       setStatus(`Running (${roomIntensity.name} intensity / ${movementPreset.name} preset)...`);
-      await ensureRoomTone();
+      try {
+        await ensureRoomTone();
+      } catch (err) {
+        loopRunning = false;
+        updateButtons();
+        setStatus("Playback could not start. Tap start once to grant audio access.");
+        await stopRoomTone();
+        return;
+      }
       setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.idleGain, loopKnownPoolSize), 1.0);
 
       while (loopRunning) {

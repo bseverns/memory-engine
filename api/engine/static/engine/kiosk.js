@@ -63,6 +63,7 @@ const meterText = document.getElementById("meterText");
 const meterFill = document.getElementById("meterFill");
 const submitStatus = document.getElementById("submitStatus");
 const selectionHint = document.getElementById("selectionHint");
+const receiptPanel = document.getElementById("receiptPanel");
 const receipt = document.getElementById("receipt");
 const preview = document.getElementById("preview");
 const loopStatus = document.getElementById("loopStatus");
@@ -100,6 +101,7 @@ let reviewTimeoutInterval = 0;
 let reviewDeadlineTs = 0;
 let quietTakeNeedsDecision = false;
 let quietTakeAnalysis = null;
+let hasReceipt = false;
 let attractStepIndex = 0;
 let attractInterval = 0;
 const PRE_ROLL_SECONDS = 3;
@@ -151,6 +153,7 @@ function render() {
   countdownOverlay.hidden = flowState !== FLOW.COUNTDOWN;
   updateStepper();
   updateModePanel();
+  updateReceiptPanel();
   updateButtons();
   updateStage();
   updateQuietTakePanel();
@@ -246,7 +249,7 @@ function updateQuietTakePanel() {
 }
 
 function startAttractLoop() {
-  if (attractInterval) return;
+  if (attractInterval || !attractPanel || attractSteps.length === 0) return;
   attractInterval = window.setInterval(() => {
     attractStepIndex = (attractStepIndex + 1) % attractSteps.length;
     if (flowState === FLOW.IDLE) {
@@ -256,6 +259,7 @@ function startAttractLoop() {
 }
 
 function updateAttractPanel() {
+  if (!attractPanel || !attractLead || attractSteps.length === 0) return;
   const visible = flowState === FLOW.IDLE;
   attractPanel.hidden = !visible;
   if (!visible) return;
@@ -267,7 +271,10 @@ function updateAttractPanel() {
 }
 
 function updateModePanel() {
-  const visible = [FLOW.REVIEW, FLOW.SUBMITTING, FLOW.COMPLETE].includes(flowState);
+  const visible = [FLOW.REVIEW, FLOW.SUBMITTING].includes(flowState);
+  if (modePanel) {
+    modePanel.hidden = !visible;
+  }
   const interactive = flowState === FLOW.REVIEW && !quietTakeNeedsDecision;
   modePanel.classList.toggle("locked", !interactive);
   choices.forEach((choice) => {
@@ -278,8 +285,6 @@ function updateModePanel() {
     selectionHint.textContent = "Unlocked after recording";
   } else if (flowState === FLOW.REVIEW && quietTakeNeedsDecision) {
     selectionHint.textContent = "Keep or retake before choosing";
-  } else if (flowState === FLOW.COMPLETE && selectedMode) {
-    selectionHint.textContent = `Completed: ${MODE_COPY[selectedMode].name}`;
   } else if (!selectedMode) {
     selectionHint.textContent = "Press 1, 2, or 3 to choose";
   } else {
@@ -289,6 +294,11 @@ function updateModePanel() {
   const canSubmit = flowState === FLOW.REVIEW && !!wavBlob && !!selectedMode;
   btnSubmit.disabled = !canSubmit;
   btnSubmit.textContent = selectedMode ? MODE_COPY[selectedMode].submitLabel : "Submit selection";
+}
+
+function updateReceiptPanel() {
+  if (!receiptPanel) return;
+  receiptPanel.hidden = !hasReceipt;
 }
 
 function updateButtons() {
@@ -374,8 +384,8 @@ function updateStage() {
 
   if (flowState === FLOW.IDLE) {
     stageBadge.textContent = "Not armed";
-    stageTitle.textContent = "Settle in before you begin.";
-    stageCopy.textContent = "Arm the microphone when you are ready. Once it is live, you can check the level meter, take a breath, and begin when it feels right.";
+    stageTitle.textContent = "When you are ready, wake the microphone.";
+    stageCopy.textContent = "Nothing records until you begin. Take a breath, notice the room, and start only when it feels right.";
     micStatus.textContent = "Microphone asleep";
     recStatus.textContent = "Microphone not armed";
     shortcutHint.textContent = "Space or Enter: arm microphone";
@@ -384,8 +394,8 @@ function updateStage() {
     setMeterLevel(0);
   } else if (flowState === FLOW.ARMING) {
     stageBadge.textContent = "Arming";
-    stageTitle.textContent = "Allow the microphone, then get comfortable.";
-    stageCopy.textContent = "The kiosk will stay quiet and wait for you. Recording does not begin until you choose to start.";
+    stageTitle.textContent = "Allow the microphone, then settle.";
+    stageCopy.textContent = "The screen will stay still and wait. Recording does not begin until you choose it.";
     micStatus.textContent = "Requesting microphone access";
     recStatus.textContent = "Waiting for microphone access";
     shortcutHint.textContent = "Microphone request in progress";
@@ -393,16 +403,16 @@ function updateStage() {
     setMicCheckStatus("Mic check starting up", "quiet");
   } else if (flowState === FLOW.ARMED) {
     stageBadge.textContent = "Ready";
-    stageTitle.textContent = "You are armed, but not recording yet.";
-    stageCopy.textContent = "Watch the level meter to confirm the USB microphone is live. When you feel settled, start the recording.";
+    stageTitle.textContent = "You are ready, but not yet recording.";
+    stageCopy.textContent = "Speak a little if you want to watch the meter. Begin when the moment feels settled.";
     micStatus.textContent = micLabel;
     recStatus.textContent = "Standing by";
     shortcutHint.textContent = "Space or Enter: start recording";
     meterText.textContent = hasMic ? "Listening for room sound" : "Microphone unavailable";
   } else if (flowState === FLOW.COUNTDOWN) {
     stageBadge.textContent = "Get ready";
-    stageTitle.textContent = "Take a breath. Recording starts in a moment.";
-    stageCopy.textContent = "The microphone is live, but capture has not started yet. Let the countdown finish or cancel it if you want to reset.";
+    stageTitle.textContent = "Take a breath.";
+    stageCopy.textContent = "Recording begins in a moment. You can still cancel if you need more time.";
     micStatus.textContent = micLabel;
     recStatus.textContent = "Countdown in progress";
     shortcutHint.textContent = "Escape: cancel countdown";
@@ -410,7 +420,7 @@ function updateStage() {
   } else if (flowState === FLOW.RECORDING) {
     stageBadge.textContent = "Recording";
     stageTitle.textContent = "Speak when you are ready.";
-    stageCopy.textContent = "Press Space, Enter, or Stop when you want to finish. The take stops automatically when the remaining timer reaches zero.";
+    stageCopy.textContent = "Stop whenever you feel complete. The take also ends automatically when the timer reaches zero.";
     micStatus.textContent = micLabel;
     recStatus.textContent = "Recording in progress";
     shortcutHint.textContent = "Space or Enter: stop recording";
@@ -418,14 +428,14 @@ function updateStage() {
   } else if (flowState === FLOW.REVIEW) {
     if (quietTakeNeedsDecision) {
       stageBadge.textContent = "Quiet take";
-      stageTitle.textContent = "This take sounds very quiet.";
-      stageCopy.textContent = "Listen back first. If the softness is intentional, keep the take. Otherwise retake it before choosing what happens next.";
+      stageTitle.textContent = "This take arrived very softly.";
+      stageCopy.textContent = "Listen once. Keep it if that softness is right, or retake it before choosing what happens next.";
     } else {
       stageBadge.textContent = "Review";
-      stageTitle.textContent = selectedMode ? `Ready to ${MODE_COPY[selectedMode].submitLabel.toLowerCase()}.` : "Listen back, then choose what happens next.";
+      stageTitle.textContent = selectedMode ? `Ready to ${MODE_COPY[selectedMode].submitLabel.toLowerCase()}.` : "Listen back, then choose what follows.";
       stageCopy.textContent = selectedMode
         ? MODE_COPY[selectedMode].reviewCopy
-        : "Use the audio preview if you want. Then choose 1, 2, or 3 to decide how the room should remember this take.";
+        : "Use the preview if you want. Then choose 1, 2, or 3 for the next step.";
     }
     micStatus.textContent = hasMic ? micLabel : "Microphone asleep";
     recStatus.textContent = quietTakeNeedsDecision ? "Very quiet input detected" : (wavBlob ? "Take captured" : "No take captured");
@@ -439,8 +449,8 @@ function updateStage() {
     );
   } else if (flowState === FLOW.SUBMITTING) {
     stageBadge.textContent = "Saving";
-    stageTitle.textContent = "Please hold on for a moment.";
-    stageCopy.textContent = "The kiosk is finishing this session and will show a receipt if there is one to keep.";
+    stageTitle.textContent = "Please hold for a moment.";
+    stageCopy.textContent = "The kiosk is finishing this session and will only show something to keep if this take produced one.";
     micStatus.textContent = "Microphone asleep";
     recStatus.textContent = "Submitting";
     shortcutHint.textContent = "Submitting current take";
@@ -450,7 +460,7 @@ function updateStage() {
   } else if (flowState === FLOW.COMPLETE) {
     stageBadge.textContent = "Finished";
     stageTitle.textContent = selectedMode ? MODE_COPY[selectedMode].completeTitle : "Session complete.";
-    stageCopy.textContent = "The microphone is asleep again. Start another recording whenever the next person is ready.";
+    stageCopy.textContent = "The microphone is asleep again. Begin another recording whenever the next person is ready.";
     micStatus.textContent = "Microphone asleep";
     recStatus.textContent = "Session complete";
     shortcutHint.textContent = "Space or Enter: start another recording";
@@ -507,11 +517,13 @@ function setMicCheckStatus(text, tone) {
 function setReceiptText(text) {
   receipt.textContent = text;
   receipt.classList.add("muted");
+  hasReceipt = true;
 }
 
 function setReceiptHtml(html) {
   receipt.innerHTML = html;
   receipt.classList.remove("muted");
+  hasReceipt = true;
 }
 
 function clearPreview() {
@@ -534,7 +546,9 @@ function clearTakeData({ clearReceipt = true } = {}) {
   clearPreview();
   submitStatus.textContent = "";
   if (clearReceipt) {
-    setReceiptText("No receipt yet.");
+    receipt.textContent = "";
+    receipt.classList.add("muted");
+    hasReceipt = false;
   }
   selectedMode = null;
   choices.forEach((choice) => choice.classList.remove("selected"));
@@ -893,6 +907,6 @@ window.addEventListener("beforeunload", () => {
   teardownMicrophone();
 });
 
-setReceiptText("No receipt yet.");
+hasReceipt = false;
 startAttractLoop();
 render();

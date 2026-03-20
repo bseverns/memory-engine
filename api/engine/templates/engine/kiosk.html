@@ -6,20 +6,13 @@
   <title>Room Memory — Confessional Kiosk</title>
   <link rel="stylesheet" href="/static/engine/kiosk.css"/>
 </head>
-<body>
+<body class="recording-page">
   <div class="shell">
     <header class="hero">
-      <p class="eyebrow">Local-first confessional kiosk</p>
+      <p class="eyebrow">Recording station</p>
       <h1>Room Memory</h1>
-      <p class="sub">Leave a short sound for the room. The microphone stays asleep until you arm it, and the whole flow works with touch, mouse, or keyboard.</p>
+      <p class="sub">A quiet place to offer a voice or sound. This screen stays focused on the act of recording, then steps aside.</p>
     </header>
-
-    <nav class="stepper" aria-label="Recording steps">
-      <div class="step active" data-step="prepare"><span>1</span> Prepare</div>
-      <div class="step" data-step="record"><span>2</span> Record</div>
-      <div class="step" data-step="choose"><span>3</span> Choose</div>
-      <div class="step" data-step="done"><span>4</span> Done</div>
-    </nav>
 
     <section class="stage">
       <div class="stage-meta">
@@ -87,6 +80,38 @@
           <div id="reviewTimeoutFill" class="review-timeout-fill"></div>
         </div>
       </section>
+
+      <section id="modePanel" class="panel mode-panel locked" hidden>
+        <p id="selectionHint" class="mode-hint">Choose what happens next.</p>
+        <div class="choices">
+          <button class="choice" data-mode="ROOM" data-key="1" aria-keyshortcuts="1">
+            <span class="choice-key">1</span>
+            <strong>Room Memory</strong>
+            <span>Stored on this device. Deleted in about 48 hours. Played in the room.</span>
+          </button>
+          <button class="choice" data-mode="FOSSIL" data-key="2" aria-keyshortcuts="2">
+            <span class="choice-key">2</span>
+            <strong>Fossil Only</strong>
+            <span>Raw fades sooner. A spectrogram image may remain locally for longer.</span>
+          </button>
+          <button class="choice" data-mode="NOSAVE" data-key="3" aria-keyshortcuts="3">
+            <span class="choice-key">3</span>
+            <strong>Don’t Save</strong>
+            <span>Play once immediately, then discard.</span>
+          </button>
+        </div>
+        <div class="row">
+          <button id="btnSubmit" class="btn" disabled>Submit selection</button>
+          <span id="submitStatus" class="status"></span>
+        </div>
+      </section>
+
+      <section id="receiptPanel" class="panel receipt-panel" hidden>
+        <p class="section-kicker">Receipt</p>
+        <h3>What to keep</h3>
+        <div id="receipt" class="receipt muted"></div>
+      </section>
+
       <div id="countdownOverlay" class="countdown-overlay" hidden>
         <div class="countdown-card">
           <p class="section-kicker">Get ready</p>
@@ -94,85 +119,6 @@
           <p id="countdownLabel" class="countdown-label">Recording starts in a moment.</p>
         </div>
       </div>
-    </section>
-
-    <section id="attractPanel" class="panel attract-panel" aria-live="polite">
-      <div class="panel-head">
-        <div>
-          <p class="section-kicker">How to begin</p>
-          <h3>No steward needed</h3>
-        </div>
-        <span id="attractLead" class="selection-hint">Tap Arm microphone or press Space to begin.</span>
-      </div>
-      <div class="attract-steps">
-        <article class="attract-step active">
-          <span class="attract-step-number">1</span>
-          <strong>Arm the microphone</strong>
-          <span>Tap the main button or press `Space` to wake the mic without starting the recording yet.</span>
-        </article>
-        <article class="attract-step">
-          <span class="attract-step-number">2</span>
-          <strong>Check the level</strong>
-          <span>Watch the meter and say a few words so you know the room can hear you before you record.</span>
-        </article>
-        <article class="attract-step">
-          <span class="attract-step-number">3</span>
-          <strong>Record, then choose</strong>
-          <span>Make the take, listen back if you want, then choose whether it stays in the room, becomes a fossil, or disappears.</span>
-        </article>
-      </div>
-    </section>
-
-    <section id="modePanel" class="panel mode-panel locked">
-      <div class="panel-head">
-        <div>
-          <p class="section-kicker">How the room remembers</p>
-          <h3>Choose what happens to this take</h3>
-        </div>
-        <span id="selectionHint" class="selection-hint">Unlocked after recording</span>
-      </div>
-      <div class="choices">
-        <button class="choice" data-mode="ROOM" data-key="1" aria-keyshortcuts="1">
-          <span class="choice-key">1</span>
-          <strong>Room Memory</strong>
-          <span>Stored on this device. Deleted in ~48 hours. Played in the room. Light decay per play.</span>
-        </button>
-        <button class="choice" data-mode="FOSSIL" data-key="2" aria-keyshortcuts="2">
-          <span class="choice-key">2</span>
-          <strong>Fossil Only</strong>
-          <span>Raw deleted in ~48 hours. A spectrogram image may remain locally for ~1 year.</span>
-        </button>
-        <button class="choice" data-mode="NOSAVE" data-key="3" aria-keyshortcuts="3">
-          <span class="choice-key">3</span>
-          <strong>Don’t Save</strong>
-          <span>Play once immediately, then discard.</span>
-        </button>
-      </div>
-      <div class="row">
-        <button id="btnSubmit" class="btn" disabled>Submit selection</button>
-        <span id="submitStatus" class="status"></span>
-      </div>
-    </section>
-
-    <section class="panel receipt-panel">
-      <p class="section-kicker">Receipt</p>
-      <h3>What to keep</h3>
-      <div id="receipt" class="receipt muted">No receipt yet.</div>
-    </section>
-
-    <section class="panel utility-panel">
-      <div class="panel-head">
-        <div>
-          <p class="section-kicker">Room loop</p>
-          <h3>Ambient playback</h3>
-        </div>
-      </div>
-      <div class="row">
-        <button id="btnLoop" class="btn secondary">Start room loop</button>
-        <button id="btnLoopStop" class="btn secondary" disabled>Stop loop</button>
-        <span id="loopStatus" class="status">Stopped</span>
-      </div>
-      <div class="hint">The room loop now drifts between fresher and more worn memories, with a quiet room-tone bed between sounds. Arming the microphone pauses it so the next speaker gets a quiet start.</div>
     </section>
 
     <footer>

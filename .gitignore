@@ -1,8 +1,14 @@
 .env
 .venv/
+node_modules/
 backups/
 __pycache__/
 *.pyc
 .DS_Store
 api/.DS_Store
 api/.test-cache/
+api/db.sqlite3
+artifacts/screenshots/
+.playwright/
+playwright-report/
+test-results/

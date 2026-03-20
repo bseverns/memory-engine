@@ -1,0 +1,12 @@
+{
+  "name": "memory-engine-kiosk",
+  "private": true,
+  "scripts": {
+    "test:frontend": "node --test frontend-tests/*.test.js",
+    "test:browser": "playwright test",
+    "screenshots": "playwright test browser-tests/visual.spec.js --project=chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.53.2"
+  }
+}
