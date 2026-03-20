@@ -116,6 +116,11 @@ GitHub Actions runs that same `./scripts/check.sh` gate from a repo-local
 `.venv`, so CI matches the local maintenance path instead of using a different
 test command.
 
+At process startup, Django now also validates the runtime config shape beyond
+secret presence: threshold ordering, secure-origin posture, MinIO endpoint
+scheme, and other range relationships fail fast instead of surfacing later as
+ambiguous runtime behavior.
+
 For browser-level simulation and screenshots, the repo also supports a small
 Playwright layer:
 
@@ -128,6 +133,8 @@ npm run screenshots
 That starts Django with the browser test settings, opens the recording kiosk,
 the dedicated playback surface, and the operator dashboard in headless
 Chromium, and writes example screenshots under `artifacts/screenshots/`.
+The browser walkthrough now also signs into `/ops/`, applies live steward
+controls, and captures how `/kiosk/` and `/room/` react to those changes.
 
 Longer operator notes live in `docs/maintenance.md`.
 That includes a MinIO section covering which credentials live where, what is set before first deploy, and how manual MinIO provisioning changes the `.env` values.

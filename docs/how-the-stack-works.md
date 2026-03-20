@@ -703,6 +703,14 @@ Important design detail: most of these settings are read directly at process
 startup and then treated as constants. A settings change generally requires a
 redeploy.
 
+The stack now also validates a handful of cross-setting relationships at
+startup, not just presence:
+
+- secure-cookie posture must align with trusted-origin scheme choices
+- MinIO endpoint must be an explicit `http://` or `https://` URL
+- warning thresholds must stay ordered sanely
+- playback and scarcity thresholds must stay in coherent ranges
+
 ## Testing and CI
 
 The local check gate is `scripts/check.sh`.

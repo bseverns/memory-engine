@@ -1,6 +1,8 @@
 import os
+import sys
 import tempfile
 
+from .config_validation import validate_runtime_settings
 from .settings import *  # noqa: F403,F401
 
 # Local test profile: keep Django tests self-contained and independent from the
@@ -36,3 +38,5 @@ MINIO_BUCKET = "test-memory"
 MINIO_ACCESS_KEY = "test-access-key"
 MINIO_SECRET_KEY = "test-secret-key"
 OPS_SHARED_SECRET = "test-ops-secret"
+
+validate_runtime_settings(sys.modules[__name__])

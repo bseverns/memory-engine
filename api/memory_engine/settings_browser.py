@@ -1,3 +1,6 @@
+import sys
+
+from .config_validation import validate_runtime_settings
 from .settings_test import *  # noqa: F403,F401
 
 # Browser automation profile: keep the isolated SQLite/eager-Celery test posture
@@ -5,3 +8,5 @@ from .settings_test import *  # noqa: F403,F401
 # Playwright can render the real kiosk and operator UI.
 
 DEBUG = True
+
+validate_runtime_settings(sys.modules[__name__])

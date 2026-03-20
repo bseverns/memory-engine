@@ -1,5 +1,8 @@
 import os
+import sys
 from pathlib import Path
+
+from .config_validation import validate_runtime_settings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -151,3 +154,5 @@ OPS_DISK_CRITICAL_FREE_GB = env_float("OPS_DISK_CRITICAL_FREE_GB", 3.0)
 OPS_DISK_CRITICAL_FREE_PERCENT = env_float("OPS_DISK_CRITICAL_FREE_PERCENT", 8.0)
 OPS_POOL_LOW_COUNT = env_int("OPS_POOL_LOW_COUNT", 6)
 OPS_POOL_IMBALANCE_RATIO = env_float("OPS_POOL_IMBALANCE_RATIO", 0.72)
+
+validate_runtime_settings(sys.modules[__name__])

@@ -1,9 +1,13 @@
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
+
+from memory_engine.config_validation import validate_runtime_settings
 
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative, Node, StewardAction, StewardState
 from .operator_auth import OPS_SESSION_KEY
@@ -333,3 +337,101 @@ class EngineBehaviorTests(TestCase):
         response = self.client.get("/api/v1/node/status")
 
         self.assertEqual(response.status_code, 403)
+
+    def test_runtime_config_validation_accepts_default_test_like_values(self):
+        config = SimpleNamespace(
+            ALLOWED_HOSTS=["localhost"],
+            CSRF_TRUSTED_ORIGINS=["http://localhost"],
+            MINIO_ENDPOINT="http://minio:9000",
+            SECURE_SSL_REDIRECT=False,
+            SESSION_COOKIE_SECURE=False,
+            CSRF_COOKIE_SECURE=False,
+            WEAR_EPSILON_PER_PLAY=0.003,
+            POOL_PLAY_COOLDOWN_SECONDS=90,
+            POOL_CANDIDATE_LIMIT=40,
+            POOL_FRESH_MAX_AGE_HOURS=8.0,
+            POOL_WORN_MIN_AGE_HOURS=18.0,
+            RAW_TTL_HOURS_ROOM=48,
+            RAW_TTL_HOURS_FOSSIL=48,
+            DERIVATIVE_TTL_DAYS_FOSSIL=365,
+            ROOM_SCARCITY_SEVERE_THRESHOLD=3,
+            ROOM_SCARCITY_LOW_THRESHOLD=6,
+            ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            OPS_SESSION_TTL_SECONDS=43200,
+            OPS_POOL_LOW_COUNT=6,
+            OPS_POOL_IMBALANCE_RATIO=0.72,
+            OPS_DISK_CRITICAL_FREE_GB=3.0,
+            OPS_DISK_WARNING_FREE_GB=8.0,
+            OPS_DISK_CRITICAL_FREE_PERCENT=8.0,
+            OPS_DISK_WARNING_FREE_PERCENT=15.0,
+        )
+
+        validate_runtime_settings(config)
+
+    def test_runtime_config_validation_rejects_inverted_thresholds(self):
+        config = SimpleNamespace(
+            ALLOWED_HOSTS=["localhost"],
+            CSRF_TRUSTED_ORIGINS=["http://localhost"],
+            MINIO_ENDPOINT="http://minio:9000",
+            SECURE_SSL_REDIRECT=False,
+            SESSION_COOKIE_SECURE=False,
+            CSRF_COOKIE_SECURE=False,
+            WEAR_EPSILON_PER_PLAY=0.003,
+            POOL_PLAY_COOLDOWN_SECONDS=90,
+            POOL_CANDIDATE_LIMIT=40,
+            POOL_FRESH_MAX_AGE_HOURS=8.0,
+            POOL_WORN_MIN_AGE_HOURS=6.0,
+            RAW_TTL_HOURS_ROOM=48,
+            RAW_TTL_HOURS_FOSSIL=48,
+            DERIVATIVE_TTL_DAYS_FOSSIL=365,
+            ROOM_SCARCITY_SEVERE_THRESHOLD=8,
+            ROOM_SCARCITY_LOW_THRESHOLD=6,
+            ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            OPS_SESSION_TTL_SECONDS=43200,
+            OPS_POOL_LOW_COUNT=6,
+            OPS_POOL_IMBALANCE_RATIO=0.72,
+            OPS_DISK_CRITICAL_FREE_GB=9.0,
+            OPS_DISK_WARNING_FREE_GB=8.0,
+            OPS_DISK_CRITICAL_FREE_PERCENT=16.0,
+            OPS_DISK_WARNING_FREE_PERCENT=15.0,
+        )
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("POOL_WORN_MIN_AGE_HOURS", str(ctx.exception))
+        self.assertIn("ROOM_SCARCITY_SEVERE_THRESHOLD", str(ctx.exception))
+        self.assertIn("OPS_DISK_CRITICAL_FREE_GB", str(ctx.exception))
+
+    def test_runtime_config_validation_rejects_insecure_origins_under_secure_cookies(self):
+        config = SimpleNamespace(
+            ALLOWED_HOSTS=["memory.example.com"],
+            CSRF_TRUSTED_ORIGINS=["http://memory.example.com"],
+            MINIO_ENDPOINT="http://minio:9000",
+            SECURE_SSL_REDIRECT=True,
+            SESSION_COOKIE_SECURE=True,
+            CSRF_COOKIE_SECURE=True,
+            WEAR_EPSILON_PER_PLAY=0.003,
+            POOL_PLAY_COOLDOWN_SECONDS=90,
+            POOL_CANDIDATE_LIMIT=40,
+            POOL_FRESH_MAX_AGE_HOURS=8.0,
+            POOL_WORN_MIN_AGE_HOURS=18.0,
+            RAW_TTL_HOURS_ROOM=48,
+            RAW_TTL_HOURS_FOSSIL=48,
+            DERIVATIVE_TTL_DAYS_FOSSIL=365,
+            ROOM_SCARCITY_SEVERE_THRESHOLD=3,
+            ROOM_SCARCITY_LOW_THRESHOLD=6,
+            ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            OPS_SESSION_TTL_SECONDS=43200,
+            OPS_POOL_LOW_COUNT=6,
+            OPS_POOL_IMBALANCE_RATIO=0.72,
+            OPS_DISK_CRITICAL_FREE_GB=3.0,
+            OPS_DISK_WARNING_FREE_GB=8.0,
+            OPS_DISK_CRITICAL_FREE_PERCENT=8.0,
+            OPS_DISK_WARNING_FREE_PERCENT=15.0,
+        )
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("https://", str(ctx.exception))
