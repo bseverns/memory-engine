@@ -17,6 +17,7 @@ from ..media_access import (
     build_surface_token,
 )
 from ..models import AccessEvent, Artifact, ConsentManifest, Derivative, StewardAction
+from ..throttling import public_ingest_budget_snapshot
 
 
 class ArtifactBehaviorTests(EngineTestCase):
@@ -185,6 +186,56 @@ class ArtifactBehaviorTests(EngineTestCase):
         response = self.client.get(f"/api/v1/media/raw/{artifact.id}")
 
         self.assertEqual(response.status_code, 404)
+
+    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {
+        "public_ingest": "2/min",
+        "public_ingest_ip": "10/min",
+        "public_revoke": "1/min",
+        "public_revoke_ip": "10/min",
+    }})
+    @patch("engine.api_views.put_bytes")
+    def test_surface_state_reports_remaining_ingest_budget_for_kiosk_client(self, put_bytes_mock):
+        cache.clear()
+        self.client.defaults["HTTP_X_MEMORY_CLIENT_ID"] = "kiosk-alpha"
+
+        initial = self.client.get("/api/v1/surface/state")
+        initial_budget = initial.json()["ingest_budget"]
+        self.assertEqual(initial_budget["client"]["remaining"], 2)
+        self.assertFalse(initial_budget["low"])
+        self.assertFalse(initial_budget["exhausted"])
+
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=0.5), content_type="audio/wav")
+        response = self.client.post("/api/v1/artifacts/audio", {"file": upload, "consent_mode": "ROOM"})
+        self.assertEqual(response.status_code, 201)
+
+        follow_up = self.client.get("/api/v1/surface/state")
+        follow_up_budget = follow_up.json()["ingest_budget"]
+        self.assertEqual(follow_up_budget["client"]["remaining"], 1)
+        self.assertTrue(follow_up_budget["low"])
+        self.assertFalse(follow_up_budget["exhausted"])
+        cache.clear()
+
+    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {
+        "public_ingest": "1/min",
+        "public_ingest_ip": "10/min",
+        "public_revoke": "1/min",
+        "public_revoke_ip": "10/min",
+    }})
+    @patch("engine.api_views.put_bytes")
+    def test_budget_snapshot_marks_ingest_budget_exhausted_after_limit(self, put_bytes_mock):
+        cache.clear()
+        self.client.defaults["HTTP_X_MEMORY_CLIENT_ID"] = "kiosk-bravo"
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=0.5), content_type="audio/wav")
+
+        response = self.client.post("/api/v1/artifacts/audio", {"file": upload, "consent_mode": "ROOM"})
+        self.assertEqual(response.status_code, 201)
+
+        budget = public_ingest_budget_snapshot(response.wsgi_request)
+        self.assertEqual(budget["effective_remaining"], 0)
+        self.assertTrue(budget["low"])
+        self.assertTrue(budget["exhausted"])
+        self.assertGreaterEqual(budget["effective_reset_in_seconds"], 1)
+        cache.clear()
 
     @patch("engine.api_views.delete_key")
     def test_revoke_token_revokes_artifacts_and_derivatives(self, delete_key_mock):

@@ -55,6 +55,7 @@ const reviewTimeoutFill = document.getElementById("reviewTimeoutFill");
 const attractPanel = document.getElementById("attractPanel");
 const attractLead = document.getElementById("attractLead");
 const operatorNotice = document.getElementById("operatorNotice");
+const budgetNotice = document.getElementById("budgetNotice");
 const heroEyebrow = document.getElementById("heroEyebrow");
 const heroTitle = document.getElementById("heroTitle");
 const heroSub = document.getElementById("heroSub");
@@ -149,6 +150,7 @@ let surfaceState = {
   kiosk_accessibility_mode: "",
   kiosk_force_reduced_motion: false,
   kiosk_max_recording_seconds: DEFAULT_MAX_RECORDING_SECONDS,
+  ingest_budget: null,
   ...(kioskConfig.operatorState || {}),
 };
 let surfaceStateInterval = 0;
@@ -273,6 +275,7 @@ function buildViewContext() {
     attractPanel,
     attractLead,
     operatorNotice,
+    budgetNotice,
     heroEyebrow,
     heroTitle,
     heroSub,
@@ -633,8 +636,10 @@ async function submitCurrentTake() {
     } else {
       await submitSave(selectedMode);
     }
+    await refreshSurfaceState();
     setFlowState(FLOW.COMPLETE);
   } catch (err) {
+    await refreshSurfaceState();
     submitStatus.textContent = describeSubmitError(err);
     setFlowState(FLOW.REVIEW);
   }
@@ -652,7 +657,7 @@ async function submitSave(mode) {
     headers: publicClientHeaders(),
   });
   if (!res.ok) {
-    throw new Error(`Save failed (${res.status})`);
+    throw await requestJsonError(res, `Save failed (${res.status})`);
   }
 
   const payload = await res.json();
@@ -676,7 +681,7 @@ async function submitNoSave() {
     headers: publicClientHeaders(),
   });
   if (!res.ok) {
-    throw new Error(`Playback failed (${res.status})`);
+    throw await requestJsonError(res, `Playback failed (${res.status})`);
   }
 
   const payload = await res.json();
@@ -747,12 +752,36 @@ function describeSubmitError(err) {
       ? currentCopy().submitErrorMaintenance
       : currentCopy().submitErrorPaused;
   }
+  if (err && (err.status === 429 || /429/.test(err.message || ""))) {
+    const budget = surfaceState.ingest_budget || {};
+    const resetInSeconds = Number(budget.effective_reset_in_seconds || 0);
+    if (resetInSeconds > 0) {
+      return formatCopy(currentCopy().submitErrorBusyUntil, {
+        duration: formatDuration(resetInSeconds * 1000),
+      });
+    }
+    return currentCopy().submitErrorBusy;
+  }
   return err && err.message ? err.message : currentCopy().submitErrorFallback;
+}
+
+async function requestJsonError(res, fallbackMessage) {
+  let detail = "";
+  try {
+    const payload = await res.json();
+    detail = String(payload.error || payload.detail || "").trim();
+  } catch (error) {}
+  const err = new Error(detail || fallbackMessage || `Request failed (${res.status})`);
+  err.status = res.status;
+  return err;
 }
 
 async function refreshSurfaceState() {
   try {
-    const response = await fetch("/api/v1/surface/state", { cache: "no-store" });
+    const response = await fetch("/api/v1/surface/state", {
+      cache: "no-store",
+      headers: publicClientHeaders(),
+    });
     if (!response.ok) {
       throw new Error(`surface state failed (${response.status})`);
     }
@@ -761,6 +790,9 @@ async function refreshSurfaceState() {
       ...surfaceState,
       ...(payload.operator_state || {}),
     };
+    if (payload.ingest_budget) {
+      surfaceState.ingest_budget = payload.ingest_budget;
+    }
     render();
   } catch (err) {}
 }

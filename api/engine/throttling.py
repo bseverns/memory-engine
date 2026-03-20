@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import math
 import re
+import time
 
 from django.conf import settings
 from django.core.cache import cache
@@ -12,6 +14,12 @@ from rest_framework.settings import api_settings
 
 CLIENT_ID_PATTERN = re.compile(r"[^a-zA-Z0-9._-]+")
 THROTTLE_EVENT_CACHE_PREFIX = "memory_engine_throttle_events"
+RATE_PERIOD_SECONDS = {
+    "s": 1,
+    "m": 60,
+    "h": 60 * 60,
+    "d": 60 * 60 * 24,
+}
 
 
 def request_client_ip(request) -> str:
@@ -128,4 +136,73 @@ def public_throttle_snapshots() -> dict:
         "public_ingest_ip": throttle_scope_snapshot("public_ingest_ip"),
         "public_revoke": throttle_scope_snapshot("public_revoke"),
         "public_revoke_ip": throttle_scope_snapshot("public_revoke_ip"),
+    }
+
+
+def throttle_rate_details(scope: str) -> tuple[str, int, int]:
+    rate = str(api_settings.DEFAULT_THROTTLE_RATES.get(scope, "") or "").strip()
+    if not rate or "/" not in rate:
+        return rate, 0, 0
+    num_requests_raw, period_raw = rate.split("/", 1)
+    try:
+        num_requests = int(num_requests_raw)
+    except (TypeError, ValueError):
+        return rate, 0, 0
+    duration_seconds = RATE_PERIOD_SECONDS.get(str(period_raw).strip().lower()[:1], 0)
+    return rate, max(0, num_requests), int(duration_seconds or 0)
+
+
+def throttle_history_cache_key(scope: str, ident: str) -> str:
+    return SimpleRateThrottle.cache_format % {"scope": scope, "ident": ident}
+
+
+def throttle_budget_snapshot(scope: str, ident: str) -> dict:
+    rate, limit, duration_seconds = throttle_rate_details(scope)
+    if not rate or limit <= 0 or duration_seconds <= 0:
+        return {
+            "rate": rate,
+            "limit": limit,
+            "remaining": 0,
+            "used": 0,
+            "window_seconds": duration_seconds,
+            "reset_in_seconds": 0,
+            "low": False,
+            "exhausted": False,
+        }
+
+    cache_key = throttle_history_cache_key(scope, ident)
+    now = time.time()
+    history = [float(ts) for ts in (cache.get(cache_key) or [])]
+    valid_history = [ts for ts in history if ts > now - duration_seconds]
+    used = len(valid_history)
+    remaining = max(0, limit - used)
+    low_threshold = max(1, int(math.ceil(limit * 0.15)))
+    reset_in_seconds = 0
+    if valid_history:
+        oldest = valid_history[-1]
+        reset_in_seconds = max(0, int(math.ceil(duration_seconds - (now - oldest))))
+    return {
+        "rate": rate,
+        "limit": limit,
+        "used": used,
+        "remaining": remaining,
+        "window_seconds": duration_seconds,
+        "reset_in_seconds": reset_in_seconds,
+        "low": used > 0 and remaining <= low_threshold,
+        "exhausted": remaining <= 0,
+    }
+
+
+def public_ingest_budget_snapshot(request) -> dict:
+    client_ident = request_public_client_ident(request)
+    ip_ident = request_client_ip(request)
+    client_budget = throttle_budget_snapshot("public_ingest", client_ident)
+    ip_budget = throttle_budget_snapshot("public_ingest_ip", ip_ident)
+    return {
+        "client": client_budget,
+        "ip": ip_budget,
+        "effective_remaining": min(client_budget["remaining"], ip_budget["remaining"]),
+        "effective_reset_in_seconds": max(client_budget["reset_in_seconds"], ip_budget["reset_in_seconds"]),
+        "low": bool(client_budget["low"] or ip_budget["low"]),
+        "exhausted": bool(client_budget["exhausted"] or ip_budget["exhausted"]),
     }

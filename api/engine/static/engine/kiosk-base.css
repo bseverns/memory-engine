@@ -416,11 +416,34 @@ footer,
   line-height:1.6;
 }
 
+.budget-notice{
+  margin-top:12px;
+  padding:14px 16px;
+  border-radius:var(--radius-card);
+  border:1px solid rgba(155,107,24,0.14);
+  background:rgba(255,248,237,0.72);
+  color:#7b5d28;
+  font-size:0.96rem;
+  line-height:1.55;
+}
+
+.budget-notice.warning{
+  border-color:rgba(155,107,24,0.2);
+  background:rgba(255,244,226,0.82);
+}
+
 body.recording-page.a11y-mode .operator-notice{
   border-color:rgba(122,82,24,0.34);
   background:rgba(255,244,220,0.96);
   color:#68420f;
   font-size:1.08rem;
+}
+
+body.recording-page.a11y-mode .budget-notice{
+  border-color:rgba(122,82,24,0.28);
+  background:rgba(255,246,230,0.96);
+  color:#68420f;
+  font-size:1.03rem;
 }
 
 .quiet-take-panel,

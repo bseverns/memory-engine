@@ -59,6 +59,7 @@ from .throttling import (
     PublicIngestThrottle,
     PublicRevokeAbuseThrottle,
     PublicRevokeThrottle,
+    public_ingest_budget_snapshot,
     public_throttle_snapshots,
 )
 
@@ -578,6 +579,7 @@ def node_status(request):
 def surface_state(request):
     return Response({
         "operator_state": steward_state_payload(),
+        "ingest_budget": public_ingest_budget_snapshot(request),
     })
 
 

@@ -208,7 +208,8 @@ upload size, a maximum recording duration, PCM 16-bit mono WAV validation, and
 public throttling on ingest and revoke endpoints instead of trusting the
 browser's reported duration alone. `/ops/` now exposes both the configured
 budgets and recent throttle hits so a busy installation can see the ceiling
-before it feels arbitrary.
+before it feels arbitrary, and `/kiosk/` now gives a soft warning when the
+current station is approaching its remaining ingest budget.
 
 For common installs, you can also start from a named behavior preset:
 

@@ -724,7 +724,10 @@ exposes live controls for:
 
 The kiosk and playback machines do not receive operator access. They poll the
 lighter-weight public endpoint `/api/v1/surface/state` so they can obey the
-current steward posture without seeing the full operator dashboard.
+current steward posture without seeing the full operator dashboard. The
+recording station also receives a small ingest-budget snapshot there, so it can
+warn participants when that specific kiosk is close to its current submission
+ceiling.
 
 ## Configuration model
 

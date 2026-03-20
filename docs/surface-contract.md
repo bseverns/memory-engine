@@ -128,7 +128,9 @@ Use this split when deciding where a new field belongs:
 ## Current payload contract
 
 `/api/v1/surface/state` currently carries the public live machine posture for
-`/kiosk/` and `/room/`.
+`/kiosk/` and `/room/`. For `/kiosk/`, it also carries a small ingest-budget
+snapshot for the current client identity so the recorder can warn before the
+station fully hits its public write ceiling.
 
 `/api/v1/pool/next` currently carries:
 

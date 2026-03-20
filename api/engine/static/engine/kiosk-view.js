@@ -54,6 +54,38 @@
       : copy.operatorPausedIdle;
   }
 
+  function updateBudgetNotice(ctx) {
+    if (!ctx.budgetNotice) return;
+    const budget = ctx.surfaceState.ingest_budget || null;
+    if (!budget || ctx.intakePaused()) {
+      ctx.budgetNotice.hidden = true;
+      ctx.budgetNotice.textContent = "";
+      ctx.budgetNotice.classList.remove("warning");
+      return;
+    }
+
+    if (!budget.low && !budget.exhausted) {
+      ctx.budgetNotice.hidden = true;
+      ctx.budgetNotice.textContent = "";
+      ctx.budgetNotice.classList.remove("warning");
+      return;
+    }
+
+    const copy = ctx.currentCopy();
+    const remaining = Number(budget.effective_remaining || 0);
+    const resetInSeconds = Number(budget.effective_reset_in_seconds || 0);
+    ctx.budgetNotice.hidden = false;
+    ctx.budgetNotice.classList.toggle("warning", true);
+    ctx.budgetNotice.textContent = budget.exhausted
+      ? ctx.formatCopy(copy.budgetExhausted, {
+        duration: ctx.formatDuration(resetInSeconds * 1000),
+      })
+      : ctx.formatCopy(copy.budgetLow, {
+        remaining: String(remaining),
+        duration: ctx.formatDuration(resetInSeconds * 1000),
+      });
+  }
+
   function updateStepper(ctx) {
     const activeIndex = flowStateToStepIndex(ctx.flowState, ctx.FLOW);
     ctx.stepEls.forEach((stepEl, index) => {
@@ -427,6 +459,7 @@
     updateReviewTimeoutPanel(ctx);
     updateAttractPanel(ctx);
     updateOperatorNotice(ctx);
+    updateBudgetNotice(ctx);
   }
 
   global.MemoryEngineKioskView = {
@@ -437,6 +470,7 @@
     setMeterLevel,
     setMicCheckStatus,
     updateAttractPanel,
+    updateBudgetNotice,
     updateButtons,
     updateModePanel,
     updateOperatorNotice,
