@@ -1,0 +1,66 @@
+.recording-page .shell{
+  max-width:760px;
+  min-height:100vh;
+  padding:40px 22px 48px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+
+.recording-page .hero{
+  margin-bottom:34px;
+  text-align:center;
+}
+
+.recording-page .sub{
+  max-width:620px;
+  margin:0 auto;
+  font-size:1.02rem;
+  line-height:1.75;
+}
+
+.recording-page .stage{
+  min-height:68vh;
+  padding:40px 34px;
+  background:rgba(255,255,255,0.74);
+}
+
+.recording-page .stage-meta,
+.recording-page .action-row{
+  justify-content:center;
+}
+
+.recording-page .recording-strip{
+  margin-top:22px;
+}
+
+.recording-page .meter-card,
+.recording-page .recording-strip,
+.recording-page .quiet-take-panel,
+.recording-page .review-timeout-panel{
+  background:rgba(255,255,255,0.52);
+}
+
+.recording-page .hint{
+  margin-top:14px;
+  text-align:center;
+}
+
+.recording-page .shortcut-row{
+  justify-content:center;
+}
+
+.recording-page .mode-panel,
+.recording-page .receipt-panel{
+  padding:0;
+  margin:26px 0 0;
+  border:none;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  backdrop-filter:none;
+}
+
+.recording-page .choices{
+  margin-top:0;
+}

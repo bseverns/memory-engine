@@ -1,0 +1,67 @@
+body.reduced-motion-mode .countdown-overlay{
+  background:rgba(44,32,20,0.32);
+  backdrop-filter:none;
+}
+
+body.reduced-motion-mode .countdown-card,
+body.reduced-motion-mode .stage,
+body.reduced-motion-mode .panel{
+  backdrop-filter:none;
+}
+
+body.reduced-motion-mode .btn,
+body.reduced-motion-mode .choice,
+body.reduced-motion-mode .meter-fill,
+body.reduced-motion-mode .review-timeout-fill{
+  transition:none !important;
+}
+@media (max-width:820px){
+  .shell{
+    padding:18px 14px 28px;
+  }
+
+  .stepper{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .stage,
+  .panel{
+    border-radius:var(--radius-panel);
+    padding:18px;
+  }
+
+  .stage h2{
+    max-width:none;
+    font-size:2.2rem;
+  }
+
+  .choices{
+    grid-template-columns:1fr;
+  }
+
+  .playback-note-grid{
+    grid-template-columns:1fr;
+  }
+
+  .playback-visual-shell{
+    grid-template-columns:1fr;
+  }
+
+  .playback-stage{
+    padding:22px 18px 20px;
+  }
+
+  .lightbox-card{
+    padding:18px;
+  }
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,
+  *::before,
+  *::after{
+    animation:none !important;
+    transition:none !important;
+    scroll-behavior:auto !important;
+  }
+}

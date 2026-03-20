@@ -107,6 +107,7 @@ const ATTRACT_ROTATE_MS = 3600;
 const SURFACE_STATE_POLL_MS = 5000;
 
 const kioskCopyApi = window.MemoryEngineKioskCopy;
+const kioskView = window.MemoryEngineKioskView;
 
 const PRE_ROLL_TONE = {
   gain: 0.04,
@@ -202,50 +203,108 @@ function setFlowState(nextState, options = {}) {
   render();
 }
 
-function applyStaticCopy() {
-  const copy = currentCopy();
-  document.documentElement.lang = copy.htmlLang;
-  document.title = copy.documentTitle;
-  if (heroEyebrow) heroEyebrow.textContent = copy.heroEyebrow;
-  if (heroTitle) heroTitle.textContent = copy.heroTitle;
-  if (heroSub) heroSub.textContent = copy.heroSub;
-  if (meterLabel) meterLabel.textContent = copy.meterLabel;
-  if (elapsedLabel) elapsedLabel.textContent = copy.timerElapsed;
-  if (remainingLabel) remainingLabel.textContent = copy.timerRemaining;
-  if (shortcutReset) shortcutReset.textContent = copy.resetShortcut;
-  if (privacyHint) privacyHint.textContent = copy.privacyHint;
-  if (quietTakeKicker) quietTakeKicker.textContent = copy.quietTakeKicker;
-  if (quietTakeTitle) quietTakeTitle.textContent = copy.quietTakeTitle;
-  if (btnQuietKeep) btnQuietKeep.textContent = copy.quietTakeKeep;
-  if (btnQuietRetake) btnQuietRetake.textContent = copy.quietTakeRetake;
-  if (reviewTimeoutHint) reviewTimeoutHint.textContent = copy.reviewTimeoutHint;
-  if (receiptKicker) receiptKicker.textContent = copy.receiptKicker;
-  if (receiptTitle) receiptTitle.textContent = copy.receiptTitle;
-  if (countdownKicker) countdownKicker.textContent = copy.countdownKicker;
-  if (footerCopy) footerCopy.textContent = copy.footerCopy;
-  for (const [mode, els] of choiceCopyEls.entries()) {
-    const modeStrings = copy.modes[mode];
-    if (!modeStrings) continue;
-    if (els.title) els.title.textContent = modeStrings.name;
-    if (els.copy) els.copy.textContent = modeStrings.optionCopy;
-  }
+function buildViewContext() {
+  return {
+    FLOW,
+    MIC_SIGNAL_THRESHOLD,
+    REVIEW_IDLE_TIMEOUT_MS,
+    performance,
+    document,
+    captureController,
+    flowState,
+    selectedMode,
+    wavBlob,
+    durationMs,
+    recStartTs,
+    reviewDeadlineTs,
+    quietTakeNeedsDecision,
+    quietTakeAnalysis,
+    hasReceipt,
+    attractStepIndex,
+    lastErrorMessage,
+    micLabel,
+    surfaceState,
+    btnPrimary,
+    btnSecondary,
+    btnSubmit,
+    btnQuietKeep,
+    btnQuietRetake,
+    stageBadge,
+    stageTitle,
+    stageCopy,
+    shortcutHint,
+    micStatus,
+    micCheckStatus,
+    recStatus,
+    recTimer,
+    remainingTimer,
+    maxDurationHint,
+    meterText,
+    meterFill,
+    submitStatus,
+    selectionHint,
+    receiptPanel,
+    reviewTimeoutPanel,
+    reviewTimeoutChip,
+    reviewTimeoutFill,
+    quietTakePanel,
+    quietTakeCopy,
+    attractPanel,
+    attractLead,
+    operatorNotice,
+    heroEyebrow,
+    heroTitle,
+    heroSub,
+    meterLabel,
+    elapsedLabel,
+    remainingLabel,
+    shortcutReset,
+    privacyHint,
+    quietTakeKicker,
+    quietTakeTitle,
+    reviewTimeoutHint,
+    receiptKicker,
+    receiptTitle,
+    countdownKicker,
+    footerCopy,
+    choiceCopyEls,
+    countdownOverlay,
+    modePanel,
+    choices,
+    stepEls,
+    attractSteps,
+    currentCopy,
+    formatCopy,
+    modeCopy,
+    recordingLimitMs,
+    accessibilityModeEnabled,
+    shouldReduceMotion,
+    intakePaused,
+    maintenanceMode,
+    formatDuration,
+    actions: {
+      acknowledgeQuietTake,
+      armMicrophone,
+      cancelCountdown,
+      cancelCurrentTake,
+      disarmToIdle,
+      recordAgain,
+      startFreshSession,
+      startRecording,
+      stopRecording,
+      submitCurrentTake,
+    },
+    setPrimaryAction(nextAction) {
+      primaryAction = nextAction;
+    },
+    setSecondaryAction(nextAction) {
+      secondaryAction = nextAction;
+    },
+  };
 }
 
 function render() {
-  applyStaticCopy();
-  document.body.dataset.state = flowState;
-  document.body.classList.toggle("a11y-mode", accessibilityModeEnabled());
-  document.body.classList.toggle("reduced-motion-mode", shouldReduceMotion());
-  countdownOverlay.hidden = flowState !== FLOW.COUNTDOWN;
-  updateStepper();
-  updateModePanel();
-  updateReceiptPanel();
-  updateButtons();
-  updateStage();
-  updateQuietTakePanel();
-  updateReviewTimeoutPanel();
-  updateAttractPanel();
-  updateOperatorNotice();
+  kioskView.render(buildViewContext());
 }
 
 function recordingLimitMs() {
@@ -270,39 +329,8 @@ function maintenanceMode() {
   return Boolean(surfaceState.maintenance_mode);
 }
 
-function updateOperatorNotice() {
-  if (!operatorNotice) return;
-  if (!intakePaused()) {
-    operatorNotice.hidden = true;
-    operatorNotice.textContent = "";
-    return;
-  }
-
-  operatorNotice.hidden = false;
-  const copy = currentCopy();
-  if (surfaceState.maintenance_mode) {
-    operatorNotice.textContent = copy.operatorMaintenance;
-    return;
-  }
-  operatorNotice.textContent = flowState === FLOW.REVIEW && wavBlob
-    ? copy.operatorPausedReview
-    : copy.operatorPausedIdle;
-}
-
-function updateStepper() {
-  const activeIndex = flowStateToStepIndex(flowState);
-  stepEls.forEach((stepEl, index) => {
-    stepEl.classList.toggle("active", index === activeIndex);
-    stepEl.classList.toggle("completed", index < activeIndex);
-  });
-}
-
-function flowStateToStepIndex(state) {
-  if ([FLOW.IDLE, FLOW.ARMING, FLOW.ARMED, FLOW.ERROR].includes(state)) return 0;
-  if ([FLOW.COUNTDOWN, FLOW.RECORDING].includes(state)) return 1;
-  if ([FLOW.REVIEW, FLOW.SUBMITTING].includes(state)) return 2;
-  return 3;
-}
+function updateOperatorNotice() { kioskView.updateOperatorNotice(buildViewContext()); }
+function updateStepper() { kioskView.updateStepper(buildViewContext()); }
 
 function syncReviewTimeout(previousState, nextState) {
   if (nextState === FLOW.REVIEW) {
@@ -345,21 +373,7 @@ function tickReviewTimeout() {
 }
 
 function updateReviewTimeoutPanel() {
-  const visible = flowState === FLOW.REVIEW && reviewDeadlineTs > 0;
-  reviewTimeoutPanel.hidden = !visible;
-  if (!visible) {
-    reviewTimeoutChip.classList.remove("warning");
-    reviewTimeoutFill.style.width = "100%";
-    return;
-  }
-
-  const remainingMs = Math.max(0, reviewDeadlineTs - performance.now());
-  const progress = Math.max(0, Math.min(1, remainingMs / REVIEW_IDLE_TIMEOUT_MS));
-  reviewTimeoutChip.textContent = formatCopy(currentCopy().reviewResetsIn, {
-    duration: formatDuration(remainingMs),
-  });
-  reviewTimeoutChip.classList.toggle("warning", remainingMs <= 20000);
-  reviewTimeoutFill.style.width = `${progress * 100}%`;
+  kioskView.updateReviewTimeoutPanel(buildViewContext());
 }
 
 function noteReviewActivity() {
@@ -368,16 +382,7 @@ function noteReviewActivity() {
   updateReviewTimeoutPanel();
 }
 
-function updateQuietTakePanel() {
-  const visible = flowState === FLOW.REVIEW && quietTakeNeedsDecision;
-  quietTakePanel.hidden = !visible;
-  if (!visible) return;
-
-  const copy = currentCopy();
-  quietTakeCopy.textContent = quietTakeAnalysis
-    ? copy.quietTakeCopyMeasured
-    : copy.quietTakeCopyDefault;
-}
+function updateQuietTakePanel() { kioskView.updateQuietTakePanel(buildViewContext()); }
 
 function startAttractLoop() {
   if (attractInterval || !attractPanel || attractSteps.length === 0) return;
@@ -392,321 +397,14 @@ function startAttractLoop() {
   }, ATTRACT_ROTATE_MS);
 }
 
-function updateAttractPanel() {
-  if (!attractPanel || !attractLead || attractSteps.length === 0) return;
-  const visible = flowState === FLOW.IDLE;
-  attractPanel.hidden = !visible;
-  if (!visible) return;
-
-  const copy = currentCopy();
-  const messages = [
-    copy.shortcutArm,
-    copy.stageIdleCopy,
-    copy.stageArmedCopy,
-  ];
-  const activeIndex = shouldReduceMotion() ? 0 : (attractStepIndex % messages.length);
-  attractLead.textContent = messages[activeIndex];
-  attractSteps.forEach((step, index) => {
-    step.classList.toggle("active", index === activeIndex);
-  });
-}
-
-function updateModePanel() {
-  const copy = currentCopy();
-  const visible = [FLOW.REVIEW, FLOW.SUBMITTING].includes(flowState);
-  if (modePanel) {
-    modePanel.hidden = !visible;
-  }
-  const interactive = flowState === FLOW.REVIEW && !quietTakeNeedsDecision;
-  modePanel.classList.toggle("locked", !interactive);
-  choices.forEach((choice) => {
-    choice.disabled = !interactive;
-  });
-
-  if (!visible) {
-    selectionHint.textContent = copy.selectionUnlocked;
-  } else if (flowState === FLOW.REVIEW && quietTakeNeedsDecision) {
-    selectionHint.textContent = copy.selectionKeepOrRetake;
-  } else if (!selectedMode) {
-    selectionHint.textContent = copy.selectionPressChoice;
-  } else {
-    selectionHint.textContent = formatCopy(copy.selectionSelected, { name: modeCopy(selectedMode).name });
-  }
-
-  if (intakePaused()) {
-    selectionHint.textContent = copy.selectionPaused;
-  }
-
-  const canSubmit = flowState === FLOW.REVIEW && !!wavBlob && !!selectedMode && !intakePaused();
-  btnSubmit.disabled = !canSubmit;
-  btnSubmit.textContent = selectedMode ? modeCopy(selectedMode).submitLabel : copy.submitSelection;
-}
-
-function updateReceiptPanel() {
-  if (!receiptPanel) return;
-  receiptPanel.hidden = !hasReceipt;
-}
-
-function updateButtons() {
-  const copy = currentCopy();
-  let primaryLabel = copy.btnArm;
-  let primaryDisabled = false;
-  let secondaryLabel = copy.btnStartOver;
-  let secondaryDisabled = true;
-
-  primaryAction = armMicrophone;
-  secondaryAction = startFreshSession;
-
-  if (flowState === FLOW.ARMING) {
-    primaryLabel = copy.btnArming;
-    primaryDisabled = true;
-    secondaryLabel = copy.btnPleaseWait;
-    secondaryDisabled = true;
-  } else if (flowState === FLOW.ARMED) {
-    primaryLabel = copy.btnStartRecording;
-    primaryAction = startRecording;
-    secondaryLabel = copy.btnDisarm;
-    secondaryAction = disarmToIdle;
-    secondaryDisabled = false;
-  } else if (flowState === FLOW.COUNTDOWN) {
-    primaryLabel = copy.btnStartingSoon;
-    primaryDisabled = true;
-    secondaryLabel = copy.btnCancelCountdown;
-    secondaryAction = cancelCountdown;
-    secondaryDisabled = false;
-  } else if (flowState === FLOW.RECORDING) {
-    primaryLabel = copy.btnStopRecording;
-    primaryAction = stopRecording;
-    secondaryLabel = copy.btnCancelTake;
-    secondaryAction = cancelCurrentTake;
-    secondaryDisabled = false;
-  } else if (flowState === FLOW.REVIEW) {
-    if (quietTakeNeedsDecision) {
-      primaryLabel = copy.quietTakeKeep;
-      primaryAction = acknowledgeQuietTake;
-      primaryDisabled = !wavBlob;
-      secondaryLabel = copy.quietTakeRetake;
-      secondaryAction = recordAgain;
-    } else {
-      primaryLabel = selectedMode ? modeCopy(selectedMode).submitLabel : copy.btnChooseMemoryMode;
-      primaryAction = submitCurrentTake;
-      primaryDisabled = !selectedMode || !wavBlob;
-      secondaryLabel = copy.btnRecordAgain;
-      secondaryAction = recordAgain;
-    }
-    secondaryDisabled = false;
-  } else if (flowState === FLOW.SUBMITTING) {
-    primaryLabel = copy.btnSubmitting;
-    primaryDisabled = true;
-    secondaryLabel = copy.btnPleaseWait;
-    secondaryDisabled = true;
-  } else if (flowState === FLOW.COMPLETE) {
-    primaryLabel = copy.btnStartAnother;
-    primaryAction = startFreshSession;
-    secondaryLabel = copy.btnStartOver;
-    secondaryDisabled = true;
-  } else if (flowState === FLOW.ERROR) {
-    primaryLabel = copy.btnTryMicAgain;
-    primaryAction = armMicrophone;
-    secondaryLabel = copy.btnStartOver;
-    secondaryAction = startFreshSession;
-    secondaryDisabled = false;
-  }
-
-  if (intakePaused() && ![FLOW.RECORDING, FLOW.SUBMITTING, FLOW.COMPLETE].includes(flowState)) {
-    primaryDisabled = true;
-    if (flowState === FLOW.IDLE || flowState === FLOW.ERROR) {
-      primaryLabel = copy.btnRecordingPaused;
-    } else if (flowState === FLOW.REVIEW) {
-      primaryLabel = copy.btnSubmissionPaused;
-      secondaryLabel = copy.btnResetSession;
-      secondaryAction = startFreshSession;
-      secondaryDisabled = false;
-    }
-  }
-
-  btnPrimary.textContent = primaryLabel;
-  btnPrimary.disabled = primaryDisabled;
-  btnSecondary.textContent = secondaryLabel;
-  btnSecondary.disabled = secondaryDisabled;
-}
-
-function updateStage() {
-  const copy = currentCopy();
-  const hasMic = captureController.hasLiveInput();
-  const maxRecordingMs = recordingLimitMs();
-  const elapsedMs = flowState === FLOW.RECORDING ? (performance.now() - recStartTs) : durationMs;
-  const remainingMs = flowState === FLOW.RECORDING
-    ? Math.max(0, maxRecordingMs - elapsedMs)
-    : Math.max(0, maxRecordingMs - durationMs);
-  recTimer.textContent = formatDuration(elapsedMs);
-  remainingTimer.textContent = formatDuration(remainingMs);
-  maxDurationHint.textContent = formatCopy(copy.maxDuration, { duration: formatDuration(maxRecordingMs) });
-
-  if (intakePaused() && flowState === FLOW.IDLE) {
-    stageBadge.textContent = maintenanceMode() ? copy.badgeMaintenance : copy.badgePaused;
-    stageTitle.textContent = maintenanceMode()
-      ? copy.stageMaintenanceIdleTitle
-      : copy.stagePausedIdleTitle;
-    stageCopy.textContent = maintenanceMode()
-      ? copy.stageMaintenanceIdleCopy
-      : copy.stagePausedIdleCopy;
-    micStatus.textContent = copy.micAsleep;
-    recStatus.textContent = maintenanceMode() ? copy.recMaintenance : copy.recPaused;
-    shortcutHint.textContent = maintenanceMode() ? copy.shortcutOffline : copy.shortcutPaused;
-    meterText.textContent = copy.meterWaitingResume;
-    setMicCheckStatus(copy.micCheckAsleep, "quiet");
-    setMeterLevel(0);
-  } else if (flowState === FLOW.IDLE) {
-    stageBadge.textContent = copy.badgeNotArmed;
-    stageTitle.textContent = copy.stageIdleTitle;
-    stageCopy.textContent = copy.stageIdleCopy;
-    micStatus.textContent = copy.micAsleep;
-    recStatus.textContent = copy.recNotArmed;
-    shortcutHint.textContent = copy.shortcutArm;
-    meterText.textContent = copy.meterWaitingMic;
-    setMicCheckStatus(copy.micCheckUnavailable, "quiet");
-    setMeterLevel(0);
-  } else if (flowState === FLOW.ARMING) {
-    stageBadge.textContent = copy.badgeArming;
-    stageTitle.textContent = copy.stageArmingTitle;
-    stageCopy.textContent = copy.stageArmingCopy;
-    micStatus.textContent = copy.micRequesting;
-    recStatus.textContent = copy.recWaitingMicAccess;
-    shortcutHint.textContent = copy.micRequesting;
-    meterText.textContent = copy.meterRequestingAccess;
-    setMicCheckStatus(copy.micCheckStarting, "quiet");
-  } else if (flowState === FLOW.ARMED) {
-    stageBadge.textContent = intakePaused() ? (maintenanceMode() ? copy.badgeMaintenance : copy.badgePaused) : copy.badgeReady;
-    stageTitle.textContent = intakePaused()
-      ? (maintenanceMode() ? copy.stageArmedMaintenanceTitle : copy.stageArmedPausedTitle)
-      : copy.stageArmedTitle;
-    stageCopy.textContent = intakePaused()
-      ? (maintenanceMode()
-        ? copy.stageArmedMaintenanceCopy
-        : copy.stageArmedPausedCopy)
-      : copy.stageArmedCopy;
-    micStatus.textContent = micLabel;
-    recStatus.textContent = intakePaused()
-      ? (maintenanceMode() ? copy.recMaintenance : copy.recPaused)
-      : copy.recStandingBy;
-    shortcutHint.textContent = intakePaused()
-      ? (maintenanceMode() ? copy.shortcutOffline : copy.shortcutPaused)
-      : copy.shortcutStart;
-    meterText.textContent = hasMic ? copy.meterListeningRoom : copy.meterMicUnavailable;
-  } else if (flowState === FLOW.COUNTDOWN) {
-    stageBadge.textContent = copy.badgeGetReady;
-    stageTitle.textContent = copy.stageCountdownTitle;
-    stageCopy.textContent = copy.stageCountdownCopy;
-    micStatus.textContent = micLabel;
-    recStatus.textContent = copy.recCountdown;
-    shortcutHint.textContent = copy.shortcutCancelCountdown;
-    meterText.textContent = copy.meterListeningRoom;
-  } else if (flowState === FLOW.RECORDING) {
-    stageBadge.textContent = copy.badgeRecording;
-    stageTitle.textContent = copy.stageRecordingTitle;
-    stageCopy.textContent = copy.stageRecordingCopy;
-    micStatus.textContent = micLabel;
-    recStatus.textContent = copy.recRecording;
-    shortcutHint.textContent = copy.shortcutStop;
-    meterText.textContent = copy.meterRecordingSignal;
-  } else if (flowState === FLOW.REVIEW) {
-    if (quietTakeNeedsDecision) {
-      stageBadge.textContent = copy.badgeQuietTake;
-      stageTitle.textContent = copy.stageQuietTitle;
-      stageCopy.textContent = copy.stageQuietCopy;
-    } else {
-      stageBadge.textContent = intakePaused() ? (maintenanceMode() ? copy.badgeMaintenance : copy.badgePaused) : copy.badgeReview;
-      stageTitle.textContent = intakePaused()
-        ? (maintenanceMode() ? copy.stageReviewMaintenanceTitle : copy.stageReviewPausedTitle)
-        : (selectedMode ? formatCopy(copy.stageReadyTo, { label: modeCopy(selectedMode).submitLabel.toLowerCase() }) : copy.stageReviewTitle);
-      stageCopy.textContent = intakePaused()
-        ? (maintenanceMode()
-          ? copy.stageReviewMaintenanceCopy
-          : copy.stageReviewPausedCopy)
-        : (selectedMode
-          ? modeCopy(selectedMode).reviewCopy
-          : copy.stageReviewCopy);
-    }
-    micStatus.textContent = hasMic ? micLabel : copy.micAsleep;
-    recStatus.textContent = quietTakeNeedsDecision ? copy.recQuietInput : (wavBlob ? copy.recTakeCaptured : copy.recNoTake);
-    shortcutHint.textContent = quietTakeNeedsDecision
-      ? copy.shortcutKeepQuiet
-      : (intakePaused()
-        ? (maintenanceMode() ? copy.shortcutOffline : copy.shortcutPausedSubmit)
-        : (selectedMode ? copy.shortcutSubmit : copy.shortcutModeChoice));
-    meterText.textContent = quietTakeNeedsDecision ? copy.meterPreviewTake : (hasMic ? copy.meterMicStillArmed : copy.meterMicAsleep);
-    setMicCheckStatus(
-      quietTakeNeedsDecision ? copy.micCheckQuietWarning : (hasMic ? copy.micCheckComplete : copy.micCheckAsleep),
-      quietTakeNeedsDecision ? "quiet" : (hasMic ? "good" : "quiet"),
-    );
-  } else if (flowState === FLOW.SUBMITTING) {
-    stageBadge.textContent = copy.badgeSaving;
-    stageTitle.textContent = copy.stageSavingTitle;
-    stageCopy.textContent = copy.stageSavingCopy;
-    micStatus.textContent = copy.micAsleep;
-    recStatus.textContent = copy.recSubmitting;
-    shortcutHint.textContent = copy.shortcutSubmitting;
-    meterText.textContent = copy.meterMicAsleep;
-    setMicCheckStatus(copy.micCheckAsleep, "quiet");
-    setMeterLevel(0);
-  } else if (flowState === FLOW.COMPLETE) {
-    stageBadge.textContent = copy.badgeFinished;
-    stageTitle.textContent = selectedMode ? modeCopy(selectedMode).completeTitle : copy.stageCompleteFallback;
-    stageCopy.textContent = copy.stageCompleteCopy;
-    micStatus.textContent = copy.micAsleep;
-    recStatus.textContent = copy.recComplete;
-    shortcutHint.textContent = copy.shortcutStartAnother;
-    meterText.textContent = copy.meterMicAsleep;
-    setMicCheckStatus(copy.micCheckAsleep, "quiet");
-    setMeterLevel(0);
-  } else if (flowState === FLOW.ERROR) {
-    stageBadge.textContent = copy.badgeMicIssue;
-    stageTitle.textContent = copy.stageErrorTitle;
-    stageCopy.textContent = lastErrorMessage || copy.stageErrorCopyFallback;
-    micStatus.textContent = copy.micUnavailable;
-    recStatus.textContent = copy.recMicError;
-    shortcutHint.textContent = copy.shortcutTryAgain;
-    meterText.textContent = copy.meterMicUnavailable;
-    setMicCheckStatus(copy.micCheckUnavailable, "quiet");
-    setMeterLevel(0);
-  }
-}
-
-function setMeterLevel(level) {
-  meterFill.style.width = `${Math.max(0, Math.min(100, level * 100))}%`;
-}
-
-function handleMeterLevel(boosted) {
-  const copy = currentCopy();
-  setMeterLevel(boosted);
-
-  if (flowState === FLOW.ARMED) {
-    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? copy.meterSignalDetected : copy.meterWaitingVoice;
-    setMicCheckStatus(
-      boosted > MIC_SIGNAL_THRESHOLD ? copy.micCheckWeHearYou : copy.micCheckSpeakLouder,
-      boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
-    );
-  } else if (flowState === FLOW.COUNTDOWN) {
-    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? copy.meterSignalDetected : copy.meterListeningClosely;
-    setMicCheckStatus(
-      boosted > MIC_SIGNAL_THRESHOLD ? copy.micCheckWeHearYou : copy.micCheckSpeakLouder,
-      boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
-    );
-  } else if (flowState === FLOW.RECORDING) {
-    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? copy.meterRecordingSignal : copy.meterListeningClosely;
-    setMicCheckStatus(
-      boosted > MIC_SIGNAL_THRESHOLD ? copy.micCheckHealthy : copy.micCheckVeryQuiet,
-      boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
-    );
-  }
-}
-
-function setMicCheckStatus(text, tone) {
-  micCheckStatus.textContent = text;
-  micCheckStatus.classList.remove("good", "quiet");
-  micCheckStatus.classList.add(tone === "good" ? "good" : "quiet");
-}
+function updateAttractPanel() { kioskView.updateAttractPanel(buildViewContext()); }
+function updateModePanel() { kioskView.updateModePanel(buildViewContext()); }
+function updateReceiptPanel() { kioskView.updateReceiptPanel(buildViewContext()); }
+function updateButtons() { kioskView.updateButtons(buildViewContext()); }
+function updateStage() { kioskView.updateStage(buildViewContext()); }
+function setMeterLevel(level) { kioskView.setMeterLevel(buildViewContext(), level); }
+function handleMeterLevel(boosted) { kioskView.handleMeterLevel(buildViewContext(), boosted); }
+function setMicCheckStatus(text, tone) { kioskView.setMicCheckStatus(buildViewContext(), text, tone); }
 
 function setReceiptText(text) {
   receipt.textContent = text;
