@@ -26,6 +26,7 @@ assigned the right URL and role.
 - Do not expect remote plain `http://IP/...` recording to work. Browsers usually block microphone capture there.
 - If you deploy before DNS exists, make sure the kiosk device trusts the internal CA before expecting microphone capture over HTTPS to an IP address.
 - Run `./scripts/doctor.sh` after writing `.env` so the browser/TLS posture is checked before install day.
+- If you want a bundled room-behavior starting point, set `INSTALLATION_PROFILE` in `.env` before first deploy. Use `shared_lab` for the most neutral multi-machine default and then override individual env vars only where the site needs something different.
 
 ## Browser Kiosk Mode
 

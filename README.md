@@ -123,6 +123,21 @@ secret presence: threshold ordering, secure-origin posture, MinIO endpoint
 scheme, and other range relationships fail fast instead of surfacing later as
 ambiguous runtime behavior.
 
+For common installs, you can also start from a named behavior preset:
+
+```env
+INSTALLATION_PROFILE=shared_lab
+```
+
+Available profiles:
+- `custom`: no bundled behavior overrides
+- `quiet_gallery`: quieter pacing and softer overnight posture
+- `shared_lab`: balanced defaults for a multi-surface lab or classroom
+- `active_exhibit`: quicker pacing and stronger layering for busier public use
+
+Explicit env vars still win over the profile, so the profile is a starting
+point rather than a lock-in.
+
 For browser-level simulation and screenshots, the repo also supports a small
 Playwright layer:
 

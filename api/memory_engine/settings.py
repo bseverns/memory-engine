@@ -3,6 +3,11 @@ import sys
 from pathlib import Path
 
 from .config_validation import validate_runtime_settings
+from .installation_profiles import (
+    DEFAULT_INSTALLATION_PROFILE,
+    installation_profile_default,
+    normalize_installation_profile_name,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -23,6 +28,15 @@ def env_float(name: str, default: float) -> float:
     if value is None:
         return default
     return float(value.strip())
+
+
+INSTALLATION_PROFILE = normalize_installation_profile_name(
+    os.getenv("INSTALLATION_PROFILE", DEFAULT_INSTALLATION_PROFILE),
+)
+
+
+def profile_default(name: str, fallback):
+    return installation_profile_default(INSTALLATION_PROFILE, name, fallback)
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
 DEBUG = env_bool("DJANGO_DEBUG", False)
@@ -123,8 +137,14 @@ MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
 # Steward / operator access
 OPS_SHARED_SECRET = os.getenv("OPS_SHARED_SECRET", "").strip()
 OPS_SESSION_TTL_SECONDS = env_int("OPS_SESSION_TTL_SECONDS", 43200)
-KIOSK_DEFAULT_LANGUAGE_CODE = os.getenv("KIOSK_DEFAULT_LANGUAGE_CODE", "en").strip().lower()
-KIOSK_DEFAULT_MAX_RECORDING_SECONDS = env_int("KIOSK_DEFAULT_MAX_RECORDING_SECONDS", 120)
+KIOSK_DEFAULT_LANGUAGE_CODE = os.getenv(
+    "KIOSK_DEFAULT_LANGUAGE_CODE",
+    str(profile_default("KIOSK_DEFAULT_LANGUAGE_CODE", "en")),
+).strip().lower()
+KIOSK_DEFAULT_MAX_RECORDING_SECONDS = env_int(
+    "KIOSK_DEFAULT_MAX_RECORDING_SECONDS",
+    int(profile_default("KIOSK_DEFAULT_MAX_RECORDING_SECONDS", 120)),
+)
 
 # Decay tuning
 WEAR_EPSILON_PER_PLAY = float(os.getenv("WEAR_EPSILON_PER_PLAY", "0.005"))
@@ -146,31 +166,85 @@ RAW_TTL_HOURS_FOSSIL = int(os.getenv("RAW_TTL_HOURS_FOSSIL", "48"))
 DERIVATIVE_TTL_DAYS_FOSSIL = int(os.getenv("DERIVATIVE_TTL_DAYS_FOSSIL", "365"))
 
 # Room loop tuning
-ROOM_INTENSITY_PROFILE = os.getenv("ROOM_INTENSITY_PROFILE", "balanced").strip().lower()
-ROOM_MOVEMENT_PRESET = os.getenv("ROOM_MOVEMENT_PRESET", "balanced").strip().lower()
-ROOM_DAYPART_ENABLED = env_bool("ROOM_DAYPART_ENABLED", True)
-ROOM_QUIET_HOURS_ENABLED = env_bool("ROOM_QUIET_HOURS_ENABLED", False)
-ROOM_QUIET_HOURS_START_HOUR = env_int("ROOM_QUIET_HOURS_START_HOUR", 22)
-ROOM_QUIET_HOURS_END_HOUR = env_int("ROOM_QUIET_HOURS_END_HOUR", 6)
-ROOM_QUIET_HOURS_GAP_MULTIPLIER = env_float("ROOM_QUIET_HOURS_GAP_MULTIPLIER", 1.2)
-ROOM_QUIET_HOURS_TONE_MULTIPLIER = env_float("ROOM_QUIET_HOURS_TONE_MULTIPLIER", 0.78)
-ROOM_QUIET_HOURS_OUTPUT_GAIN_MULTIPLIER = env_float("ROOM_QUIET_HOURS_OUTPUT_GAIN_MULTIPLIER", 0.72)
-ROOM_TONE_PROFILE = os.getenv("ROOM_TONE_PROFILE", "soft_air").strip().lower()
+ROOM_INTENSITY_PROFILE = os.getenv(
+    "ROOM_INTENSITY_PROFILE",
+    str(profile_default("ROOM_INTENSITY_PROFILE", "balanced")),
+).strip().lower()
+ROOM_MOVEMENT_PRESET = os.getenv(
+    "ROOM_MOVEMENT_PRESET",
+    str(profile_default("ROOM_MOVEMENT_PRESET", "balanced")),
+).strip().lower()
+ROOM_DAYPART_ENABLED = env_bool("ROOM_DAYPART_ENABLED", bool(profile_default("ROOM_DAYPART_ENABLED", True)))
+ROOM_QUIET_HOURS_ENABLED = env_bool(
+    "ROOM_QUIET_HOURS_ENABLED",
+    bool(profile_default("ROOM_QUIET_HOURS_ENABLED", False)),
+)
+ROOM_QUIET_HOURS_START_HOUR = env_int(
+    "ROOM_QUIET_HOURS_START_HOUR",
+    int(profile_default("ROOM_QUIET_HOURS_START_HOUR", 22)),
+)
+ROOM_QUIET_HOURS_END_HOUR = env_int(
+    "ROOM_QUIET_HOURS_END_HOUR",
+    int(profile_default("ROOM_QUIET_HOURS_END_HOUR", 6)),
+)
+ROOM_QUIET_HOURS_GAP_MULTIPLIER = env_float(
+    "ROOM_QUIET_HOURS_GAP_MULTIPLIER",
+    float(profile_default("ROOM_QUIET_HOURS_GAP_MULTIPLIER", 1.2)),
+)
+ROOM_QUIET_HOURS_TONE_MULTIPLIER = env_float(
+    "ROOM_QUIET_HOURS_TONE_MULTIPLIER",
+    float(profile_default("ROOM_QUIET_HOURS_TONE_MULTIPLIER", 0.78)),
+)
+ROOM_QUIET_HOURS_OUTPUT_GAIN_MULTIPLIER = env_float(
+    "ROOM_QUIET_HOURS_OUTPUT_GAIN_MULTIPLIER",
+    float(profile_default("ROOM_QUIET_HOURS_OUTPUT_GAIN_MULTIPLIER", 0.72)),
+)
+ROOM_TONE_PROFILE = os.getenv(
+    "ROOM_TONE_PROFILE",
+    str(profile_default("ROOM_TONE_PROFILE", "soft_air")),
+).strip().lower()
 ROOM_TONE_SOURCE_MODE = os.getenv("ROOM_TONE_SOURCE_MODE", "synthetic").strip().lower()
 ROOM_TONE_SOURCE_URL = os.getenv("ROOM_TONE_SOURCE_URL", "").strip()
-ROOM_SCARCITY_ENABLED = env_bool("ROOM_SCARCITY_ENABLED", True)
-ROOM_SCARCITY_LOW_THRESHOLD = env_int("ROOM_SCARCITY_LOW_THRESHOLD", 6)
-ROOM_SCARCITY_SEVERE_THRESHOLD = env_int("ROOM_SCARCITY_SEVERE_THRESHOLD", 3)
+ROOM_SCARCITY_ENABLED = env_bool("ROOM_SCARCITY_ENABLED", bool(profile_default("ROOM_SCARCITY_ENABLED", True)))
+ROOM_SCARCITY_LOW_THRESHOLD = env_int(
+    "ROOM_SCARCITY_LOW_THRESHOLD",
+    int(profile_default("ROOM_SCARCITY_LOW_THRESHOLD", 6)),
+)
+ROOM_SCARCITY_SEVERE_THRESHOLD = env_int(
+    "ROOM_SCARCITY_SEVERE_THRESHOLD",
+    int(profile_default("ROOM_SCARCITY_SEVERE_THRESHOLD", 3)),
+)
 ROOM_ANTI_REPETITION_WINDOW_SIZE = env_int("ROOM_ANTI_REPETITION_WINDOW_SIZE", 12)
-ROOM_SOURCE_SLICE_MAX_SECONDS = env_int("ROOM_SOURCE_SLICE_MAX_SECONDS", 45)
-ROOM_SOURCE_SLICE_REVOLUTION_SECONDS = env_int("ROOM_SOURCE_SLICE_REVOLUTION_SECONDS", 300)
-ROOM_OVERLAP_CHANCE = env_float("ROOM_OVERLAP_CHANCE", 0.1)
+ROOM_SOURCE_SLICE_MAX_SECONDS = env_int(
+    "ROOM_SOURCE_SLICE_MAX_SECONDS",
+    int(profile_default("ROOM_SOURCE_SLICE_MAX_SECONDS", 45)),
+)
+ROOM_SOURCE_SLICE_REVOLUTION_SECONDS = env_int(
+    "ROOM_SOURCE_SLICE_REVOLUTION_SECONDS",
+    int(profile_default("ROOM_SOURCE_SLICE_REVOLUTION_SECONDS", 300)),
+)
+ROOM_OVERLAP_CHANCE = env_float(
+    "ROOM_OVERLAP_CHANCE",
+    float(profile_default("ROOM_OVERLAP_CHANCE", 0.1)),
+)
 ROOM_OVERLAP_MIN_POOL_SIZE = env_int("ROOM_OVERLAP_MIN_POOL_SIZE", 6)
-ROOM_OVERLAP_MAX_LAYERS = env_int("ROOM_OVERLAP_MAX_LAYERS", 2)
-ROOM_OVERLAP_MIN_DELAY_MS = env_int("ROOM_OVERLAP_MIN_DELAY_MS", 180)
-ROOM_OVERLAP_MAX_DELAY_MS = env_int("ROOM_OVERLAP_MAX_DELAY_MS", 520)
+ROOM_OVERLAP_MAX_LAYERS = env_int(
+    "ROOM_OVERLAP_MAX_LAYERS",
+    int(profile_default("ROOM_OVERLAP_MAX_LAYERS", 2)),
+)
+ROOM_OVERLAP_MIN_DELAY_MS = env_int(
+    "ROOM_OVERLAP_MIN_DELAY_MS",
+    int(profile_default("ROOM_OVERLAP_MIN_DELAY_MS", 180)),
+)
+ROOM_OVERLAP_MAX_DELAY_MS = env_int(
+    "ROOM_OVERLAP_MAX_DELAY_MS",
+    int(profile_default("ROOM_OVERLAP_MAX_DELAY_MS", 520)),
+)
 ROOM_OVERLAP_GAIN_MULTIPLIER = env_float("ROOM_OVERLAP_GAIN_MULTIPLIER", 0.68)
-ROOM_FOSSIL_VISUALS_ENABLED = env_bool("ROOM_FOSSIL_VISUALS_ENABLED", False)
+ROOM_FOSSIL_VISUALS_ENABLED = env_bool(
+    "ROOM_FOSSIL_VISUALS_ENABLED",
+    bool(profile_default("ROOM_FOSSIL_VISUALS_ENABLED", False)),
+)
 
 # Operator warning thresholds
 OPS_STORAGE_PATH = os.getenv("OPS_STORAGE_PATH", "/")

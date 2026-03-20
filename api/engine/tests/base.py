@@ -40,6 +40,7 @@ class EngineTestCase(TestCase):
 
 def default_runtime_config(**overrides):
     payload = {
+        "INSTALLATION_PROFILE": "custom",
         "ALLOWED_HOSTS": ["localhost"],
         "CSRF_TRUSTED_ORIGINS": ["http://localhost"],
         "MINIO_ENDPOINT": "http://minio:9000",

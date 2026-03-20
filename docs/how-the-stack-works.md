@@ -727,6 +727,12 @@ The major groups are:
 - steward access and session settings
 - operator warning thresholds
 
+There is also an installation-profile layer now:
+
+- `INSTALLATION_PROFILE=custom` keeps the plain repo baseline
+- `quiet_gallery`, `shared_lab`, and `active_exhibit` provide curated behavior defaults
+- explicit env vars still override any value the profile supplies
+
 Important design detail: most of these settings are read directly at process
 startup and then treated as constants. A settings change generally requires a
 redeploy.

@@ -94,6 +94,14 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, compose status, doctor output, and recent logs into a single handoff archive.
 - `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
 - Django also validates runtime config relationships at startup now, so bad threshold ordering or insecure origin posture fails fast before the stack enters service.
+- `INSTALLATION_PROFILE` can provide a named starting posture for room behavior and kiosk defaults. Explicit env vars still override profile defaults.
+
+Current bundled installation profiles:
+
+- `custom`: no bundled behavior defaults beyond the normal repo baseline
+- `quiet_gallery`: slower pacing, gentler tone, and quiet-hours enabled
+- `shared_lab`: balanced defaults for a recording kiosk plus a separate playback surface
+- `active_exhibit`: quicker pacing, shorter slice windows, and more overlap
 
 ## Standard maintenance flow
 

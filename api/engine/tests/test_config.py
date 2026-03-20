@@ -1,5 +1,7 @@
 from django.core.exceptions import ImproperlyConfigured
 
+from memory_engine.installation_profiles import installation_profile_default
+
 from .base import EngineTestCase, default_runtime_config, validate_runtime_settings
 
 
@@ -54,3 +56,27 @@ class RuntimeConfigValidationTests(EngineTestCase):
             validate_runtime_settings(config)
 
         self.assertIn("KIOSK_DEFAULT_LANGUAGE_CODE", str(ctx.exception))
+
+    def test_runtime_config_validation_rejects_unknown_installation_profile(self):
+        config = default_runtime_config(INSTALLATION_PROFILE="unknown_profile")
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("INSTALLATION_PROFILE", str(ctx.exception))
+
+    def test_installation_profile_defaults_return_expected_values(self):
+        self.assertEqual(
+            installation_profile_default("shared_lab", "KIOSK_DEFAULT_MAX_RECORDING_SECONDS", 120),
+            180,
+        )
+        self.assertEqual(
+            installation_profile_default("active-exhibit", "ROOM_TONE_PROFILE", "soft_air"),
+            "warm_hiss",
+        )
+
+    def test_installation_profile_defaults_fall_back_to_explicit_default_for_custom_profile(self):
+        self.assertEqual(
+            installation_profile_default("custom", "ROOM_TONE_PROFILE", "soft_air"),
+            "soft_air",
+        )
