@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from engine.api_views import healthz
-from engine.views import kiosk_view, operator_dashboard_view, playback_view
+from engine.views import kiosk_view, operator_dashboard_view, operator_logout_view, playback_view
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -10,4 +10,5 @@ urlpatterns = [
     path("kiosk/", kiosk_view, name="kiosk"),
     path("room/", playback_view, name="room-playback"),
     path("ops/", operator_dashboard_view, name="operator-dashboard"),
+    path("ops/logout/", operator_logout_view, name="operator-logout"),
 ]

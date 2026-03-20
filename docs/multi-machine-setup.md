@@ -92,7 +92,9 @@ Practical note:
 This machine should:
 
 - open `/ops/`
+- sign in with `OPS_SHARED_SECRET`
 - verify `ready`, `degraded`, or `broken` state
+- use the live controls when intake or playback needs to be paused temporarily
 - be used for setup, acceptance, and troubleshooting
 
 It can also open `/kiosk/` or `/room/` temporarily for checks, but that should

@@ -26,6 +26,8 @@ docker compose up --build
 - Admin: http://localhost/admin/  (creates a default superuser in dev; see logs)
 - Ops: http://localhost/ops/
 
+`/ops/` now requires the shared steward secret from `OPS_SHARED_SECRET`.
+
 For a real multi-machine install, the intended role split is:
 - recording machine opens `/kiosk/`
 - playback machine opens `/room/`
@@ -67,6 +69,7 @@ Later, when DNS exists:
 What the script does:
 - creates `.env` from `.env.example` if needed
 - writes the public host, Caddy site address, Django allowed hosts, and CSRF trusted origins
+- generates a fresh `OPS_SHARED_SECRET` if the default placeholder is still present
 - turns off Django debug mode and dev superuser bootstrap
 - refuses to deploy if obvious dev secrets are still unchanged
 - runs `docker compose up --build -d`
@@ -224,7 +227,9 @@ Caddy will then be able to obtain a public certificate automatically, assuming p
 - A longer movement cycle sits above that local counterbalance. The room can spend a few memories gathering energy, drift into weathered material, and then open back out rather than staying in one perpetual middle state.
 
 ## Operator view
-- `/ops/` provides a lightweight operator dashboard with `ready`, `degraded`, and `broken` states, dependency checks, current artifact counts, and a quick view of fresh/mid/worn lane balance.
+- `/ops/` now sits behind the shared steward secret in `OPS_SHARED_SECRET`.
+- After sign-in, `/ops/` provides the node state (`ready`, `degraded`, `broken`), dependency checks, current artifact counts, and a quick view of fresh/mid/worn lane balance.
+- `/ops/` also carries live steward controls for pausing intake, pausing playback, and switching the room into a quieter mode.
 
 ## Decay feel tuning (v0)
 The kiosk applies **stateful wear** on each playback (raw audio remains immutable). Wear is stored server-side and mapped to gentle “memory loss” effects client-side (WebAudio).

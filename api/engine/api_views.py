@@ -14,16 +14,41 @@ from rest_framework.response import Response
 
 from .consent import consent_manifest, default_node_from_env, hash_token, make_revocation_token
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative
+from .operator_auth import operator_secret_configured, operator_session_active
 from .ops import disk_status, health_component_status, pool_warnings
 from .pool import artifact_age_hours, artifact_density, artifact_lane, artifact_mood, select_pool_artifact
 from .serializers import ArtifactSerializer, DerivativeSerializer
 from .storage import delete_key, put_bytes, stream_key
+from .steward import load_steward_state, recent_steward_actions, steward_state_payload, update_steward_state
 from .tasks import generate_spectrogram
+
+
+def operator_api_denied():
+    if not operator_secret_configured():
+        return Response({"error": "operator secret is not configured"}, status=503)
+    return Response({"error": "operator authentication required"}, status=403)
+
+
+def request_operator_label(request) -> str:
+    forwarded_for = (request.META.get("HTTP_X_FORWARDED_FOR") or "").strip()
+    remote_addr = (forwarded_for.split(",")[0].strip() if forwarded_for else request.META.get("REMOTE_ADDR", "")).strip()
+    return f"operator@{remote_addr}" if remote_addr else "operator"
+
+
+def parse_boolish(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 @api_view(["POST"])
 @parser_classes([MultiPartParser, FormParser])
 def create_audio_artifact(request):
+    if load_steward_state().intake_paused:
+        return Response({"error": "intake is paused by the steward"}, status=423)
+
     consent_mode = (request.data.get("consent_mode") or "ROOM").upper()
     if consent_mode not in ("ROOM", "FOSSIL"):
         return Response({"error": "consent_mode must be ROOM or FOSSIL for this endpoint."}, status=400)
@@ -65,6 +90,9 @@ def create_audio_artifact(request):
 @api_view(["POST"])
 @parser_classes([MultiPartParser, FormParser])
 def create_ephemeral_audio(request):
+    if load_steward_state().intake_paused:
+        return Response({"error": "intake is paused by the steward"}, status=423)
+
     upload = request.data.get("file")
     if not upload:
         return Response({"error": "file required"}, status=400)
@@ -165,6 +193,9 @@ def revoke(request):
 
 @api_view(["GET"])
 def pool_next(request):
+    if load_steward_state().playback_paused:
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     now = timezone.now()
     playable_count = Artifact.objects.filter(
         status=Artifact.STATUS_ACTIVE,
@@ -247,6 +278,9 @@ def healthz(request):
 
 @api_view(["GET"])
 def node_status(request):
+    if not operator_session_active(request):
+        return operator_api_denied()
+
     now = timezone.now()
     ok, components = health_component_status()
     active_qs = Artifact.objects.filter(status=Artifact.STATUS_ACTIVE, expires_at__gt=now)
@@ -286,6 +320,7 @@ def node_status(request):
     return Response({
         "ok": ok,
         "components": components,
+        "operator_state": steward_state_payload(),
         "active": active,
         "lanes": lane_counts,
         "moods": mood_counts,
@@ -295,6 +330,39 @@ def node_status(request):
         "expired": expired,
         "revoked": revoked,
         "now": now,
+    })
+
+
+@api_view(["GET"])
+def surface_state(request):
+    return Response({
+        "operator_state": steward_state_payload(),
+    })
+
+
+@api_view(["GET", "POST"])
+@parser_classes([JSONParser])
+def operator_controls(request):
+    if not operator_session_active(request):
+        return operator_api_denied()
+
+    if request.method == "GET":
+        return Response({
+            "operator_state": steward_state_payload(),
+            "recent_actions": recent_steward_actions(),
+        })
+
+    state = load_steward_state()
+    state, changes = update_steward_state(
+        intake_paused=parse_boolish(request.data.get("intake_paused", state.intake_paused)),
+        playback_paused=parse_boolish(request.data.get("playback_paused", state.playback_paused)),
+        quieter_mode=parse_boolish(request.data.get("quieter_mode", state.quieter_mode)),
+        actor=request_operator_label(request),
+    )
+    return Response({
+        "operator_state": steward_state_payload(state),
+        "changes": changes,
+        "recent_actions": recent_steward_actions(),
     })
 
 

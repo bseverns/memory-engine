@@ -7,6 +7,7 @@
 - `/healthz` endpoint for readiness checks
 - Docker healthchecks for core services that have reliable built-in probes
 - `/ops/` operator dashboard with `ready`, `degraded`, and `broken` states
+- Shared-secret auth boundary for `/ops/` and protected operator APIs
 - `scripts/first_boot.sh` to stamp out development defaults and set node identity
 - `scripts/deploy.sh` for public-IP-now / domain-later rollout
 - `scripts/backup.sh` and `scripts/restore.sh` for Postgres + MinIO recovery
@@ -18,6 +19,8 @@
 - `README.md` pointers for operator maintenance and recovery flows
 - Disk-space and storage-pressure warnings surfaced in `/ops/`
 - Pool-health warnings in `/ops/` when lanes or moods become too sparse or imbalanced
+- Simple steward controls for pausing intake, pausing playback, or switching to a quieter mode
+- Persisted steward state and audit rows for live control changes
 
 ### Recording experience
 - Split the browser experience into a dedicated recording station at `/kiosk/` and a separate playback surface at `/room/`
@@ -64,9 +67,6 @@
 - Support a hands-free control path
   - USB button
   - footswitch
-
-### Operator / stewardship
-- Add simple steward controls for pausing intake, pausing playback, or switching to a quieter mode
 
 ## Next
 

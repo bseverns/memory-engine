@@ -86,6 +86,30 @@
     }));
   }
 
+  function actionCards(actions) {
+    if (!actions || actions.length === 0) {
+      return [{
+        tagName: "article",
+        className: "component-card ready",
+        title: "No steward changes yet",
+        detail: "Control changes will appear here as they are applied.",
+      }];
+    }
+
+    return actions.map((action) => ({
+      tagName: "article",
+      className: "component-card ready",
+      title: action.detail || action.action,
+      detail: formatActionDetail(action),
+    }));
+  }
+
+  function formatActionDetail(action) {
+    const timestamp = action.created_at ? new Date(action.created_at).toLocaleString() : "Unknown time";
+    const actor = action.actor || "operator";
+    return `${actor} · ${timestamp}`;
+  }
+
   function makeCard(doc, card) {
     const el = doc.createElement(card.tagName || "article");
     el.className = card.className || "";
@@ -103,7 +127,32 @@
   }
 
   function replaceCardList(doc, container, cards) {
+    if (!container) return;
     container.replaceChildren(...cards.map((card) => makeCard(doc, card)));
+  }
+
+  function readJsonScript(doc, id, fallback = {}) {
+    const el = doc.getElementById(id);
+    if (!el || !el.textContent) {
+      return fallback;
+    }
+    try {
+      return JSON.parse(el.textContent);
+    } catch (error) {
+      return fallback;
+    }
+  }
+
+  function readCookie(doc, name) {
+    const pattern = `${name}=`;
+    const parts = (doc.cookie || "").split(";");
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed.startsWith(pattern)) {
+        return decodeURIComponent(trimmed.slice(pattern.length));
+      }
+    }
+    return "";
   }
 
   function collectDom(doc) {
@@ -122,7 +171,23 @@
       opsWarnings: doc.getElementById("opsWarnings"),
       opsComponents: doc.getElementById("opsComponents"),
       opsRefreshed: doc.getElementById("opsRefreshed"),
+      opsControlsForm: doc.getElementById("opsControlsForm"),
+      opsIntakePaused: doc.getElementById("opsIntakePaused"),
+      opsPlaybackPaused: doc.getElementById("opsPlaybackPaused"),
+      opsQuieterMode: doc.getElementById("opsQuieterMode"),
+      opsControlsSave: doc.getElementById("opsControlsSave"),
+      opsControlStatus: doc.getElementById("opsControlStatus"),
+      opsRecentActions: doc.getElementById("opsRecentActions"),
     };
+  }
+
+  function renderOperatorState(dom, operatorState) {
+    if (!dom.opsIntakePaused || !dom.opsPlaybackPaused || !dom.opsQuieterMode) {
+      return;
+    }
+    dom.opsIntakePaused.checked = Boolean(operatorState.intake_paused);
+    dom.opsPlaybackPaused.checked = Boolean(operatorState.playback_paused);
+    dom.opsQuieterMode.checked = Boolean(operatorState.quieter_mode);
   }
 
   function renderPayload(doc, dom, payload) {
@@ -142,7 +207,23 @@
     dom.opsStorage.textContent = payload.storage ? `${payload.storage.free_gb} GB` : "-";
     replaceCardList(doc, dom.opsWarnings, warningCards(payload.warnings || []));
     replaceCardList(doc, dom.opsComponents, componentCards(payload.components || {}));
+    renderOperatorState(dom, payload.operator_state || {});
     dom.opsRefreshed.textContent = `Last refreshed ${new Date().toLocaleTimeString()}`;
+  }
+
+  function renderControlPayload(doc, dom, payload) {
+    renderOperatorState(dom, payload.operator_state || {});
+    replaceCardList(doc, dom.opsRecentActions, actionCards(payload.recent_actions || []));
+    if (dom.opsControlStatus) {
+      const state = payload.operator_state || {};
+      const labels = [];
+      if (state.intake_paused) labels.push("intake paused");
+      if (state.playback_paused) labels.push("playback paused");
+      if (state.quieter_mode) labels.push("quieter mode");
+      dom.opsControlStatus.textContent = labels.length
+        ? `Active controls: ${labels.join(", ")}.`
+        : "No live control overrides are active.";
+    }
   }
 
   function renderError(doc, dom, error) {
@@ -163,26 +244,87 @@
     dom.opsRefreshed.textContent = "Last refresh failed";
   }
 
+  async function fetchJson(fetchImpl, url, options = {}) {
+    const response = await fetchImpl(url, options);
+    if (!response.ok) {
+      throw new Error(`Request failed (${response.status})`);
+    }
+    return response.json();
+  }
+
   function start({ doc = document, fetchImpl = fetch, intervalMs = 10000 } = {}) {
     const dom = collectDom(doc);
+    const initialState = readJsonScript(doc, "ops-operator-state", {});
+    renderOperatorState(dom, initialState);
+    replaceCardList(doc, dom.opsRecentActions, actionCards([]));
 
     async function refreshStatus() {
       try {
-        const response = await fetchImpl("/api/v1/node/status", { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error(`Status fetch failed (${response.status})`);
-        }
-        const payload = await response.json();
+        const payload = await fetchJson(fetchImpl, "/api/v1/node/status", { cache: "no-store" });
         renderPayload(doc, dom, payload);
       } catch (error) {
         renderError(doc, dom, error);
       }
     }
 
+    async function refreshControls() {
+      try {
+        const payload = await fetchJson(fetchImpl, "/api/v1/operator/controls", { cache: "no-store" });
+        renderControlPayload(doc, dom, payload);
+      } catch (error) {
+        if (dom.opsControlStatus) {
+          dom.opsControlStatus.textContent = error.message || "Control refresh failed.";
+        }
+      }
+    }
+
+    async function saveControls(event) {
+      event.preventDefault();
+      if (!dom.opsControlsSave) return;
+      dom.opsControlsSave.disabled = true;
+      if (dom.opsControlStatus) {
+        dom.opsControlStatus.textContent = "Applying controls...";
+      }
+      try {
+        const payload = await fetchJson(fetchImpl, "/api/v1/operator/controls", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": readCookie(doc, "csrftoken"),
+          },
+          body: JSON.stringify({
+            intake_paused: Boolean(dom.opsIntakePaused?.checked),
+            playback_paused: Boolean(dom.opsPlaybackPaused?.checked),
+            quieter_mode: Boolean(dom.opsQuieterMode?.checked),
+          }),
+        });
+        renderControlPayload(doc, dom, payload);
+        await refreshStatus();
+      } catch (error) {
+        if (dom.opsControlStatus) {
+          dom.opsControlStatus.textContent = error.message || "Control update failed.";
+        }
+      } finally {
+        dom.opsControlsSave.disabled = false;
+      }
+    }
+
+    if (dom.opsControlsForm) {
+      dom.opsControlsForm.addEventListener("submit", (event) => {
+        void saveControls(event);
+      });
+    }
+
     void refreshStatus();
-    const intervalId = root.setInterval(refreshStatus, intervalMs);
+    void refreshControls();
+    const intervalId = root.setInterval(() => {
+      void refreshStatus();
+      void refreshControls();
+    }, intervalMs);
+
     return {
       refreshStatus,
+      refreshControls,
       stop() {
         root.clearInterval(intervalId);
       },
@@ -190,11 +332,13 @@
   }
 
   return {
+    actionCards,
     classifyState,
-    warningCards,
     componentCards,
-    renderPayload,
+    renderControlPayload,
     renderError,
+    renderPayload,
     start,
+    warningCards,
   };
 }));

@@ -216,8 +216,13 @@
     return response.arrayBuffer();
   }
 
-  async function playUrlWithLightChain(url, wear) {
+  async function playUrlWithLightChain(url, wear, options = {}) {
     const amount = smoothstep(clamp(wear, 0, 1));
+    const outputGainMultiplier = clamp(
+      Number.isFinite(Number(options.outputGainMultiplier)) ? Number(options.outputGainMultiplier) : 1.0,
+      0.1,
+      2.0,
+    );
     const arrayBuffer = await fetchArrayBuffer(url);
     const ctx = new (global.AudioContext || global.webkitAudioContext)();
     await ensureWorkletModule(ctx);
@@ -270,8 +275,8 @@
     const fadeOutSeconds = Math.min(PLAYBACK_SMOOTHING.fadeOutSeconds, Math.max(0.04, buffer.duration / 3));
     const releaseAt = Math.max(fadeInSeconds, buffer.duration - fadeOutSeconds);
     gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(normalizedGain * 0.95, ctx.currentTime + fadeInSeconds);
-    gain.gain.setValueAtTime(normalizedGain * 0.95, ctx.currentTime + releaseAt);
+    gain.gain.linearRampToValueAtTime(normalizedGain * 0.95 * outputGainMultiplier, ctx.currentTime + fadeInSeconds);
+    gain.gain.setValueAtTime(normalizedGain * 0.95 * outputGainMultiplier, ctx.currentTime + releaseAt);
     gain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + buffer.duration);
 
     src.connect(lowpass);

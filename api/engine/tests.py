@@ -5,11 +5,17 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import AccessEvent, Artifact, ConsentManifest, Derivative, Node
+from .models import AccessEvent, Artifact, ConsentManifest, Derivative, Node, StewardAction, StewardState
+from .operator_auth import OPS_SESSION_KEY
 from .pool import pool_weight
 
 
 class EngineBehaviorTests(TestCase):
+    def login_operator(self):
+        session = self.client.session
+        session[OPS_SESSION_KEY] = True
+        session.save()
+
     def make_consent(self, mode: str, token: str = "TOKEN12345") -> ConsentManifest:
         return ConsentManifest.objects.create(
             json={"mode": mode},
@@ -218,6 +224,63 @@ class EngineBehaviorTests(TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertFalse(response.json()["ok"])
 
+    def test_operator_dashboard_requires_secret_entry(self):
+        response = self.client.get("/ops/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Steward sign-in")
+
+    def test_operator_controls_toggle_persisted_state_and_audit(self):
+        self.login_operator()
+
+        response = self.client.post(
+            "/api/v1/operator/controls",
+            data={
+                "intake_paused": True,
+                "playback_paused": True,
+                "quieter_mode": True,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        state = StewardState.load()
+        self.assertTrue(state.intake_paused)
+        self.assertTrue(state.playback_paused)
+        self.assertTrue(state.quieter_mode)
+        self.assertEqual(StewardAction.objects.count(), 3)
+        payload = response.json()
+        self.assertTrue(payload["operator_state"]["intake_paused"])
+        self.assertEqual(len(payload["changes"]), 3)
+
+    @patch("engine.api_views.put_bytes")
+    def test_intake_pause_blocks_new_audio_artifact_creation(self, put_bytes_mock):
+        state = StewardState.load()
+        state.intake_paused = True
+        state.save(update_fields=["intake_paused"])
+
+        upload = SimpleUploadedFile("audio.wav", b"RIFFtest-room-audio", content_type="audio/wav")
+        response = self.client.post(
+            "/api/v1/artifacts/audio",
+            {"file": upload, "consent_mode": "ROOM", "duration_ms": "3210"},
+        )
+
+        self.assertEqual(response.status_code, 423)
+        put_bytes_mock.assert_not_called()
+
+    def test_playback_pause_forces_pool_next_to_hold(self):
+        artifact = self.make_active_artifact(
+            raw_uri="raw/only.wav",
+            created_at=timezone.now() - timedelta(hours=10),
+        )
+        state = StewardState.load()
+        state.playback_paused = True
+        state.save(update_fields=["playback_paused"])
+
+        response = self.client.get(f"/api/v1/pool/next?exclude_ids={artifact.id}")
+
+        self.assertEqual(response.status_code, 204)
+
     @patch("engine.api_views.health_component_status")
     def test_node_status_reports_empty_pool_warning(self, health_mock):
         health_mock.return_value = (
@@ -228,6 +291,7 @@ class EngineBehaviorTests(TestCase):
                 "storage": {"ok": True},
             },
         )
+        self.login_operator()
 
         response = self.client.get("/api/v1/node/status")
 
@@ -247,6 +311,7 @@ class EngineBehaviorTests(TestCase):
                 "storage": {"ok": True},
             },
         )
+        self.login_operator()
         consent = self.make_consent("ROOM")
         for index in range(6):
             self.make_active_artifact(
@@ -263,3 +328,8 @@ class EngineBehaviorTests(TestCase):
         self.assertEqual(response.status_code, 200)
         titles = {warning["title"] for warning in response.json()["warnings"]}
         self.assertIn("Fresh lane is dominating the pool", titles)
+
+    def test_node_status_requires_operator_session(self):
+        response = self.client.get("/api/v1/node/status")
+
+        self.assertEqual(response.status_code, 403)

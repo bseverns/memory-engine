@@ -16,6 +16,13 @@ async function saveScreenshot(page, name) {
   });
 }
 
+async function signIntoOps(page) {
+  await page.goto("/ops/");
+  await expect(page.getByRole("heading", { name: "Steward sign-in" })).toBeVisible();
+  await page.getByLabel("Shared steward secret").fill("test-ops-secret");
+  await page.getByRole("button", { name: "Open dashboard" }).click();
+}
+
 test.describe("visual stack walkthrough", () => {
   test("captures the recording kiosk landing state", async ({ page }) => {
     await page.goto("/kiosk/");
@@ -63,11 +70,29 @@ test.describe("visual stack walkthrough", () => {
             free_percent: 58.0,
           },
           warnings: [],
+          operator_state: {
+            intake_paused: false,
+            playback_paused: false,
+            quieter_mode: false,
+          },
+        }),
+      });
+    });
+    await page.route("**/api/v1/operator/controls", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          operator_state: {
+            intake_paused: false,
+            playback_paused: false,
+            quieter_mode: false,
+          },
+          recent_actions: [],
         }),
       });
     });
 
-    await page.goto("/ops/");
+    await signIntoOps(page);
     await expect(page.getByRole("heading", { name: "Room Memory Status" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Ready" })).toBeVisible();
     await saveScreenshot(page, "ops-ready.png");
@@ -116,11 +141,36 @@ test.describe("visual stack walkthrough", () => {
               detail: "4 of 4 playable sounds are currently classified as fresh.",
             },
           ],
+          operator_state: {
+            intake_paused: true,
+            playback_paused: false,
+            quieter_mode: true,
+          },
+        }),
+      });
+    });
+    await page.route("**/api/v1/operator/controls", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          operator_state: {
+            intake_paused: true,
+            playback_paused: false,
+            quieter_mode: true,
+          },
+          recent_actions: [
+            {
+              action: "quieter_mode.enabled",
+              actor: "operator@test",
+              detail: "quieter mode enabled",
+              created_at: "2026-03-20T10:00:00Z",
+            },
+          ],
         }),
       });
     });
 
-    await page.goto("/ops/");
+    await signIntoOps(page);
     await expect(page.getByRole("heading", { name: "Room Memory Status" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Degraded" })).toBeVisible();
     await saveScreenshot(page, "ops-degraded.png");

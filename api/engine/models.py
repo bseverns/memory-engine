@@ -66,3 +66,24 @@ class AccessEvent(models.Model):
     ts = models.DateTimeField(default=timezone.now)
     context = models.CharField(max_length=64, default="kiosk")
     action = models.CharField(max_length=64, default="play")
+
+
+class StewardState(models.Model):
+    singleton_key = models.CharField(max_length=32, unique=True, default="default")
+    intake_paused = models.BooleanField(default=False)
+    playback_paused = models.BooleanField(default=False)
+    quieter_mode = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def load(cls):
+        state, _ = cls.objects.get_or_create(singleton_key="default")
+        return state
+
+
+class StewardAction(models.Model):
+    created_at = models.DateTimeField(default=timezone.now)
+    action = models.CharField(max_length=64)
+    actor = models.CharField(max_length=128, blank=True, default="operator")
+    detail = models.CharField(max_length=255, blank=True, default="")
+    payload = models.JSONField(default=dict, blank=True)

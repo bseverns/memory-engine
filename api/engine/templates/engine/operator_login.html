@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Room Memory — Operator Access</title>
+  <link rel="stylesheet" href="/static/engine/kiosk.css"/>
+</head>
+<body class="operator-login-page">
+  <div class="shell login-shell">
+    <header class="hero">
+      <p class="eyebrow">Operator access</p>
+      <h1>Steward sign-in</h1>
+      <p class="sub">This machine protects the dashboard and live controls behind a shared steward secret.</p>
+    </header>
+
+    <section class="panel login-panel">
+      {% if operator_configured %}
+        <form action="/ops/" method="post" class="ops-login-form">
+          {% csrf_token %}
+          <label class="ops-login-field" for="secret">
+            <span class="section-kicker">Shared steward secret</span>
+            <input id="secret" name="secret" type="password" autocomplete="current-password" required/>
+          </label>
+          <div class="shortcut-row">
+            <button type="submit" class="btn">Open dashboard</button>
+            <span class="shortcut">This session stays signed in on this browser for a limited time.</span>
+          </div>
+        </form>
+      {% else %}
+        <p class="stage-copy">`OPS_SHARED_SECRET` is not configured yet, so operator access is intentionally unavailable.</p>
+      {% endif %}
+
+      {% if error %}
+        <p class="status ops-login-error">{{ error }}</p>
+      {% endif %}
+    </section>
+  </div>
+</body>
+</html>

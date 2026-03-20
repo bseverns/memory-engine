@@ -78,6 +78,7 @@ const reviewTimeoutChip = document.getElementById("reviewTimeoutChip");
 const reviewTimeoutFill = document.getElementById("reviewTimeoutFill");
 const attractPanel = document.getElementById("attractPanel");
 const attractLead = document.getElementById("attractLead");
+const operatorNotice = document.getElementById("operatorNotice");
 const attractSteps = Array.from(document.querySelectorAll(".attract-step"));
 const stepEls = Array.from(document.querySelectorAll(".step"));
 const choices = Array.from(document.querySelectorAll(".choice"));
@@ -109,6 +110,7 @@ const MAX_RECORDING_MS = 120000;
 const MIC_SIGNAL_THRESHOLD = 0.07;
 const REVIEW_IDLE_TIMEOUT_MS = 90000;
 const ATTRACT_ROTATE_MS = 3600;
+const SURFACE_STATE_POLL_MS = 5000;
 
 const ATTRACT_MESSAGES = [
   "Tap Arm microphone or press Space to begin.",
@@ -130,6 +132,27 @@ const {
   playUrlWithLightChain,
   processRecordingSamples,
 } = window.MemoryEngineKioskAudio;
+
+function readKioskConfig() {
+  const el = document.getElementById("kiosk-config");
+  if (!el || !el.textContent) {
+    return {};
+  }
+  try {
+    return JSON.parse(el.textContent);
+  } catch (err) {
+    return {};
+  }
+}
+
+const kioskConfig = readKioskConfig();
+let surfaceState = {
+  intake_paused: false,
+  playback_paused: false,
+  quieter_mode: false,
+  ...(kioskConfig.operatorState || {}),
+};
+let surfaceStateInterval = 0;
 
 const captureController = window.MemoryEngineKioskCapture.createController({
   onMeterLevel: handleMeterLevel,
@@ -159,6 +182,25 @@ function render() {
   updateQuietTakePanel();
   updateReviewTimeoutPanel();
   updateAttractPanel();
+  updateOperatorNotice();
+}
+
+function intakePaused() {
+  return Boolean(surfaceState.intake_paused);
+}
+
+function updateOperatorNotice() {
+  if (!operatorNotice) return;
+  if (!intakePaused()) {
+    operatorNotice.hidden = true;
+    operatorNotice.textContent = "";
+    return;
+  }
+
+  operatorNotice.hidden = false;
+  operatorNotice.textContent = flowState === FLOW.REVIEW && wavBlob
+    ? "Recording intake is paused by the steward. New submissions are temporarily on hold."
+    : "Recording intake is paused by the steward. This station is resting until intake resumes.";
 }
 
 function updateStepper() {
@@ -291,7 +333,11 @@ function updateModePanel() {
     selectionHint.textContent = `Selected: ${MODE_COPY[selectedMode].name}`;
   }
 
-  const canSubmit = flowState === FLOW.REVIEW && !!wavBlob && !!selectedMode;
+  if (intakePaused()) {
+    selectionHint.textContent = "Intake is paused by the steward";
+  }
+
+  const canSubmit = flowState === FLOW.REVIEW && !!wavBlob && !!selectedMode && !intakePaused();
   btnSubmit.disabled = !canSubmit;
   btnSubmit.textContent = selectedMode ? MODE_COPY[selectedMode].submitLabel : "Submit selection";
 }
@@ -366,6 +412,18 @@ function updateButtons() {
     secondaryDisabled = false;
   }
 
+  if (intakePaused() && ![FLOW.RECORDING, FLOW.SUBMITTING, FLOW.COMPLETE].includes(flowState)) {
+    primaryDisabled = true;
+    if (flowState === FLOW.IDLE || flowState === FLOW.ERROR) {
+      primaryLabel = "Recording paused";
+    } else if (flowState === FLOW.REVIEW) {
+      primaryLabel = "Submission paused";
+      secondaryLabel = "Reset session";
+      secondaryAction = startFreshSession;
+      secondaryDisabled = false;
+    }
+  }
+
   btnPrimary.textContent = primaryLabel;
   btnPrimary.disabled = primaryDisabled;
   btnSecondary.textContent = secondaryLabel;
@@ -382,7 +440,17 @@ function updateStage() {
   remainingTimer.textContent = formatDuration(remainingMs);
   maxDurationHint.textContent = `Max ${formatDuration(MAX_RECORDING_MS)}`;
 
-  if (flowState === FLOW.IDLE) {
+  if (intakePaused() && flowState === FLOW.IDLE) {
+    stageBadge.textContent = "Paused";
+    stageTitle.textContent = "This recording station is resting.";
+    stageCopy.textContent = "A steward has paused intake for a while. Nothing new will be recorded until intake resumes.";
+    micStatus.textContent = "Microphone asleep";
+    recStatus.textContent = "Recording intake paused";
+    shortcutHint.textContent = "Recording is paused by the steward";
+    meterText.textContent = "Waiting for intake to resume";
+    setMicCheckStatus("Mic check asleep", "quiet");
+    setMeterLevel(0);
+  } else if (flowState === FLOW.IDLE) {
     stageBadge.textContent = "Not armed";
     stageTitle.textContent = "When you are ready, wake the microphone.";
     stageCopy.textContent = "Nothing records until you begin. Take a breath, notice the room, and start only when it feels right.";
@@ -402,12 +470,14 @@ function updateStage() {
     meterText.textContent = "Requesting access";
     setMicCheckStatus("Mic check starting up", "quiet");
   } else if (flowState === FLOW.ARMED) {
-    stageBadge.textContent = "Ready";
-    stageTitle.textContent = "You are ready, but not yet recording.";
-    stageCopy.textContent = "Speak a little if you want to watch the meter. Begin when the moment feels settled.";
+    stageBadge.textContent = intakePaused() ? "Paused" : "Ready";
+    stageTitle.textContent = intakePaused() ? "The steward has paused recording intake." : "You are ready, but not yet recording.";
+    stageCopy.textContent = intakePaused()
+      ? "This take can be reset, but a new recording cannot begin until intake resumes."
+      : "Speak a little if you want to watch the meter. Begin when the moment feels settled.";
     micStatus.textContent = micLabel;
-    recStatus.textContent = "Standing by";
-    shortcutHint.textContent = "Space or Enter: start recording";
+    recStatus.textContent = intakePaused() ? "Recording intake paused" : "Standing by";
+    shortcutHint.textContent = intakePaused() ? "Recording is paused by the steward" : "Space or Enter: start recording";
     meterText.textContent = hasMic ? "Listening for room sound" : "Microphone unavailable";
   } else if (flowState === FLOW.COUNTDOWN) {
     stageBadge.textContent = "Get ready";
@@ -431,17 +501,23 @@ function updateStage() {
       stageTitle.textContent = "This take arrived very softly.";
       stageCopy.textContent = "Listen once. Keep it if that softness is right, or retake it before choosing what happens next.";
     } else {
-      stageBadge.textContent = "Review";
-      stageTitle.textContent = selectedMode ? `Ready to ${MODE_COPY[selectedMode].submitLabel.toLowerCase()}.` : "Listen back, then choose what follows.";
-      stageCopy.textContent = selectedMode
-        ? MODE_COPY[selectedMode].reviewCopy
-        : "Use the preview if you want. Then choose 1, 2, or 3 for the next step.";
+      stageBadge.textContent = intakePaused() ? "Paused" : "Review";
+      stageTitle.textContent = intakePaused()
+        ? "This take is waiting while intake is paused."
+        : (selectedMode ? `Ready to ${MODE_COPY[selectedMode].submitLabel.toLowerCase()}.` : "Listen back, then choose what follows.");
+      stageCopy.textContent = intakePaused()
+        ? "A steward paused intake before this take was submitted. You can keep the screen open or reset for the next person once intake resumes."
+        : (selectedMode
+          ? MODE_COPY[selectedMode].reviewCopy
+          : "Use the preview if you want. Then choose 1, 2, or 3 for the next step.");
     }
     micStatus.textContent = hasMic ? micLabel : "Microphone asleep";
     recStatus.textContent = quietTakeNeedsDecision ? "Very quiet input detected" : (wavBlob ? "Take captured" : "No take captured");
     shortcutHint.textContent = quietTakeNeedsDecision
       ? "Space or Enter: keep this take"
-      : (selectedMode ? "Space or Enter: submit selection" : "Press 1, 2, or 3 to choose a memory mode");
+      : (intakePaused()
+        ? "Submission is paused by the steward"
+        : (selectedMode ? "Space or Enter: submit selection" : "Press 1, 2, or 3 to choose a memory mode"));
     meterText.textContent = quietTakeNeedsDecision ? "Preview this take before deciding" : (hasMic ? "Microphone still armed" : "Microphone asleep");
     setMicCheckStatus(
       quietTakeNeedsDecision ? "Quiet take warning" : (hasMic ? "Mic check complete" : "Mic check asleep"),
@@ -563,6 +639,7 @@ function formatDuration(ms) {
 
 async function armMicrophone() {
   if (flowState === FLOW.ARMING || flowState === FLOW.RECORDING || flowState === FLOW.SUBMITTING) return;
+  if (intakePaused()) return;
 
   roomLoopController.stop("Room loop paused for recording.");
   clearTakeData();
@@ -584,6 +661,7 @@ async function ensureMicrophoneReady() {
 
 async function startRecording() {
   if (flowState !== FLOW.ARMED) return;
+  if (intakePaused()) return;
 
   await ensureMicrophoneReady();
   startCountdown();
@@ -697,6 +775,9 @@ function acknowledgeQuietTake() {
 async function submitCurrentTake() {
   if (!wavBlob || !selectedMode || flowState !== FLOW.REVIEW) {
     return;
+  }
+  if (intakePaused()) {
+    throw new Error("Recording intake is paused by the steward right now.");
   }
 
   submitStatus.textContent = "Submitting...";
@@ -820,7 +901,25 @@ function describeMicError(err) {
 }
 
 function describeSubmitError(err) {
+  if (err && /423/.test(err.message || "")) {
+    return "Recording intake is paused by the steward right now.";
+  }
   return err && err.message ? err.message : "Something went wrong while submitting the take.";
+}
+
+async function refreshSurfaceState() {
+  try {
+    const response = await fetch("/api/v1/surface/state", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`surface state failed (${response.status})`);
+    }
+    const payload = await response.json();
+    surfaceState = {
+      ...surfaceState,
+      ...(payload.operator_state || {}),
+    };
+    render();
+  } catch (err) {}
 }
 
 btnPrimary.addEventListener("click", () => runAction(primaryAction));
@@ -903,10 +1002,15 @@ const roomLoopController = window.MemoryEngineRoomLoop.createController({
 window.addEventListener("beforeunload", () => {
   window.clearInterval(attractInterval);
   window.clearInterval(reviewTimeoutInterval);
+  window.clearInterval(surfaceStateInterval);
   roomLoopController.teardown();
   teardownMicrophone();
 });
 
 hasReceipt = false;
 startAttractLoop();
+void refreshSurfaceState();
+surfaceStateInterval = window.setInterval(() => {
+  void refreshSurfaceState();
+}, SURFACE_STATE_POLL_MS);
 render();

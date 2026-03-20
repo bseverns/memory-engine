@@ -103,7 +103,7 @@ The root URL table lives in `api/memory_engine/urls.py`.
 
 - `/kiosk/` renders the recording station
 - `/room/` renders the dedicated playback surface
-- `/ops/` renders the operator dashboard
+- `/ops/` renders the operator dashboard and sign-in surface
 - `/healthz` reports dependency readiness
 - `/api/v1/...` exposes the kiosk and ops API surface
 
@@ -111,7 +111,7 @@ In the intended field setup:
 
 - the recording machine opens `/kiosk/`
 - the playback machine opens `/room/`
-- the operator machine opens `/ops/`
+- the operator machine opens `/ops/` and signs in with `OPS_SHARED_SECRET`
 
 The app API routes in `api/engine/urls.py` break down into five groups:
 
@@ -124,8 +124,10 @@ The app API routes in `api/engine/urls.py` break down into five groups:
   `/api/v1/revoke`
 - playback and observation
   `/api/v1/pool/next`
+  `/api/v1/surface/state`
   `/api/v1/node/status`
   `/api/v1/healthz`
+  `/api/v1/operator/controls`
 - blob and derivative access
   `/api/v1/blob/<id>/raw`
   `/api/v1/derivatives/spectrograms`
@@ -179,6 +181,22 @@ that derivatives can outlive raw audio when the consent mode allows that.
 
 Records each playback action. Right now the primary use is a lightweight audit
 trail and debugging signal around pool behavior.
+
+### `StewardState`
+
+Stores the current live operator posture for the whole node:
+
+- whether intake is paused
+- whether playback is paused
+- whether quieter mode is active
+
+This is a singleton-style row rather than per-browser state, because the room
+needs all client machines to agree on the same current stewardship posture.
+
+### `StewardAction`
+
+Records each live operator control change with a timestamp, actor label, and a
+small JSON payload describing the change.
 
 The core data shape is:
 
@@ -653,6 +671,18 @@ The HTML dashboard is rendered by Django and hydrated by
 `/api/v1/node/status` every few seconds and classifies the node into `ready`,
 `degraded`, or `broken`.
 
+`/ops/` is no longer a public status page. It now requires the shared steward
+secret from `OPS_SHARED_SECRET`, stores that access in the browser session, and
+then exposes live controls for:
+
+- pausing intake
+- pausing playback
+- switching the playback surface into quieter mode
+
+The kiosk and playback machines do not receive operator access. They poll the
+lighter-weight public endpoint `/api/v1/surface/state` so they can obey the
+current steward posture without seeing the full operator dashboard.
+
 ## Configuration model
 
 The stack is configured almost entirely through environment variables in
@@ -666,6 +696,7 @@ The major groups are:
 - MinIO endpoint and credentials
 - playback and wear tuning
 - room loop tuning
+- steward access and session settings
 - operator warning thresholds
 
 Important design detail: most of these settings are read directly at process
@@ -706,7 +737,8 @@ Use:
 ```
 
 This is the "make this server into a node" path. It creates `.env` if needed,
-replaces obvious development defaults, and can chain into the first deploy.
+replaces obvious development defaults, generates a fresh `OPS_SHARED_SECRET` if
+needed, and can chain into the first deploy.
 
 ### Existing machine update
 

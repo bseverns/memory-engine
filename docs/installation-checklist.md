@@ -62,7 +62,7 @@ assigned the right URL and role.
 - Run `./scripts/check.sh`.
 - Run `./scripts/doctor.sh`.
 - Run `./scripts/status.sh`.
-- Open `/ops/` and confirm the node reports `ready` or an understood `degraded` state.
+- Open `/ops/`, sign in with `OPS_SHARED_SECRET`, and confirm the node reports `ready` or an understood `degraded` state.
 - Confirm there are no critical storage warnings.
 - Confirm there are no unexpected pool warnings before public use.
 - Test one full participant flow: arm, record, review, choose a mode, receive a receipt if applicable.

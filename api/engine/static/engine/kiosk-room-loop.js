@@ -39,6 +39,11 @@
       roomScarcityLowThreshold: 6,
       roomScarcitySevereThreshold: 3,
       roomAntiRepetitionWindowSize: 12,
+      operatorState: {
+        intake_paused: false,
+        playback_paused: false,
+        quieter_mode: false,
+      },
       roomLoopConfig: defaultRoomLoopConfig(),
     };
     if (!el || !el.textContent) {
@@ -194,6 +199,12 @@
     const movementPreset = movementPresets[config.roomMovementPreset]
       || movementPresets.balanced
       || fallbackConfig.movementPresets.balanced;
+    let surfaceState = {
+      intake_paused: false,
+      playback_paused: false,
+      quieter_mode: false,
+      ...(config.operatorState || {}),
+    };
 
     let loopRunning = false;
     let loopScene = null;
@@ -219,6 +230,14 @@
       }
     }
 
+    function quieterModeEnabled() {
+      return Boolean(surfaceState.quieter_mode);
+    }
+
+    function playbackPausedBySteward() {
+      return Boolean(surfaceState.playback_paused);
+    }
+
     function updateButtons() {
       if (startButton) {
         startButton.disabled = loopRunning;
@@ -226,6 +245,18 @@
       if (stopButton) {
         stopButton.disabled = !loopRunning;
       }
+    }
+
+    function applySurfaceGapMultiplier(value) {
+      return value * (quieterModeEnabled() ? 1.18 : 1.0);
+    }
+
+    function applySurfaceToneMultiplier(value) {
+      return value * (quieterModeEnabled() ? 0.72 : 1.0);
+    }
+
+    function surfaceOutputGainMultiplier() {
+      return quieterModeEnabled() ? 0.74 : 1.0;
     }
 
     function startLoopMovement(index) {
@@ -419,6 +450,10 @@
         setStatus("Room loop config is missing.");
         return;
       }
+      if (playbackPausedBySteward()) {
+        setStatus("Playback is paused by the steward.");
+        return;
+      }
 
       loopRunning = true;
       stopMessage = "Stopped";
@@ -442,13 +477,20 @@
         await stopRoomTone();
         return;
       }
-      setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.idleGain, loopKnownPoolSize), 1.0);
+      setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.idleGain, loopKnownPoolSize)), 1.0);
 
       while (loopRunning) {
         try {
+          if (playbackPausedBySteward()) {
+            setStatus("Playback is paused by the steward.");
+            setRoomToneLevel(0.0001, 0.8);
+            await sleep(900);
+            continue;
+          }
+
           const { movement, scene, cue } = nextLoopCue();
           if (cue.pauseMs) {
-            const pauseMultiplier = adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, true);
+            const pauseMultiplier = applySurfaceGapMultiplier(adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, true));
             const scarcityLabel = scarcityProfile(config, loopKnownPoolSize).label;
             setStatus(
               scarcityLabel
@@ -456,7 +498,7 @@
                 : `Holding space in ${movement.name} / ${scene.name}.`,
             );
             setRoomToneLevel(
-              roomToneLevelFor(config, roomIntensity, toneLevelForName(cue.toneLevel), loopKnownPoolSize),
+              applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, toneLevelForName(cue.toneLevel), loopKnownPoolSize)),
               1.4,
             );
             await sleep(Math.round(cue.pauseMs * pauseMultiplier));
@@ -480,13 +522,13 @@
           if (response.status === 204) {
             loopKnownPoolSize = 0;
             setStatus(`No ${mood} ${density} memory available in ${movement.name}. Scarcity mode is holding the room tone.`);
-            setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize), 1.8);
-            await sleep(Math.round(1500 * adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, true)));
+            setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize)), 1.8);
+            await sleep(Math.round(1500 * applySurfaceGapMultiplier(adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, true))));
             continue;
           }
           if (!response.ok) {
             setStatus(`Pool error: ${response.status}`);
-            setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize), 1.4);
+            setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize)), 1.4);
             await sleep(1500);
             continue;
           }
@@ -502,17 +544,19 @@
               ? `Playing ${laneLabel} in ${movement.name} / ${scene.name} (${scarcityLabel} pool, wear ${payload.wear.toFixed(3)})`
               : `Playing ${laneLabel} in ${movement.name} / ${scene.name} (wear ${payload.wear.toFixed(3)})`,
           );
-          setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.duckGain, loopKnownPoolSize), 0.8);
-          await playUrlWithLightChain(payload.audio_url, payload.wear);
+          setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.duckGain, loopKnownPoolSize)), 0.8);
+          await playUrlWithLightChain(payload.audio_url, payload.wear, {
+            outputGainMultiplier: surfaceOutputGainMultiplier(),
+          });
           advanceLoopMovement();
           if (loopRunning) {
-            const gapMultiplier = adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, false);
-            setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.idleGain, loopKnownPoolSize), 1.4);
+            const gapMultiplier = applySurfaceGapMultiplier(adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, false));
+            setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.idleGain, loopKnownPoolSize)), 1.4);
             await sleep(Math.round((cue.gapMs || 900) * gapMultiplier));
           }
         } catch (err) {
           setStatus("Room loop interrupted.");
-          setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize), 1.2);
+          setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize)), 1.2);
           await sleep(1500);
         }
       }
@@ -548,6 +592,12 @@
 
     return {
       start,
+      setSurfaceState(nextState = {}) {
+        surfaceState = {
+          ...surfaceState,
+          ...nextState,
+        };
+      },
       stop,
       teardown,
       isRunning() {

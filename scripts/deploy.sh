@@ -134,6 +134,7 @@ require_not_default() {
 }
 
 require_not_default DJANGO_SECRET_KEY "dev-secret-change-me" "dev-secret"
+require_not_default OPS_SHARED_SECRET "change-me-ops-secret"
 require_not_default POSTGRES_PASSWORD "memory_engine"
 require_not_default MINIO_ROOT_PASSWORD "minioadmin123"
 require_not_default MINIO_SECRET_KEY "minioadmin123"

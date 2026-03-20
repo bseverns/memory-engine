@@ -90,6 +90,7 @@ That is the default conservative path for an existing server. It will:
 6. Run `./scripts/status.sh`.
 
 Then open `/ops/` and confirm the node is `ready` with no critical storage or pool warnings.
+Sign in there with `OPS_SHARED_SECRET`; the dashboard now protects live operator controls behind that shared secret.
 
 That sequence is deliberately conservative. The extra backup step matters more here than squeezing a few seconds out of deploy time.
 
@@ -108,6 +109,7 @@ There are three practical health surfaces:
 - `docker compose ps` tells you whether the containers are running and whether Docker thinks health checks are passing.
 - `/healthz` is the backend readiness view and is the source used by the API container health check.
 - `/ops/` is the human-facing dashboard for steward use during install or troubleshooting.
+- `/ops/` is now the authenticated steward surface. It exposes pause-intake, pause-playback, and quieter-mode controls once the steward secret is accepted.
 
 Expected healthy services:
 
@@ -198,6 +200,10 @@ docker compose exec -T api curl -fsS http://localhost:8000/healthz
 If you want to inspect the MinIO console directly on the server, use `http://127.0.0.1:9001` locally on that machine or tunnel it over SSH.
 
 ## Common operator failure modes
+
+### `/ops/` loads a sign-in page, but the secret never works
+
+Check `OPS_SHARED_SECRET` in `.env`, then redeploy. `scripts/first_boot.sh` now generates that value automatically if it is still a placeholder.
 
 ### The site loads but recording will not start
 

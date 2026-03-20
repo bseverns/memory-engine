@@ -3,6 +3,7 @@
   const stopButton = document.getElementById("btnPlaybackStop");
   const statusEl = document.getElementById("playbackStatus");
   const autostartNote = document.getElementById("playbackAutostartNote");
+  const SURFACE_STATE_POLL_MS = 5000;
 
   if (!startButton || !stopButton || !statusEl || !autostartNote) {
     return;
@@ -14,12 +15,50 @@
     statusEl,
     playUrlWithLightChain: global.MemoryEngineKioskAudio.playUrlWithLightChain,
   });
+  let autostartRequested = false;
+  let surfaceStateInterval = 0;
 
   function updateSurfaceNote(message) {
     autostartNote.textContent = message;
   }
 
+  async function refreshSurfaceState() {
+    try {
+      const response = await fetch("/api/v1/surface/state", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`Surface state failed (${response.status})`);
+      }
+      const payload = await response.json();
+      const operatorState = payload.operator_state || {};
+      roomLoopController.setSurfaceState(operatorState);
+
+      if (operatorState.playback_paused) {
+        roomLoopController.stop("Playback paused by steward.");
+        updateSurfaceNote("Playback is paused by the steward on this machine.");
+        statusEl.textContent = operatorState.quieter_mode
+          ? "Playback is paused by steward. Quieter mode will still apply when playback resumes."
+          : "Playback is paused by steward.";
+        return;
+      }
+
+      if (operatorState.quieter_mode) {
+        updateSurfaceNote("Quieter mode is active on this listening surface.");
+      } else if (roomLoopController.isRunning()) {
+        updateSurfaceNote("Playback is running here. Recording stays on the separate kiosk.");
+      }
+
+      if (autostartRequested && !roomLoopController.isRunning()) {
+        requestPlaybackStart(false);
+      }
+    } catch (error) {
+      if (!roomLoopController.isRunning()) {
+        updateSurfaceNote("Unable to refresh steward controls right now.");
+      }
+    }
+  }
+
   function requestPlaybackStart(userInitiated) {
+    autostartRequested = true;
     updateSurfaceNote(
       userInitiated
         ? "Starting playback on the listening surface..."
@@ -49,6 +88,7 @@
   });
 
   stopButton.addEventListener("click", () => {
+    autostartRequested = false;
     roomLoopController.stop("Playback paused.");
     updateSurfaceNote("Playback paused on this surface.");
   });
@@ -62,12 +102,14 @@
 
     if (event.code === "Escape") {
       event.preventDefault();
+      autostartRequested = false;
       roomLoopController.stop("Playback paused.");
       updateSurfaceNote("Playback paused on this surface.");
     }
   });
 
   global.addEventListener("beforeunload", () => {
+    global.clearInterval(surfaceStateInterval);
     roomLoopController.teardown();
   });
 
@@ -75,7 +117,12 @@
   if (params.get("autostart") !== "0") {
     requestPlaybackStart(false);
   } else {
+    autostartRequested = false;
     updateSurfaceNote("Autostart disabled for this visit. Tap Start listening when ready.");
     statusEl.textContent = "Ready to start room playback.";
   }
+  void refreshSurfaceState();
+  surfaceStateInterval = global.setInterval(() => {
+    void refreshSurfaceState();
+  }, SURFACE_STATE_POLL_MS);
 }(window));

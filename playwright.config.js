@@ -46,7 +46,7 @@ module.exports = defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "PATH=\"$(pwd)/.venv/bin:$PATH\" python api/manage.py runserver 127.0.0.1:8000 --settings memory_engine.settings_browser",
+    command: "/bin/sh -c 'PATH=\"$(pwd)/.venv/bin:$PATH\" python api/manage.py migrate --noinput --settings memory_engine.settings_browser && PATH=\"$(pwd)/.venv/bin:$PATH\" python api/manage.py runserver 127.0.0.1:8000 --noreload --settings memory_engine.settings_browser'",
     url: "http://127.0.0.1:8000/kiosk/",
     reuseExistingServer: true,
     stdout: "pipe",

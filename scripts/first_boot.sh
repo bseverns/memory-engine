@@ -102,6 +102,7 @@ ensure_secret() {
 }
 
 ensure_secret DJANGO_SECRET_KEY "dev-secret-change-me" "dev-secret"
+ensure_secret OPS_SHARED_SECRET "change-me-ops-secret"
 ensure_secret POSTGRES_PASSWORD "memory_engine"
 ensure_secret MINIO_ROOT_PASSWORD "minioadmin123"
 ensure_secret MINIO_SECRET_KEY "minioadmin123"

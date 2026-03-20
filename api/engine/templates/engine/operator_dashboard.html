@@ -86,18 +86,67 @@
     <section class="panel dashboard-panel">
       <div class="panel-head">
         <div>
+          <p class="section-kicker">Steward controls</p>
+          <h3>Live machine posture</h3>
+        </div>
+      </div>
+      <form id="opsControlsForm" class="ops-controls-form">
+        <label class="ops-toggle">
+          <input id="opsIntakePaused" type="checkbox" name="intake_paused"/>
+          <span>
+            <strong>Pause intake</strong>
+            <span>Stops new recordings from being saved until intake resumes.</span>
+          </span>
+        </label>
+        <label class="ops-toggle">
+          <input id="opsPlaybackPaused" type="checkbox" name="playback_paused"/>
+          <span>
+            <strong>Pause playback</strong>
+            <span>Lets the room fall silent without shutting the stack down.</span>
+          </span>
+        </label>
+        <label class="ops-toggle">
+          <input id="opsQuieterMode" type="checkbox" name="quieter_mode"/>
+          <span>
+            <strong>Quieter mode</strong>
+            <span>Softens room-level playback and leaves more breathing space between memories.</span>
+          </span>
+        </label>
+        <div class="shortcut-row">
+          <button id="opsControlsSave" type="submit" class="btn">Apply controls</button>
+          <span id="opsControlStatus" class="shortcut">Controls are loading.</span>
+        </div>
+      </form>
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">Recent steward actions</p>
+          <h3>Last control changes</h3>
+        </div>
+      </div>
+      <div id="opsRecentActions" class="component-list"></div>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
           <p class="section-kicker">Shortcuts</p>
           <h3>Operator links</h3>
         </div>
       </div>
       <div class="shortcut-row">
         <a class="btn secondary link-btn" href="/kiosk/">Open kiosk</a>
+        <a class="btn secondary link-btn" href="/room/">Open room playback</a>
         <a class="btn secondary link-btn" href="/admin/">Open admin</a>
         <a class="btn secondary link-btn" href="/api/v1/node/status">Raw node status</a>
+        <form action="/ops/logout/" method="post" class="inline-form">
+          {% csrf_token %}
+          <button class="btn secondary" type="submit">Log out</button>
+        </form>
       </div>
     </section>
   </div>
 
+  {{ operator_state|json_script:"ops-operator-state" }}
   <script src="/static/engine/operator-dashboard.js"></script>
   <script>
     window.MemoryEngineOperatorDashboard.start();

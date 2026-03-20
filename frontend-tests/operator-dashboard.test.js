@@ -40,3 +40,18 @@ test("warningCards yields a default ready card when there are no warnings", () =
   assert.equal(cards[0].className, "component-card ready");
   assert.equal(cards[0].title, "No current warnings");
 });
+
+test("actionCards formats recent steward changes", () => {
+  const cards = operatorDashboard.actionCards([
+    {
+      action: "intake_paused.enabled",
+      actor: "operator@127.0.0.1",
+      detail: "intake paused enabled",
+      created_at: "2026-03-20T10:00:00Z",
+    },
+  ]);
+
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].title, "intake paused enabled");
+  assert.match(cards[0].detail, /operator@127\.0\.0\.1/);
+});
