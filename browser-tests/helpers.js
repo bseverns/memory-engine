@@ -99,22 +99,18 @@ function fossilDataUrl(label = "Fossil Drift") {
 }
 
 async function mockSpectrograms(target) {
-  await target.route("**/api/v1/derivatives/spectrograms", async (route) => {
+  await target.route("**/api/v1/surface/fossils/**", async (route) => {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify([
         {
-          id: 1,
-          artifact_id: 18,
-          kind: "spectrogram_png",
           created_at: "2026-03-20T14:00:00Z",
+          title: "Fossil drift",
           image_url: fossilDataUrl("Fossil 18"),
         },
         {
-          id: 2,
-          artifact_id: 14,
-          kind: "spectrogram_png",
           created_at: "2026-03-18T10:30:00Z",
+          title: "Fossil drift",
           image_url: fossilDataUrl("Fossil 14"),
         },
       ]),

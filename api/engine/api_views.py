@@ -13,6 +13,17 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from .consent import consent_manifest, default_node_from_env, hash_token, make_revocation_token
+from .media_access import (
+    PURPOSE_EPHEMERAL_AUDIO,
+    PURPOSE_POOL_AUDIO,
+    PURPOSE_SPECTROGRAM_IMAGE,
+    PURPOSE_SURFACE_FOSSILS,
+    build_media_token,
+    media_raw_url,
+    media_spectrogram_url,
+    read_media_token,
+    read_surface_token,
+)
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative
 from .operator_auth import operator_secret_configured, operator_session_active
 from .ops import disk_status, health_component_status, pool_warnings, retention_summary
@@ -85,6 +96,40 @@ def artifact_latest_spectrogram(artifact: Artifact, now):
         kind=Derivative.KIND_SPECTROGRAM_PNG,
         expires_at__gt=now,
     ).order_by("-created_at").first()
+
+
+def playable_artifact_or_404(artifact_id: int, now):
+    artifact = Artifact.objects.prefetch_related("derivative_set").filter(id=int(artifact_id)).first()
+    if not artifact:
+        raise Http404("Artifact not found")
+    if not playable_artifact_queryset(now).filter(id=artifact.id).exists():
+        raise Http404("No playable audio")
+    return artifact
+
+
+def spectrogram_derivative_or_404(artifact_id: int, now):
+    try:
+        artifact = Artifact.objects.get(id=int(artifact_id))
+    except Artifact.DoesNotExist:
+        raise Http404("Artifact not found")
+    if artifact.status != Artifact.STATUS_ACTIVE:
+        raise Http404("No spectrogram available")
+    derivative = artifact_latest_spectrogram(artifact, now)
+    if not derivative:
+        raise Http404("No spectrogram available")
+    return artifact, derivative
+
+
+def serialize_surface_spectrogram(derivative: Derivative) -> dict:
+    token = build_media_token(
+        purpose=PURPOSE_SPECTROGRAM_IMAGE,
+        artifact_id=derivative.artifact_id,
+    )
+    return {
+        "created_at": derivative.created_at,
+        "image_url": media_spectrogram_url(token),
+        "title": "Fossil drift",
+    }
 
 
 @api_view(["POST"])
@@ -175,12 +220,18 @@ def create_ephemeral_audio(request):
 
     consume_token = secrets.token_urlsafe(16)
     consent.json["consume_token_hash"] = hash_token(consume_token)
+    consent.json["ephemeral_access_hash"] = hash_token(consume_token)
     consent.save(update_fields=["json"])
 
     return Response({
         "artifact_id": artifact.id,
-        "play_url": f"/api/v1/blob/{artifact.id}/raw",
-        "consume_token": consume_token,
+        "play_url": media_raw_url(
+            build_media_token(
+                purpose=PURPOSE_EPHEMERAL_AUDIO,
+                artifact_id=artifact.id,
+                nonce=consume_token,
+            ),
+        ),
     }, status=201)
 
 
@@ -335,7 +386,12 @@ def pool_next(request):
         "featured_return": featured_return,
         "play_count": artifact.play_count,
         "pool_size": playable_count,
-        "audio_url": f"/api/v1/blob/{artifact.id}/raw",
+        "audio_url": media_raw_url(
+            build_media_token(
+                purpose=PURPOSE_POOL_AUDIO,
+                artifact_id=artifact.id,
+            ),
+        ),
         "expires_at": artifact.expires_at,
     })
 
@@ -463,30 +519,64 @@ def operator_controls(request):
     })
 
 
-def blob_proxy_raw(request, artifact_id: int):
-    try:
-        artifact = Artifact.objects.get(id=int(artifact_id))
-    except Artifact.DoesNotExist:
-        raise Http404("Artifact not found")
-    media_key = artifact_playback_key(artifact, timezone.now())
-    if not media_key:
-        raise Http404("No playable audio")
-    stream, content_type = stream_key(media_key)
+def media_proxy_raw(request, access_token: str):
+    token_payload = read_media_token(access_token)
+    if not token_payload:
+        raise Http404("Media token not found")
+
+    purpose = str(token_payload.get("purpose") or "")
+    artifact_id = token_payload.get("artifact_id")
+    if not artifact_id:
+        raise Http404("Media token is incomplete")
+
+    now = timezone.now()
+    if purpose == PURPOSE_POOL_AUDIO:
+        artifact = playable_artifact_or_404(int(artifact_id), now)
+        media_key = artifact_playback_key(artifact, now)
+        if not media_key:
+            raise Http404("No playable audio")
+        stream, content_type = stream_key(media_key)
+    elif purpose == PURPOSE_EPHEMERAL_AUDIO:
+        nonce = str(token_payload.get("nonce") or "")
+        if not nonce:
+            raise Http404("Media token is incomplete")
+        with transaction.atomic():
+            try:
+                artifact = Artifact.objects.select_for_update().select_related("consent").get(id=int(artifact_id))
+            except Artifact.DoesNotExist:
+                raise Http404("Artifact not found")
+            if artifact.status != Artifact.STATUS_EPHEMERAL or not artifact.raw_uri:
+                raise Http404("No playable audio")
+            expected = artifact.consent.json.get("ephemeral_access_hash")
+            if not expected or hash_token(nonce) != expected:
+                raise Http404("No playable audio")
+            media_key = artifact.raw_uri
+            stream, content_type = stream_key(media_key)
+            artifact.status = Artifact.STATUS_REVOKED
+            artifact.raw_uri = ""
+            artifact.save(update_fields=["status", "raw_uri"])
+            artifact.consent.json.pop("ephemeral_access_hash", None)
+            artifact.consent.save(update_fields=["json"])
+        try:
+            delete_key(media_key)
+        except Exception:
+            pass
+    else:
+        raise Http404("Media token not found")
+
     response = FileResponse(stream, content_type=content_type)
     response["Cache-Control"] = "no-store"
     return response
 
 
-def blob_proxy_spectrogram(request, artifact_id: int):
-    try:
-        artifact = Artifact.objects.get(id=int(artifact_id))
-    except Artifact.DoesNotExist:
-        raise Http404("Artifact not found")
-
-    derivative = artifact_latest_spectrogram(artifact, timezone.now())
-    if not derivative:
-        raise Http404("No spectrogram available")
-
+def media_proxy_spectrogram(request, access_token: str):
+    token_payload = read_media_token(access_token)
+    if not token_payload or str(token_payload.get("purpose") or "") != PURPOSE_SPECTROGRAM_IMAGE:
+        raise Http404("Media token not found")
+    artifact_id = token_payload.get("artifact_id")
+    if not artifact_id:
+        raise Http404("Media token is incomplete")
+    _, derivative = spectrogram_derivative_or_404(int(artifact_id), timezone.now())
     stream, content_type = stream_key(derivative.uri)
     response = FileResponse(stream, content_type=content_type)
     response["Cache-Control"] = "no-store"
@@ -495,14 +585,43 @@ def blob_proxy_spectrogram(request, artifact_id: int):
 
 @api_view(["GET"])
 def list_spectrograms(request):
-    queryset = Derivative.objects.filter(kind="spectrogram_png").order_by("-created_at")[:50]
+    if not operator_session_active(request):
+        return operator_api_denied()
+
+    queryset = Derivative.objects.filter(
+        kind=Derivative.KIND_SPECTROGRAM_PNG,
+    ).select_related("artifact").order_by("-created_at")[:50]
     now = timezone.now()
     return Response([
         {
             **DerivativeSerializer(derivative).data,
-            "image_url": f"/api/v1/blob/{derivative.artifact_id}/spectrogram",
+            "image_url": media_spectrogram_url(
+                build_media_token(
+                    purpose=PURPOSE_SPECTROGRAM_IMAGE,
+                    artifact_id=derivative.artifact_id,
+                ),
+            ),
             "is_expired": bool(derivative.expires_at and derivative.expires_at <= now),
         }
+        for derivative in queryset
+        if derivative.artifact.status == Artifact.STATUS_ACTIVE
+        and (not derivative.expires_at or derivative.expires_at > now)
+    ])
+
+
+@api_view(["GET"])
+def surface_fossils(request, access_token: str):
+    token_payload = read_surface_token(access_token)
+    if not token_payload or str(token_payload.get("purpose") or "") != PURPOSE_SURFACE_FOSSILS:
+        raise Http404("Surface feed not found")
+
+    now = timezone.now()
+    queryset = Derivative.objects.filter(
+        kind=Derivative.KIND_SPECTROGRAM_PNG,
+        artifact__status=Artifact.STATUS_ACTIVE,
+    ).select_related("artifact").order_by("-created_at")[:12]
+    return Response([
+        serialize_surface_spectrogram(derivative)
         for derivative in queryset
         if not derivative.expires_at or derivative.expires_at > now
     ])

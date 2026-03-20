@@ -32,6 +32,7 @@ class PoolBehaviorTests(EngineTestCase):
         self.assertEqual(payload["artifact_id"], artifact.id)
         self.assertTrue(payload["playback_windowed"])
         self.assertEqual(payload["playback_duration_ms"], 45000)
+        self.assertTrue(payload["audio_url"].startswith("/api/v1/media/raw/"))
         self.assertGreaterEqual(payload["playback_start_ms"], 0)
         self.assertLessEqual(payload["playback_start_ms"], artifact.duration_ms - payload["playback_duration_ms"])
         self.assertEqual(payload["playback_revolution_seconds"], 300)

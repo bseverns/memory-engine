@@ -9,9 +9,10 @@ urlpatterns = [
     path("revoke", api_views.revoke),
     path("pool/next", api_views.pool_next),
     path("surface/state", api_views.surface_state),
+    path("surface/fossils/<str:access_token>", api_views.surface_fossils),
     path("node/status", api_views.node_status),
     path("operator/controls", api_views.operator_controls),
-    path("blob/<int:artifact_id>/raw", api_views.blob_proxy_raw),
-    path("blob/<int:artifact_id>/spectrogram", api_views.blob_proxy_spectrogram),
+    path("media/raw/<str:access_token>", api_views.media_proxy_raw),
+    path("media/spectrogram/<str:access_token>", api_views.media_proxy_spectrogram),
     path("derivatives/spectrograms", api_views.list_spectrograms),
 ]

@@ -97,7 +97,7 @@
       return "Waiting for recent fossils.";
     }
     const createdAt = entry.created_at ? new Date(entry.created_at).toLocaleString() : "Unknown time";
-    return `Recent fossil ${entry.artifact_id} · ${createdAt}`;
+    return `${entry.title || "Recent fossil drift"} · ${createdAt}`;
   }
 
   async function refreshFossilVisuals() {
@@ -107,7 +107,12 @@
     }
     renderFossilVisualsEnabled(true);
     try {
-      const response = await fetch("/api/v1/derivatives/spectrograms", { cache: "no-store" });
+      const feedUrl = String(config.surfaceFossilFeedUrl || "").trim();
+      if (!feedUrl) {
+        renderNoFossilVisuals("Fossil visuals are not configured for this surface.");
+        return;
+      }
+      const response = await fetch(feedUrl, { cache: "no-store" });
       if (!response.ok) {
         throw new Error(`Fossil visuals failed (${response.status})`);
       }
@@ -128,7 +133,7 @@
         fossilImage.src = entry.image_url;
       }
       if (fossilTitle) {
-        fossilTitle.textContent = `Fossil ${entry.artifact_id}`;
+        fossilTitle.textContent = entry.title || "Fossil drift";
       }
       if (fossilMeta) {
         fossilMeta.textContent = describeFossilEntry(entry);

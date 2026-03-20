@@ -2,6 +2,7 @@ from django.conf import settings
 from django.shortcuts import redirect
 from django.shortcuts import render
 
+from .media_access import PURPOSE_SURFACE_FOSSILS, build_surface_token, surface_fossils_url
 from .operator_auth import (
     authenticate_operator_secret,
     end_operator_session,
@@ -58,6 +59,10 @@ def room_surface_config():
         "roomOverlapMaxDelayMs": int(settings.ROOM_OVERLAP_MAX_DELAY_MS),
         "roomOverlapGainMultiplier": float(settings.ROOM_OVERLAP_GAIN_MULTIPLIER),
         "roomFossilVisualsEnabled": bool(settings.ROOM_FOSSIL_VISUALS_ENABLED),
+        "surfaceFossilFeedUrl": (
+            surface_fossils_url(build_surface_token(purpose=PURPOSE_SURFACE_FOSSILS))
+            if bool(settings.ROOM_FOSSIL_VISUALS_ENABLED) else ""
+        ),
         "operatorState": steward_state_payload(),
         "roomLoopConfig": ROOM_LOOP_CONFIG,
     }

@@ -656,18 +656,6 @@ async function submitNoSave() {
 
   await playUrlWithLightChain(payload.play_url, 0.0);
 
-  const consumeRes = await fetch("/api/v1/ephemeral/consume", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      artifact_id: payload.artifact_id,
-      consume_token: payload.consume_token,
-    }),
-  });
-  if (!consumeRes.ok) {
-    throw new Error(`Discard failed (${consumeRes.status})`);
-  }
-
   submitStatus.textContent = modeCopy("NOSAVE").completeStatus;
 }
 

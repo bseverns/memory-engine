@@ -128,11 +128,13 @@ The app API routes in `api/engine/urls.py` break down into five groups:
 - playback and observation
   `/api/v1/pool/next`
   `/api/v1/surface/state`
+  `/api/v1/surface/fossils/<token>`
   `/api/v1/node/status`
   `/api/v1/healthz`
   `/api/v1/operator/controls`
 - blob and derivative access
-  `/api/v1/blob/<id>/raw`
+  `/api/v1/media/raw/<token>`
+  `/api/v1/media/spectrogram/<token>`
   `/api/v1/derivatives/spectrograms`
 
 ## Data model
@@ -394,16 +396,23 @@ stateDiagram-v2
 
 The browser does not talk to MinIO directly.
 
-`GET /api/v1/blob/<artifact_id>/raw` in `api/engine/api_views.py` resolves the
-best playable media for that artifact, preferring the raw WAV when it still
-exists and falling back to `essence_wav` when the raw fossil has expired. It
-then opens the object stream through `storage.stream_key` and returns it as a
-Django `FileResponse` with `Cache-Control: no-store`.
+`GET /api/v1/media/raw/<token>` in `api/engine/api_views.py` resolves the best
+playable media for the signed artifact token, preferring the raw WAV when it
+still exists and falling back to `essence_wav` when the raw fossil has
+expired. It then opens the object stream through `storage.stream_key` and
+returns it as a Django `FileResponse` with `Cache-Control: no-store`.
+
+Important boundary change:
+
+- raw and spectrogram media are no longer served as public artifact-ID routes
+- `/api/v1/pool/next` now mints short-lived media URLs for room playback
+- the public room visuals feed uses its own signed surface token
+- `/api/v1/derivatives/spectrograms` is now an operator-only inventory view
 
 This keeps the browser-facing trust model simple:
 
 - no MinIO bucket is made public
-- no presigned URLs are needed
+- no direct MinIO URLs are needed
 - no browser CORS configuration is required
 - access policy remains centralized in Django
 
@@ -498,7 +507,7 @@ sequenceDiagram
     API->>DB: update play_count, wear, last_access_at
     API-->>Loop: artifact_id, wear, audio_url, pool_size
     Loop->>Local: persist selected artifact_id
-    Loop->>Blob: GET /blob/<id>/raw
+    Loop->>Blob: GET /media/raw/<token>
     Blob->>MinIO: stream raw WAV or essence residue
     MinIO-->>Blob: playable audio stream
     Blob-->>Loop: no-store audio response

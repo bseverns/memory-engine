@@ -6,6 +6,11 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 
 from .base import EngineTestCase
+from ..media_access import (
+    PURPOSE_POOL_AUDIO,
+    PURPOSE_SPECTROGRAM_IMAGE,
+    build_media_token,
+)
 from ..models import AccessEvent, Artifact, ConsentManifest, Derivative, StewardAction
 
 
@@ -46,10 +51,12 @@ class ArtifactBehaviorTests(EngineTestCase):
         delay_mock.assert_called_once_with(artifact.id)
         essence_mock.assert_called_once_with(artifact.id)
 
+    @patch("engine.api_views.stream_key")
     @patch("engine.api_views.delete_key")
     @patch("engine.api_views.put_bytes")
-    def test_ephemeral_audio_can_be_consumed_and_revoked(self, put_bytes_mock, delete_key_mock):
+    def test_ephemeral_audio_can_be_consumed_and_revoked(self, put_bytes_mock, delete_key_mock, stream_key_mock):
         upload = SimpleUploadedFile("audio.wav", b"RIFFtest-ephemeral", content_type="audio/wav")
+        stream_key_mock.return_value = (io.BytesIO(b"RIFFtest-ephemeral"), "audio/wav")
 
         create_response = self.client.post(
             "/api/v1/ephemeral/audio",
@@ -62,20 +69,21 @@ class ArtifactBehaviorTests(EngineTestCase):
         self.assertEqual(artifact.status, Artifact.STATUS_EPHEMERAL)
         put_bytes_mock.assert_called_once()
 
-        consume_response = self.client.post(
-            "/api/v1/ephemeral/consume",
-            data={
-                "artifact_id": artifact.id,
-                "consume_token": payload["consume_token"],
-            },
-            content_type="application/json",
-        )
+        consume_response = self.client.get(payload["play_url"])
 
         self.assertEqual(consume_response.status_code, 200)
         artifact.refresh_from_db()
         self.assertEqual(artifact.status, Artifact.STATUS_REVOKED)
         self.assertEqual(artifact.raw_uri, "")
+        stream_key_mock.assert_called_once_with(f"ephemeral/{artifact.id}/audio.wav")
         delete_key_mock.assert_called_once_with(f"ephemeral/{artifact.id}/audio.wav")
+
+    def test_raw_media_route_rejects_direct_access_without_token(self):
+        artifact = self.make_active_artifact(raw_uri="raw/private.wav")
+
+        response = self.client.get(f"/api/v1/media/raw/{artifact.id}")
+
+        self.assertEqual(response.status_code, 404)
 
     @patch("engine.api_views.delete_key")
     def test_revoke_token_revokes_artifacts_and_derivatives(self, delete_key_mock):
@@ -113,8 +121,9 @@ class ArtifactBehaviorTests(EngineTestCase):
             expires_at=timezone.now() + timedelta(days=30),
         )
         stream_key_mock.return_value = (io.BytesIO(b"RIFFessence"), "audio/wav")
+        access_token = build_media_token(purpose=PURPOSE_POOL_AUDIO, artifact_id=artifact.id)
 
-        response = self.client.get(f"/api/v1/blob/{artifact.id}/raw")
+        response = self.client.get(f"/api/v1/media/raw/{access_token}")
 
         self.assertEqual(response.status_code, 200)
         stream_key_mock.assert_called_once_with("derivatives/1/essence.wav")
@@ -177,7 +186,7 @@ class ArtifactBehaviorTests(EngineTestCase):
         self.assertEqual(response.json()["artifact_id"], artifact.id)
 
     @patch("engine.api_views.stream_key")
-    def test_spectrogram_list_and_blob_proxy_expose_public_visual_url(self, stream_key_mock):
+    def test_operator_spectrogram_list_and_tokenized_blob_proxy_work(self, stream_key_mock):
         artifact = self.make_active_artifact(
             raw_uri="raw/fossil.wav",
             created_at=timezone.now() - timedelta(days=3),
@@ -190,15 +199,54 @@ class ArtifactBehaviorTests(EngineTestCase):
         )
         stream_key_mock.return_value = (io.BytesIO(b"PNG"), "image/png")
 
+        denied = self.client.get("/api/v1/derivatives/spectrograms")
+        self.assertEqual(denied.status_code, 403)
+
+        self.login_operator()
         listing = self.client.get("/api/v1/derivatives/spectrograms")
 
         self.assertEqual(listing.status_code, 200)
-        self.assertEqual(listing.json()[0]["image_url"], f"/api/v1/blob/{artifact.id}/spectrogram")
+        image_url = listing.json()[0]["image_url"]
+        self.assertTrue(image_url.startswith("/api/v1/media/spectrogram/"))
 
-        blob = self.client.get(f"/api/v1/blob/{artifact.id}/spectrogram")
+        blob = self.client.get(image_url)
 
         self.assertEqual(blob.status_code, 200)
         stream_key_mock.assert_called_once_with("derivatives/fossil/spectrogram.png")
+
+    def test_public_surface_fossil_feed_omits_artifact_ids(self):
+        artifact = self.make_active_artifact(
+            raw_uri="raw/fossil.wav",
+            created_at=timezone.now() - timedelta(days=3),
+        )
+        Derivative.objects.create(
+            artifact=artifact,
+            kind=Derivative.KIND_SPECTROGRAM_PNG,
+            uri="derivatives/fossil/spectrogram.png",
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+
+        from ..media_access import PURPOSE_SURFACE_FOSSILS, build_surface_token
+
+        token = build_surface_token(purpose=PURPOSE_SURFACE_FOSSILS)
+        response = self.client.get(f"/api/v1/surface/fossils/{token}")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()[0]
+        self.assertNotIn("artifact_id", payload)
+        self.assertIn("/api/v1/media/spectrogram/", payload["image_url"])
+
+    @patch("engine.api_views.stream_key")
+    def test_pool_audio_token_fails_for_revoked_artifact(self, stream_key_mock):
+        artifact = self.make_active_artifact(raw_uri="raw/private.wav")
+        artifact.status = Artifact.STATUS_REVOKED
+        artifact.save(update_fields=["status"])
+        access_token = build_media_token(purpose=PURPOSE_POOL_AUDIO, artifact_id=artifact.id)
+
+        response = self.client.get(f"/api/v1/media/raw/{access_token}")
+
+        self.assertEqual(response.status_code, 404)
+        stream_key_mock.assert_not_called()
 
     def test_pool_next_advances_wear_and_honors_excluded_ids_when_possible(self):
         consent = self.make_consent("ROOM")
