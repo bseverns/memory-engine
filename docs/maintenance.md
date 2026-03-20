@@ -13,7 +13,7 @@ Bootstrap a new server:
 Re-deploy after code or config changes:
 
 ```bash
-./scripts/deploy.sh --public-host 203.0.113.10
+./scripts/update.sh --public-host 203.0.113.10
 ```
 
 Run the fast repo checks before deploy:
@@ -63,7 +63,9 @@ Restore a backup:
 
 - `scripts/first_boot.sh` creates `.env` if needed, replaces development defaults, and optionally chains into deployment.
 - `scripts/deploy.sh` writes host and TLS settings into `.env`, refuses obvious development secrets, and runs compose.
+- `scripts/update.sh` is the normal existing-server path: fast-forward pull, checks, doctor, backup, deploy, and final status.
 - `scripts/check.sh` is the quick sanity pass for browser JavaScript syntax, frontend smoke tests, Python, the Django behavior suite, shell syntax, and `git diff --check`.
+- `.github/workflows/check.yml` runs that same `scripts/check.sh` gate in GitHub Actions using a repo-local `.venv`, so CI stays aligned with the local check path.
 - `scripts/doctor.sh` checks `.env`, compose state, MinIO reachability through `/healthz`, and browser/TLS constraints that affect recording.
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.
@@ -74,16 +76,30 @@ Restore a backup:
 
 For a normal update on an existing server:
 
-1. Pull the latest repo state.
-2. Review `.env` if the change introduces new settings.
-3. Run `./scripts/check.sh`.
-4. Run `./scripts/doctor.sh`.
-5. Run `./scripts/backup.sh`.
-6. Run `./scripts/deploy.sh --public-host ...`.
-7. Run `./scripts/status.sh`.
-8. Open `/ops/` and confirm the node is `ready` with no critical storage or pool warnings.
+```bash
+./scripts/update.sh --public-host memory.example.com
+```
+
+That is the default conservative path for an existing server. It will:
+
+1. Fast-forward pull the current branch from `origin`.
+2. Run `./scripts/check.sh`.
+3. Run `./scripts/doctor.sh`.
+4. Run `./scripts/backup.sh`.
+5. Run `./scripts/deploy.sh --public-host ...`.
+6. Run `./scripts/status.sh`.
+
+Then open `/ops/` and confirm the node is `ready` with no critical storage or pool warnings.
 
 That sequence is deliberately conservative. The extra backup step matters more here than squeezing a few seconds out of deploy time.
+
+If you need to skip one phase intentionally:
+
+```bash
+./scripts/update.sh --public-host memory.example.com --skip-pull
+./scripts/update.sh --public-host memory.example.com --skip-backup
+./scripts/update.sh --public-host 203.0.113.10 --tls internal
+```
 
 ## Health and readiness
 

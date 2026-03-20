@@ -65,6 +65,29 @@ What the script does:
 - refuses to deploy if obvious dev secrets are still unchanged
 - runs `docker compose up --build -d`
 
+For a server that is already bootstrapped and just needs the usual
+`pull -> test -> backup -> deploy -> status` cycle, use:
+
+```bash
+./scripts/update.sh --public-host memory.example.com
+```
+
+That wrapper will:
+- fast-forward pull the current branch from `origin`
+- run `./scripts/check.sh`
+- run `./scripts/doctor.sh`
+- create a backup
+- deploy the stack
+- print final status and readiness
+
+Useful flags:
+
+```bash
+./scripts/update.sh --public-host memory.example.com --skip-pull
+./scripts/update.sh --public-host 203.0.113.10 --tls internal
+./scripts/update.sh --public-host memory.example.com --branch main
+```
+
 Backup and restore helpers are included for operators:
 
 ```bash
@@ -79,6 +102,10 @@ Fast maintenance helpers are also included:
 ./scripts/status.sh
 ./scripts/doctor.sh
 ```
+
+GitHub Actions runs that same `./scripts/check.sh` gate from a repo-local
+`.venv`, so CI matches the local maintenance path instead of using a different
+test command.
 
 Longer operator notes live in `docs/maintenance.md`.
 That includes a MinIO section covering which credentials live where, what is set before first deploy, and how manual MinIO provisioning changes the `.env` values.
@@ -200,6 +227,7 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 - `scripts/check.sh` — browser syntax, frontend smoke tests, Django behavior tests, and patch-hygiene validation
 - `scripts/doctor.sh` — operator-focused env, compose, storage, and browser-constraint checks
 - `scripts/deploy.sh` — server-side deploy helper for IP-now / domain-later rollout
+- `scripts/update.sh` — server-side pull, verify, backup, deploy, and status helper for existing installs
 - `scripts/first_boot.sh` — bootstrap strong secrets and node identity before deployment
 - `scripts/backup.sh` — snapshot Postgres + MinIO data
 - `scripts/restore.sh` — restore Postgres + MinIO data from a backup folder
