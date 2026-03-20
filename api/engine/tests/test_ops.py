@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.test import override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 
@@ -30,6 +31,27 @@ class OperatorBehaviorTests(EngineTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Steward sign-in")
+
+    @override_settings(OPS_ALLOWED_NETWORKS=["10.0.0.0/8"])
+    def test_operator_dashboard_denies_requests_outside_allowed_networks(self):
+        response = self.client.get("/ops/", REMOTE_ADDR="127.0.0.1")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, "network is not allowed", status_code=403)
+
+    @override_settings(OPS_LOGIN_MAX_ATTEMPTS=1, OPS_LOGIN_LOCKOUT_SECONDS=60)
+    def test_operator_login_locks_after_failed_attempt(self):
+        response = self.client.post("/ops/", {"secret": "wrong-secret"}, REMOTE_ADDR="127.0.0.1")
+
+        self.assertEqual(response.status_code, 429)
+        self.assertContains(response, "Too many failed sign-in attempts", status_code=429)
+
+    def test_operator_session_invalidates_when_client_binding_changes(self):
+        self.client.post("/ops/", {"secret": "test-ops-secret"}, REMOTE_ADDR="127.0.0.1", HTTP_USER_AGENT="browser-a")
+
+        response = self.client.get("/api/v1/node/status", REMOTE_ADDR="127.0.0.1", HTTP_USER_AGENT="browser-b")
+
+        self.assertEqual(response.status_code, 403)
 
     def test_operator_controls_toggle_persisted_state_and_audit(self):
         self.login_operator()

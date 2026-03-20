@@ -11,7 +11,7 @@
     <header class="hero">
       <p class="eyebrow">Operator access</p>
       <h1>Steward sign-in</h1>
-      <p class="sub">This machine protects the dashboard and live controls behind a shared steward secret.</p>
+      <p class="sub">This machine protects the dashboard and live controls behind a shared steward secret, trusted-network policy, and browser-bound steward sessions.</p>
     </header>
 
     <section class="panel login-panel">
@@ -26,6 +26,9 @@
             <button type="submit" class="btn">Open dashboard</button>
             <span class="shortcut">This session stays signed in on this browser for a limited time.</span>
           </div>
+          {% if allowlist_enabled %}
+            <p class="shortcut">Steward access is also limited to explicitly allowed networks.</p>
+          {% endif %}
         </form>
       {% else %}
         <p class="stage-copy">`OPS_SHARED_SECRET` is not configured yet, so operator access is intentionally unavailable.</p>

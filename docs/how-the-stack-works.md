@@ -712,8 +712,9 @@ The HTML dashboard is rendered by Django and hydrated by
 `degraded`, or `broken`.
 
 `/ops/` is no longer a public status page. It now requires the shared steward
-secret from `OPS_SHARED_SECRET`, stores that access in the browser session, and
-then exposes live controls for:
+secret from `OPS_SHARED_SECRET`, can optionally be restricted by
+`OPS_ALLOWED_NETWORKS`, stores that access in a browser-bound session, and then
+exposes live controls for:
 
 - pausing intake
 - pausing playback

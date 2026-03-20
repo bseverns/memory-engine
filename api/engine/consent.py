@@ -28,8 +28,11 @@ def default_node_from_env() -> Node:
 
 
 def make_revocation_token() -> str:
-    raw = secrets.token_urlsafe(8)
-    return raw.replace("-", "").replace("_", "")[:10].upper()
+    token = ""
+    while len(token) < 10:
+        raw = secrets.token_urlsafe(8)
+        token += raw.replace("-", "").replace("_", "")
+    return token[:10].upper()
 
 
 def hash_token(token: str) -> str:

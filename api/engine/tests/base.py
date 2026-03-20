@@ -10,13 +10,15 @@ from django.utils import timezone
 from memory_engine.config_validation import validate_runtime_settings
 
 from ..models import Artifact, ConsentManifest, Node
-from ..operator_auth import OPS_SESSION_KEY
+from ..operator_auth import OPS_SESSION_BINDING_KEY, OPS_SESSION_KEY, operator_session_binding
 
 
 class EngineTestCase(TestCase):
     def login_operator(self):
         session = self.client.session
         session[OPS_SESSION_KEY] = True
+        request = SimpleNamespace(META={"REMOTE_ADDR": "127.0.0.1", "HTTP_USER_AGENT": ""})
+        session[OPS_SESSION_BINDING_KEY] = operator_session_binding(request)
         session.save()
 
     def make_consent(self, mode: str, token: str = "TOKEN12345") -> ConsentManifest:
@@ -82,6 +84,9 @@ def default_runtime_config(**overrides):
         "ROOM_OVERLAP_MAX_DELAY_MS": 520,
         "ROOM_OVERLAP_GAIN_MULTIPLIER": 0.68,
         "OPS_SESSION_TTL_SECONDS": 43200,
+        "OPS_ALLOWED_NETWORKS": [],
+        "OPS_LOGIN_MAX_ATTEMPTS": 6,
+        "OPS_LOGIN_LOCKOUT_SECONDS": 900,
         "MEDIA_ACCESS_TOKEN_TTL_SECONDS": 900,
         "SURFACE_ACCESS_TOKEN_TTL_SECONDS": 86400,
         "INGEST_MAX_UPLOAD_BYTES": 32 * 1024 * 1024,

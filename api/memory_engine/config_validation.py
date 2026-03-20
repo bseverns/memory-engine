@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ipaddress
+
 from django.core.exceptions import ImproperlyConfigured
 
 from .installation_profiles import available_installation_profiles
@@ -87,6 +89,8 @@ def validate_runtime_settings(settings_obj) -> None:
     ensure_non_negative(errors, settings_obj, "ROOM_OVERLAP_MAX_DELAY_MS")
     ensure_between(errors, settings_obj, "ROOM_OVERLAP_GAIN_MULTIPLIER", 0.0, 1.0, inclusive_min=False, inclusive_max=True)
     ensure_positive(errors, settings_obj, "OPS_SESSION_TTL_SECONDS")
+    ensure_positive(errors, settings_obj, "OPS_LOGIN_MAX_ATTEMPTS")
+    ensure_positive(errors, settings_obj, "OPS_LOGIN_LOCKOUT_SECONDS")
     ensure_positive(errors, settings_obj, "MEDIA_ACCESS_TOKEN_TTL_SECONDS")
     ensure_positive(errors, settings_obj, "SURFACE_ACCESS_TOKEN_TTL_SECONDS")
     ensure_positive(errors, settings_obj, "INGEST_MAX_UPLOAD_BYTES")
@@ -105,6 +109,11 @@ def validate_runtime_settings(settings_obj) -> None:
     if installation_profile not in set(available_installation_profiles()):
         joined_profiles = ", ".join(available_installation_profiles())
         errors.append(f"INSTALLATION_PROFILE must be one of: {joined_profiles}.")
+    for network in list(getattr(settings_obj, "OPS_ALLOWED_NETWORKS", []) or []):
+        try:
+            ipaddress.ip_network(str(network), strict=False)
+        except ValueError:
+            errors.append(f"OPS_ALLOWED_NETWORKS entry '{network}' must be a valid IP or CIDR.")
 
     fresh_max_age = float(getattr(settings_obj, "POOL_FRESH_MAX_AGE_HOURS", 0.0))
     worn_min_age = float(getattr(settings_obj, "POOL_WORN_MIN_AGE_HOURS", 0.0))

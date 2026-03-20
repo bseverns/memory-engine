@@ -55,7 +55,7 @@ from .throttling import PublicIngestThrottle, PublicRevokeThrottle
 def operator_api_denied():
     if not operator_secret_configured():
         return Response({"error": "operator secret is not configured"}, status=503)
-    return Response({"error": "operator authentication required"}, status=403)
+    return Response({"error": "operator authentication required or session no longer matches this network/browser"}, status=403)
 
 
 def request_operator_label(request) -> str:

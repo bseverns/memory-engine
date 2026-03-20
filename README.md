@@ -26,7 +26,8 @@ docker compose up --build
 - Admin: http://localhost/admin/  (creates a default superuser in dev; see logs)
 - Ops: http://localhost/ops/
 
-`/ops/` now requires the shared steward secret from `OPS_SHARED_SECRET`.
+`/ops/` now requires the shared steward secret from `OPS_SHARED_SECRET`, and it
+can also be restricted to trusted networks with `OPS_ALLOWED_NETWORKS`.
 
 For a real multi-machine install, the intended role split is:
 - recording machine opens `/kiosk/`
@@ -94,6 +95,19 @@ What the script does:
 - turns off Django debug mode and dev superuser bootstrap
 - refuses to deploy if obvious dev secrets are still unchanged
 - runs `docker compose up --build -d`
+
+For stronger steward posture on a real server, also set:
+
+```env
+OPS_ALLOWED_NETWORKS=127.0.0.1/32,10.0.0.0/8
+OPS_LOGIN_MAX_ATTEMPTS=6
+OPS_LOGIN_LOCKOUT_SECONDS=900
+```
+
+That adds a trusted-network allowlist and temporary lockout after repeated bad
+secret guesses. Operator sessions are also bound to the originating
+network/browser tuple, so replaying the cookie from somewhere else is not
+enough to keep `/ops/` open.
 
 For a server that is already bootstrapped and just needs the usual
 `pull -> test -> backup -> deploy -> status` cycle, use:
@@ -281,7 +295,7 @@ Caddy will then be able to obtain a public certificate automatically, assuming p
 - A longer movement cycle sits above that local counterbalance. The room can spend a few memories gathering energy, drift into weathered material, and then open back out rather than staying in one perpetual middle state.
 
 ## Operator view
-- `/ops/` now sits behind the shared steward secret in `OPS_SHARED_SECRET`.
+- `/ops/` now sits behind the shared steward secret in `OPS_SHARED_SECRET`, with optional trusted-network enforcement from `OPS_ALLOWED_NETWORKS`.
 - After sign-in, `/ops/` provides the node state (`ready`, `degraded`, `broken`), dependency checks, current artifact counts, and a quick view of fresh/mid/worn lane balance.
 - `/ops/` also carries live steward controls for maintenance mode, pausing intake, pausing playback, and switching the room into a quieter mode.
 - `/ops/` now includes a retention view for raw-audio expiry pressure and fossil hold posture.

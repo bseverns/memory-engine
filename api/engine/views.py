@@ -5,7 +5,12 @@ from django.shortcuts import render
 from .media_access import PURPOSE_SURFACE_FOSSILS, build_surface_token, surface_fossils_url
 from .operator_auth import (
     authenticate_operator_secret,
+    clear_failed_operator_logins,
     end_operator_session,
+    note_failed_operator_login,
+    operator_allowed_networks,
+    operator_login_locked_out,
+    operator_request_allowed,
     operator_secret_configured,
     operator_session_active,
     start_operator_session,
@@ -81,20 +86,41 @@ def playback_view(request):
 
 
 def operator_dashboard_view(request):
+    allowlist_enabled = bool(operator_allowed_networks())
+
+    if not operator_request_allowed(request):
+        return render(request, "engine/operator_login.html", {
+            "error": "This network is not allowed to access steward controls.",
+            "operator_configured": operator_secret_configured(),
+            "allowlist_enabled": allowlist_enabled,
+        }, status=403)
+
     if request.method == "POST":
+        if operator_login_locked_out(request):
+            return render(request, "engine/operator_login.html", {
+                "error": "Too many failed sign-in attempts. Wait before trying again.",
+                "operator_configured": operator_secret_configured(),
+                "allowlist_enabled": allowlist_enabled,
+            }, status=429)
         secret = request.POST.get("secret", "")
         if authenticate_operator_secret(secret):
+            clear_failed_operator_logins(request)
             start_operator_session(request)
             return redirect("operator-dashboard")
+        note_failed_operator_login(request)
+        status_code = 429 if operator_login_locked_out(request) else 403
         return render(request, "engine/operator_login.html", {
-            "error": "The steward secret did not match.",
+            "error": "Too many failed sign-in attempts. Wait before trying again."
+            if status_code == 429 else "The steward secret did not match.",
             "operator_configured": operator_secret_configured(),
-        }, status=403)
+            "allowlist_enabled": allowlist_enabled,
+        }, status=status_code)
 
     if not operator_session_active(request):
         return render(request, "engine/operator_login.html", {
             "error": "",
             "operator_configured": operator_secret_configured(),
+            "allowlist_enabled": allowlist_enabled,
         }, status=503 if not operator_secret_configured() else 200)
 
     return render(request, "engine/operator_dashboard.html", {
