@@ -161,6 +161,30 @@
             <option value="gathering">Gathering</option>
           </select>
         </label>
+        <label class="ops-login-field">
+          <span>
+            <strong>Kiosk accessibility</strong>
+            <span>Switch the recording station into a larger, higher-contrast presentation for difficult rooms.</span>
+          </span>
+          <select id="opsKioskAccessibilityMode" name="kiosk_accessibility_mode">
+            <option value="">Standard</option>
+            <option value="large_high_contrast">Large type / high contrast</option>
+          </select>
+        </label>
+        <label class="ops-toggle">
+          <input id="opsKioskReducedMotion" type="checkbox" name="kiosk_force_reduced_motion"/>
+          <span>
+            <strong>Force reduced motion</strong>
+            <span>Simplifies the countdown and suppresses decorative movement on the recording station.</span>
+          </span>
+        </label>
+        <label class="ops-login-field">
+          <span>
+            <strong>Kiosk max recording length</strong>
+            <span>Set the recording cap in seconds for this installation. Shorter limits help keep sessions moving.</span>
+          </span>
+          <input id="opsKioskMaxRecordingSeconds" type="number" min="30" max="300" step="5" name="kiosk_max_recording_seconds"/>
+        </label>
         <div class="shortcut-row">
           <button id="opsControlsSave" type="submit" class="btn">Apply controls</button>
           <span id="opsControlStatus" class="shortcut">Controls are loading.</span>

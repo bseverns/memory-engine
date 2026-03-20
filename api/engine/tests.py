@@ -321,6 +321,9 @@ class EngineBehaviorTests(TestCase):
                 "playback_paused": True,
                 "quieter_mode": True,
                 "mood_bias": "weathered",
+                "kiosk_accessibility_mode": "large_high_contrast",
+                "kiosk_force_reduced_motion": True,
+                "kiosk_max_recording_seconds": 90,
             },
             content_type="application/json",
         )
@@ -332,12 +335,18 @@ class EngineBehaviorTests(TestCase):
         self.assertTrue(state.playback_paused)
         self.assertTrue(state.quieter_mode)
         self.assertEqual(state.mood_bias, "weathered")
-        self.assertEqual(StewardAction.objects.count(), 5)
+        self.assertEqual(state.kiosk_accessibility_mode, "large_high_contrast")
+        self.assertTrue(state.kiosk_force_reduced_motion)
+        self.assertEqual(state.kiosk_max_recording_seconds, 90)
+        self.assertEqual(StewardAction.objects.count(), 8)
         payload = response.json()
         self.assertTrue(payload["operator_state"]["maintenance_mode"])
         self.assertEqual(payload["operator_state"]["mood_bias"], "weathered")
+        self.assertEqual(payload["operator_state"]["kiosk_accessibility_mode"], "large_high_contrast")
+        self.assertTrue(payload["operator_state"]["kiosk_force_reduced_motion"])
+        self.assertEqual(payload["operator_state"]["kiosk_max_recording_seconds"], 90)
         self.assertTrue(payload["operator_state"]["intake_paused"])
-        self.assertEqual(len(payload["changes"]), 5)
+        self.assertEqual(len(payload["changes"]), 8)
 
     @patch("engine.api_views.put_bytes")
     def test_intake_pause_blocks_new_audio_artifact_creation(self, put_bytes_mock):
@@ -599,6 +608,7 @@ class EngineBehaviorTests(TestCase):
             ROOM_OVERLAP_MAX_DELAY_MS=520,
             ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
             OPS_SESSION_TTL_SECONDS=43200,
+            KIOSK_DEFAULT_MAX_RECORDING_SECONDS=120,
             OPS_POOL_LOW_COUNT=6,
             OPS_POOL_IMBALANCE_RATIO=0.72,
             OPS_DISK_CRITICAL_FREE_GB=3.0,
@@ -648,6 +658,7 @@ class EngineBehaviorTests(TestCase):
             ROOM_OVERLAP_MAX_DELAY_MS=520,
             ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
             OPS_SESSION_TTL_SECONDS=43200,
+            KIOSK_DEFAULT_MAX_RECORDING_SECONDS=120,
             OPS_POOL_LOW_COUNT=6,
             OPS_POOL_IMBALANCE_RATIO=0.72,
             OPS_DISK_CRITICAL_FREE_GB=9.0,
@@ -702,6 +713,7 @@ class EngineBehaviorTests(TestCase):
             ROOM_OVERLAP_MAX_DELAY_MS=520,
             ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
             OPS_SESSION_TTL_SECONDS=43200,
+            KIOSK_DEFAULT_MAX_RECORDING_SECONDS=120,
             OPS_POOL_LOW_COUNT=6,
             OPS_POOL_IMBALANCE_RATIO=0.72,
             OPS_DISK_CRITICAL_FREE_GB=3.0,
@@ -813,6 +825,7 @@ class EngineBehaviorTests(TestCase):
             ROOM_OVERLAP_MAX_DELAY_MS=520,
             ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
             OPS_SESSION_TTL_SECONDS=43200,
+            KIOSK_DEFAULT_MAX_RECORDING_SECONDS=120,
             OPS_POOL_LOW_COUNT=6,
             OPS_POOL_IMBALANCE_RATIO=0.72,
             OPS_DISK_CRITICAL_FREE_GB=3.0,

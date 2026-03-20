@@ -81,6 +81,7 @@ def validate_runtime_settings(settings_obj) -> None:
     ensure_non_negative(errors, settings_obj, "ROOM_OVERLAP_MAX_DELAY_MS")
     ensure_between(errors, settings_obj, "ROOM_OVERLAP_GAIN_MULTIPLIER", 0.0, 1.0, inclusive_min=False, inclusive_max=True)
     ensure_positive(errors, settings_obj, "OPS_SESSION_TTL_SECONDS")
+    ensure_between(errors, settings_obj, "KIOSK_DEFAULT_MAX_RECORDING_SECONDS", 30, 300)
     ensure_non_negative(errors, settings_obj, "OPS_POOL_LOW_COUNT")
     ensure_between(errors, settings_obj, "OPS_POOL_IMBALANCE_RATIO", 0.0, 1.0, inclusive_min=False, inclusive_max=False)
     ensure_non_negative(errors, settings_obj, "OPS_DISK_CRITICAL_FREE_GB")

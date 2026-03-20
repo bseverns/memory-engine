@@ -219,6 +219,9 @@
       opsPlaybackPaused: doc.getElementById("opsPlaybackPaused"),
       opsQuieterMode: doc.getElementById("opsQuieterMode"),
       opsMoodBias: doc.getElementById("opsMoodBias"),
+      opsKioskAccessibilityMode: doc.getElementById("opsKioskAccessibilityMode"),
+      opsKioskReducedMotion: doc.getElementById("opsKioskReducedMotion"),
+      opsKioskMaxRecordingSeconds: doc.getElementById("opsKioskMaxRecordingSeconds"),
       opsControlsSave: doc.getElementById("opsControlsSave"),
       opsControlStatus: doc.getElementById("opsControlStatus"),
       opsRecentActions: doc.getElementById("opsRecentActions"),
@@ -235,6 +238,15 @@
     dom.opsQuieterMode.checked = Boolean(operatorState.quieter_mode);
     if (dom.opsMoodBias) {
       dom.opsMoodBias.value = String(operatorState.mood_bias || "");
+    }
+    if (dom.opsKioskAccessibilityMode) {
+      dom.opsKioskAccessibilityMode.value = String(operatorState.kiosk_accessibility_mode || "");
+    }
+    if (dom.opsKioskReducedMotion) {
+      dom.opsKioskReducedMotion.checked = Boolean(operatorState.kiosk_force_reduced_motion);
+    }
+    if (dom.opsKioskMaxRecordingSeconds) {
+      dom.opsKioskMaxRecordingSeconds.value = String(operatorState.kiosk_max_recording_seconds || 120);
     }
   }
 
@@ -275,6 +287,11 @@
       if (state.playback_paused) labels.push("playback paused");
       if (state.quieter_mode) labels.push("quieter mode");
       if (state.mood_bias) labels.push(`mood bias: ${state.mood_bias}`);
+      if (state.kiosk_accessibility_mode) labels.push("accessible kiosk");
+      if (state.kiosk_force_reduced_motion) labels.push("reduced-motion kiosk");
+      if (Number(state.kiosk_max_recording_seconds || 120) !== 120) {
+        labels.push(`kiosk max: ${state.kiosk_max_recording_seconds}s`);
+      }
       dom.opsControlStatus.textContent = labels.length
         ? `Active controls: ${labels.join(", ")}.`
         : "No live control overrides are active.";
@@ -353,6 +370,9 @@
             playback_paused: Boolean(dom.opsPlaybackPaused?.checked),
             quieter_mode: Boolean(dom.opsQuieterMode?.checked),
             mood_bias: String(dom.opsMoodBias?.value || ""),
+            kiosk_accessibility_mode: String(dom.opsKioskAccessibilityMode?.value || ""),
+            kiosk_force_reduced_motion: Boolean(dom.opsKioskReducedMotion?.checked),
+            kiosk_max_recording_seconds: Number(dom.opsKioskMaxRecordingSeconds?.value || 120),
           }),
         });
         renderControlPayload(doc, dom, payload);

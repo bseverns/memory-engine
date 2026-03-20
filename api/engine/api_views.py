@@ -58,6 +58,13 @@ def parse_boolish(value) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def parse_intish(value, fallback: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(fallback)
+
+
 def intake_suspended() -> bool:
     state = load_steward_state()
     return bool(state.maintenance_mode or state.intake_paused)
@@ -430,6 +437,14 @@ def operator_controls(request):
         quieter_mode=parse_boolish(request.data.get("quieter_mode", state.quieter_mode)),
         maintenance_mode=parse_boolish(request.data.get("maintenance_mode", state.maintenance_mode)),
         mood_bias=request.data.get("mood_bias", state.mood_bias),
+        kiosk_accessibility_mode=request.data.get("kiosk_accessibility_mode", state.kiosk_accessibility_mode),
+        kiosk_force_reduced_motion=parse_boolish(
+            request.data.get("kiosk_force_reduced_motion", state.kiosk_force_reduced_motion),
+        ),
+        kiosk_max_recording_seconds=parse_intish(
+            request.data.get("kiosk_max_recording_seconds", state.kiosk_max_recording_seconds or 120),
+            state.kiosk_max_recording_seconds or 120,
+        ),
         actor=request_operator_label(request),
     )
     return Response({

@@ -34,10 +34,34 @@ body{
     linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
 }
 
+body.recording-page.a11y-mode{
+  --bg:#f4efe6;
+  --bg-deep:#e8dfd0;
+  --panel:#fffdfb;
+  --panel-strong:#ffffff;
+  --text:#18120d;
+  --muted:#4e4338;
+  --accent:#2c8f86;
+  --accent-soft:#dff5f0;
+  --accent-strong:#165b54;
+  --record:#87453d;
+  --warning:#7a5218;
+  --stroke:#cdbfae;
+  --shadow:0 24px 60px rgba(38, 24, 14, 0.12);
+  background:
+    radial-gradient(circle at top left, rgba(255,255,255,0.95), transparent 30%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+}
+
 .shell{
   width:min(100%, 1080px);
   max-width:1080px;
   padding:28px 22px 40px;
+}
+
+body.recording-page.a11y-mode .shell{
+  width:min(100%, 1160px);
+  max-width:1160px;
 }
 
 .hero{
@@ -66,12 +90,23 @@ h1{
   font-weight:250;
 }
 
+body.recording-page.a11y-mode h1{
+  font-size:clamp(3.4rem, 7vw, 6.2rem);
+  letter-spacing:-0.035em;
+}
+
 .sub{
   max-width:760px;
   margin:0;
   font-size:1.08rem;
   line-height:1.6;
   color:var(--muted);
+}
+
+body.recording-page.a11y-mode .sub,
+body.recording-page.a11y-mode .stage-copy{
+  font-size:1.22rem;
+  line-height:1.72;
 }
 
 .stage,
@@ -131,10 +166,26 @@ h1{
   font-weight:700;
 }
 
+body.recording-page.a11y-mode .badge,
+body.recording-page.a11y-mode .mic-chip,
+body.recording-page.a11y-mode .shortcut,
+body.recording-page.a11y-mode .selection-hint,
+body.recording-page.a11y-mode .mic-check{
+  min-height:42px;
+  padding:10px 16px;
+  font-size:1.02rem;
+  border-color:rgba(24,18,13,0.18);
+}
+
 .stage h2{
   margin:18px 0 10px;
   font-size:clamp(2.4rem,5vw,4.2rem);
   max-width:14ch;
+}
+
+body.recording-page.a11y-mode .stage h2{
+  max-width:16ch;
+  font-size:clamp(2.8rem, 5.6vw, 4.9rem);
 }
 
 .stage-copy{
@@ -209,6 +260,10 @@ h1{
   letter-spacing:.08em;
 }
 
+body.recording-page.a11y-mode .timer{
+  font-size:1.55rem;
+}
+
 .timer.alt{
   color:var(--accent-strong);
 }
@@ -270,6 +325,14 @@ h1{
   font-size:1rem;
 }
 
+body.recording-page.a11y-mode .countdown-value{
+  font-size:clamp(4.4rem, 11vw, 6.8rem);
+}
+
+body.recording-page.a11y-mode .countdown-label{
+  font-size:1.14rem;
+}
+
 .action-row{
   margin-top:18px;
 }
@@ -289,6 +352,13 @@ h1{
   cursor:pointer;
   transition:transform .12s ease, box-shadow .12s ease, opacity .12s ease, background .12s ease;
   box-shadow:0 10px 24px rgba(12,139,124,0.22);
+}
+
+body.recording-page.a11y-mode .btn{
+  min-height:64px;
+  padding:16px 24px;
+  font-size:1.14rem;
+  font-weight:500;
 }
 
 .link-btn{
@@ -338,6 +408,13 @@ footer,
   color:var(--warning);
   font-size:1rem;
   line-height:1.6;
+}
+
+body.recording-page.a11y-mode .operator-notice{
+  border-color:rgba(122,82,24,0.34);
+  background:rgba(255,244,220,0.96);
+  color:#68420f;
+  font-size:1.08rem;
 }
 
 .quiet-take-panel,
@@ -437,6 +514,20 @@ footer,
   margin:18px 0 8px;
   font-size:1.2rem;
   color:var(--text);
+}
+
+body.recording-page.a11y-mode .choice{
+  min-height:208px;
+  border-color:rgba(24,18,13,0.16);
+}
+
+body.recording-page.a11y-mode .choice strong{
+  font-size:1.34rem;
+}
+
+body.recording-page.a11y-mode .choice span{
+  font-size:1.02rem;
+  line-height:1.55;
 }
 
 .choice:hover:not(:disabled),
@@ -887,6 +978,24 @@ footer{
 .playback-note-card strong{
   font-size:1.16rem;
   color:#fff8ef;
+}
+
+body.reduced-motion-mode .countdown-overlay{
+  background:rgba(44,32,20,0.32);
+  backdrop-filter:none;
+}
+
+body.reduced-motion-mode .countdown-card,
+body.reduced-motion-mode .stage,
+body.reduced-motion-mode .panel{
+  backdrop-filter:none;
+}
+
+body.reduced-motion-mode .btn,
+body.reduced-motion-mode .choice,
+body.reduced-motion-mode .meter-fill,
+body.reduced-motion-mode .review-timeout-fill{
+  transition:none !important;
 }
 
 .playback-visual-shell{

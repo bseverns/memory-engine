@@ -29,6 +29,7 @@ def room_surface_config():
         tone_source_url=settings.ROOM_TONE_SOURCE_URL,
     )
     return {
+        "kioskMaxRecordingSeconds": int(getattr(settings, "KIOSK_DEFAULT_MAX_RECORDING_SECONDS", 120)),
         "roomIntensityProfile": schedule["intensityProfile"],
         "roomMovementPreset": schedule["movementPreset"],
         "roomDaypartEnabled": schedule["daypartEnabled"],

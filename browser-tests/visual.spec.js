@@ -50,6 +50,9 @@ function healthyNodeStatusPayload(overrides = {}) {
       playback_paused: false,
       quieter_mode: false,
       mood_bias: "",
+      kiosk_accessibility_mode: "",
+      kiosk_force_reduced_motion: false,
+      kiosk_max_recording_seconds: 120,
     },
     ...overrides,
   };
@@ -129,12 +132,18 @@ async function applyStewardControls(page, {
   playbackPaused = false,
   quieterMode = false,
   moodBias = "",
+  kioskAccessibilityMode = "",
+  kioskReducedMotion = false,
+  kioskMaxRecordingSeconds = 120,
 } = {}) {
   await signIntoOps(page);
   await setCheckboxState(page.locator("#opsIntakePaused"), intakePaused);
   await setCheckboxState(page.locator("#opsPlaybackPaused"), playbackPaused);
   await setCheckboxState(page.locator("#opsQuieterMode"), quieterMode);
   await page.locator("#opsMoodBias").selectOption(moodBias);
+  await page.locator("#opsKioskAccessibilityMode").selectOption(kioskAccessibilityMode);
+  await setCheckboxState(page.locator("#opsKioskReducedMotion"), kioskReducedMotion);
+  await page.locator("#opsKioskMaxRecordingSeconds").fill(String(kioskMaxRecordingSeconds));
   await page.locator("#opsControlsSave").click();
 
   const expectedStatus = [];
@@ -142,6 +151,9 @@ async function applyStewardControls(page, {
   if (playbackPaused) expectedStatus.push("playback paused");
   if (quieterMode) expectedStatus.push("quieter mode");
   if (moodBias) expectedStatus.push(`mood bias: ${moodBias}`);
+  if (kioskAccessibilityMode) expectedStatus.push("accessible kiosk");
+  if (kioskReducedMotion) expectedStatus.push("reduced-motion kiosk");
+  if (kioskMaxRecordingSeconds !== 120) expectedStatus.push(`kiosk max: ${kioskMaxRecordingSeconds}s`);
 
   if (expectedStatus.length) {
     for (const phrase of expectedStatus) {
@@ -160,6 +172,18 @@ test.describe("visual stack walkthrough", () => {
     await expect(page.getByRole("heading", { name: "Room Memory" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Arm microphone" })).toBeVisible();
     await saveScreenshot(page, "recording-kiosk-idle.png");
+  });
+
+  test("captures the recording kiosk in accessibility mode", async ({ page }) => {
+    await mockHealthyOpsStatus(page);
+    await applyStewardControls(page, {
+      kioskAccessibilityMode: "large_high_contrast",
+      kioskReducedMotion: true,
+      kioskMaxRecordingSeconds: 90,
+    });
+    await page.goto("/kiosk/");
+    await expect(page.locator("#maxDurationHint")).toContainText("01:30");
+    await saveScreenshot(page, "recording-kiosk-accessible.png");
   });
 
   test("captures the dedicated playback surface", async ({ page }) => {
@@ -183,6 +207,9 @@ test.describe("visual stack walkthrough", () => {
             playback_paused: false,
             quieter_mode: false,
             mood_bias: "",
+            kiosk_accessibility_mode: "",
+            kiosk_force_reduced_motion: false,
+            kiosk_max_recording_seconds: 120,
           },
           recent_actions: [],
         }),
@@ -234,6 +261,9 @@ test.describe("visual stack walkthrough", () => {
         playback_paused: false,
         quieter_mode: true,
         mood_bias: "weathered",
+        kiosk_accessibility_mode: "",
+        kiosk_force_reduced_motion: false,
+        kiosk_max_recording_seconds: 120,
       },
     });
     await page.route("**/api/v1/operator/controls", async (route) => {
@@ -245,6 +275,9 @@ test.describe("visual stack walkthrough", () => {
             playback_paused: false,
             quieter_mode: true,
             mood_bias: "weathered",
+            kiosk_accessibility_mode: "",
+            kiosk_force_reduced_motion: false,
+            kiosk_max_recording_seconds: 120,
           },
           recent_actions: [
             {

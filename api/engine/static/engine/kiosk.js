@@ -106,7 +106,6 @@ let hasReceipt = false;
 let attractStepIndex = 0;
 let attractInterval = 0;
 const PRE_ROLL_SECONDS = 3;
-const MAX_RECORDING_MS = 120000;
 const MIC_SIGNAL_THRESHOLD = 0.07;
 const REVIEW_IDLE_TIMEOUT_MS = 90000;
 const ATTRACT_ROTATE_MS = 3600;
@@ -146,14 +145,21 @@ function readKioskConfig() {
 }
 
 const kioskConfig = readKioskConfig();
+const DEFAULT_MAX_RECORDING_SECONDS = Number(kioskConfig.kioskMaxRecordingSeconds || 120);
 let surfaceState = {
   intake_paused: false,
   playback_paused: false,
   quieter_mode: false,
   maintenance_mode: false,
+  kiosk_accessibility_mode: "",
+  kiosk_force_reduced_motion: false,
+  kiosk_max_recording_seconds: DEFAULT_MAX_RECORDING_SECONDS,
   ...(kioskConfig.operatorState || {}),
 };
 let surfaceStateInterval = 0;
+const reducedMotionMediaQuery = window.matchMedia
+  ? window.matchMedia("(prefers-reduced-motion: reduce)")
+  : null;
 
 const captureController = window.MemoryEngineKioskCapture.createController({
   onMeterLevel: handleMeterLevel,
@@ -174,6 +180,8 @@ function setFlowState(nextState, options = {}) {
 
 function render() {
   document.body.dataset.state = flowState;
+  document.body.classList.toggle("a11y-mode", accessibilityModeEnabled());
+  document.body.classList.toggle("reduced-motion-mode", shouldReduceMotion());
   countdownOverlay.hidden = flowState !== FLOW.COUNTDOWN;
   updateStepper();
   updateModePanel();
@@ -184,6 +192,20 @@ function render() {
   updateReviewTimeoutPanel();
   updateAttractPanel();
   updateOperatorNotice();
+}
+
+function recordingLimitMs() {
+  const configuredSeconds = Number(surfaceState.kiosk_max_recording_seconds || DEFAULT_MAX_RECORDING_SECONDS);
+  const clampedSeconds = Math.max(30, Math.min(300, Number.isFinite(configuredSeconds) ? configuredSeconds : DEFAULT_MAX_RECORDING_SECONDS));
+  return clampedSeconds * 1000;
+}
+
+function accessibilityModeEnabled() {
+  return String(surfaceState.kiosk_accessibility_mode || "").toLowerCase() === "large_high_contrast";
+}
+
+function shouldReduceMotion() {
+  return Boolean(surfaceState.kiosk_force_reduced_motion || reducedMotionMediaQuery?.matches);
 }
 
 function intakePaused() {
@@ -302,6 +324,9 @@ function updateQuietTakePanel() {
 function startAttractLoop() {
   if (attractInterval || !attractPanel || attractSteps.length === 0) return;
   attractInterval = window.setInterval(() => {
+    if (shouldReduceMotion()) {
+      return;
+    }
     attractStepIndex = (attractStepIndex + 1) % attractSteps.length;
     if (flowState === FLOW.IDLE) {
       updateAttractPanel();
@@ -315,9 +340,10 @@ function updateAttractPanel() {
   attractPanel.hidden = !visible;
   if (!visible) return;
 
-  attractLead.textContent = ATTRACT_MESSAGES[attractStepIndex % ATTRACT_MESSAGES.length];
+  const activeIndex = shouldReduceMotion() ? 0 : (attractStepIndex % ATTRACT_MESSAGES.length);
+  attractLead.textContent = ATTRACT_MESSAGES[activeIndex];
   attractSteps.forEach((step, index) => {
-    step.classList.toggle("active", index === attractStepIndex);
+    step.classList.toggle("active", index === activeIndex);
   });
 }
 
@@ -441,13 +467,14 @@ function updateButtons() {
 
 function updateStage() {
   const hasMic = captureController.hasLiveInput();
+  const maxRecordingMs = recordingLimitMs();
   const elapsedMs = flowState === FLOW.RECORDING ? (performance.now() - recStartTs) : durationMs;
   const remainingMs = flowState === FLOW.RECORDING
-    ? Math.max(0, MAX_RECORDING_MS - elapsedMs)
-    : Math.max(0, MAX_RECORDING_MS - durationMs);
+    ? Math.max(0, maxRecordingMs - elapsedMs)
+    : Math.max(0, maxRecordingMs - durationMs);
   recTimer.textContent = formatDuration(elapsedMs);
   remainingTimer.textContent = formatDuration(remainingMs);
-  maxDurationHint.textContent = `Max ${formatDuration(MAX_RECORDING_MS)}`;
+  maxDurationHint.textContent = `Max ${formatDuration(maxRecordingMs)}`;
 
   if (intakePaused() && flowState === FLOW.IDLE) {
     stageBadge.textContent = maintenanceMode() ? "Maintenance" : "Paused";
@@ -693,17 +720,22 @@ async function startRecording() {
 function startCountdown() {
   countdownToken += 1;
   const localToken = countdownToken;
+  const countdownSeconds = shouldReduceMotion() ? 1 : PRE_ROLL_SECONDS;
   setFlowState(FLOW.COUNTDOWN);
-  countdownValue.textContent = String(PRE_ROLL_SECONDS);
-  countdownLabel.textContent = "Recording starts in a moment.";
+  countdownValue.textContent = String(countdownSeconds);
+  countdownLabel.textContent = shouldReduceMotion()
+    ? "Recording will begin shortly."
+    : "Recording starts in a moment.";
 
   const tick = (secondsLeft) => {
     if (localToken !== countdownToken || flowState !== FLOW.COUNTDOWN) return;
     countdownValue.textContent = String(secondsLeft);
-    countdownLabel.textContent = secondsLeft > 1
-      ? "Recording starts in a moment."
-      : "Recording starts now.";
-    captureController.playPreRollTone(PRE_ROLL_TONE, secondsLeft <= 1);
+    countdownLabel.textContent = shouldReduceMotion()
+      ? (secondsLeft > 1 ? "Recording will begin shortly." : "Recording starts now.")
+      : (secondsLeft > 1 ? "Recording starts in a moment." : "Recording starts now.");
+    if (!shouldReduceMotion()) {
+      captureController.playPreRollTone(PRE_ROLL_TONE, secondsLeft <= 1);
+    }
 
     if (secondsLeft <= 1) {
       runAction(beginRecordingCapture);
@@ -714,7 +746,7 @@ function startCountdown() {
   };
 
   clearTakeData();
-  window.setTimeout(() => tick(PRE_ROLL_SECONDS), 0);
+  window.setTimeout(() => tick(countdownSeconds), 0);
 }
 
 async function beginRecordingCapture() {
@@ -734,8 +766,8 @@ async function beginRecordingCapture() {
   timerInterval = window.setInterval(() => {
     const elapsed = performance.now() - recStartTs;
     recTimer.textContent = formatDuration(elapsed);
-    remainingTimer.textContent = formatDuration(Math.max(0, MAX_RECORDING_MS - elapsed));
-    if (elapsed >= MAX_RECORDING_MS) {
+    remainingTimer.textContent = formatDuration(Math.max(0, recordingLimitMs() - elapsed));
+    if (elapsed >= recordingLimitMs()) {
       stopRecording();
     }
   }, 150);
@@ -960,6 +992,7 @@ choices.forEach((choice) => {
 preview.addEventListener("play", noteReviewActivity);
 preview.addEventListener("seeking", noteReviewActivity);
 preview.addEventListener("pause", noteReviewActivity);
+reducedMotionMediaQuery?.addEventListener?.("change", render);
 
 document.addEventListener("pointerdown", noteReviewActivity, true);
 document.addEventListener("focusin", noteReviewActivity, true);

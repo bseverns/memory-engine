@@ -44,6 +44,9 @@
 - Attract-loop guidance in idle mode so participants can begin without steward help
 - Quiet-take warning with a keep-or-retake choice before mode selection
 - Visible idle timeout so abandoned review screens reset cleanly
+- Larger-type / higher-contrast accessibility mode for difficult rooms
+- Reduced-motion handling for the countdown and kiosk transitions
+- Steward-configurable max recording duration instead of keeping it browser-only
 
 ### Audience playback
 - Weighted pool selection with cooldown to reduce obvious repetition
@@ -91,9 +94,6 @@
 
 ### User / speaker
 - Add multilingual kiosk copy so the full guided flow can be swapped per installation
-- Add a larger-type / higher-contrast accessibility mode for difficult rooms
-- Add reduced-motion handling for the countdown and kiosk transitions
-- Add a steward-configurable max recording duration instead of keeping it browser-only
 - Add optional headphone or monitor-check mode for setup and microphone testing
 
 ### Audience / room effect
