@@ -1,152 +1,34 @@
 (function initMemoryEngineRoomLoop(global) {
-  const ROOM_INTENSITY_PROFILES = {
-    quiet: {
-      name: "quiet",
-      cueGapMultiplier: 1.24,
-      pauseGapMultiplier: 1.35,
-      roomToneMultiplier: 1.15,
-    },
-    balanced: {
-      name: "balanced",
-      cueGapMultiplier: 1.0,
-      pauseGapMultiplier: 1.0,
-      roomToneMultiplier: 1.0,
-    },
-    active: {
-      name: "active",
-      cueGapMultiplier: 0.82,
-      pauseGapMultiplier: 0.78,
-      roomToneMultiplier: 0.92,
-    },
-  };
-
-  const ROOM_MOVEMENT_PRESETS = {
-    meditative: {
-      name: "meditative",
-      movementGapMultiplier: 1.18,
-      minItemsDelta: 1,
-      maxItemsDelta: 1,
-    },
-    balanced: {
-      name: "balanced",
-      movementGapMultiplier: 1.0,
-      minItemsDelta: 0,
-      maxItemsDelta: 0,
-    },
-    active: {
-      name: "active",
-      movementGapMultiplier: 0.88,
-      minItemsDelta: 0,
-      maxItemsDelta: -1,
-    },
-  };
-
-  const ROOM_SCENES = [
-    {
-      name: "clearings",
-      movements: ["arrival", "release"],
-      moods: ["clear", "hushed"],
-      cues: [
-        { lane: "fresh", density: "light", mood: "clear", gapMs: 950 },
-        { lane: "fresh", density: "medium", mood: "clear", gapMs: 1600 },
-        { pauseMs: 2600, toneLevel: "sparse" },
-      ],
-    },
-    {
-      name: "weathered cluster",
-      movements: ["weathering"],
-      moods: ["weathered", "suspended"],
-      cues: [
-        { lane: "worn", density: "medium", mood: "weathered", gapMs: 1600 },
-        { lane: "worn", density: "dense", mood: "weathered", gapMs: 2500 },
-        { pauseMs: 3600, toneLevel: "sparse" },
-      ],
-    },
-    {
-      name: "suspension",
-      movements: ["arrival", "weathering"],
-      moods: ["suspended", "hushed"],
-      cues: [
-        { lane: "mid", density: "medium", mood: "suspended", gapMs: 1850 },
-        { pauseMs: 2200, toneLevel: "idle" },
-        { lane: "worn", density: "light", mood: "hushed", gapMs: 2100 },
-      ],
-    },
-    {
-      name: "gathering",
-      movements: ["gathering"],
-      moods: ["gathering", "clear", "suspended"],
-      cues: [
-        { lane: "fresh", density: "medium", mood: "clear", gapMs: 1050 },
-        { lane: "any", density: "dense", mood: "gathering", gapMs: 1550 },
-        { lane: "mid", density: "medium", mood: "suspended", gapMs: 2200 },
-      ],
-    },
-    {
-      name: "hushed drift",
-      movements: ["arrival", "release"],
-      moods: ["hushed", "clear"],
-      cues: [
-        { lane: "mid", density: "light", mood: "hushed", gapMs: 1200 },
-        { pauseMs: 2800, toneLevel: "sparse" },
-        { lane: "fresh", density: "light", mood: "clear", gapMs: 1700 },
-      ],
-    },
-    {
-      name: "afterimage",
-      movements: ["weathering", "release"],
-      moods: ["weathered", "hushed", "suspended"],
-      cues: [
-        { lane: "worn", density: "light", mood: "weathered", gapMs: 1700 },
-        { lane: "mid", density: "medium", mood: "suspended", gapMs: 2500 },
-        { pauseMs: 3400, toneLevel: "sparse" },
-      ],
-    },
-  ];
-
-  const ROOM_MOVEMENTS = [
-    {
-      name: "arrival",
-      minItems: 2,
-      maxItems: 3,
-      gapMultiplier: 1.15,
-      preferredMoods: ["clear", "hushed", "suspended"],
-      sceneNames: ["clearings", "hushed drift", "suspension"],
-    },
-    {
-      name: "gathering",
-      minItems: 3,
-      maxItems: 4,
-      gapMultiplier: 0.82,
-      preferredMoods: ["gathering", "clear", "suspended"],
-      sceneNames: ["gathering", "suspension"],
-    },
-    {
-      name: "weathering",
-      minItems: 2,
-      maxItems: 4,
-      gapMultiplier: 1.12,
-      preferredMoods: ["weathered", "suspended", "hushed"],
-      sceneNames: ["weathered cluster", "afterimage", "suspension"],
-    },
-    {
-      name: "release",
-      minItems: 2,
-      maxItems: 3,
-      gapMultiplier: 1.28,
-      preferredMoods: ["hushed", "clear", "weathered"],
-      sceneNames: ["clearings", "hushed drift", "afterimage"],
-    },
-  ];
-
-  const ROOM_TONE = {
-    idleGain: 0.011,
-    sparseGain: 0.017,
-    duckGain: 0.002,
-    fadeSeconds: 1.25,
-  };
-
   const PERSISTENT_LOOP_WINDOW_KEY = "memory-engine-room-loop-window-v1";
+
+  function defaultRoomLoopConfig() {
+    return {
+      intensityProfiles: {
+        balanced: {
+          name: "balanced",
+          cueGapMultiplier: 1.0,
+          pauseGapMultiplier: 1.0,
+          roomToneMultiplier: 1.0,
+        },
+      },
+      movementPresets: {
+        balanced: {
+          name: "balanced",
+          movementGapMultiplier: 1.0,
+          minItemsDelta: 0,
+          maxItemsDelta: 0,
+        },
+      },
+      scenes: [],
+      movements: [],
+      tone: {
+        idleGain: 0.011,
+        sparseGain: 0.017,
+        duckGain: 0.002,
+        fadeSeconds: 1.25,
+      },
+    };
+  }
 
   function readKioskConfig() {
     const el = document.getElementById("kiosk-config");
@@ -157,13 +39,17 @@
       roomScarcityLowThreshold: 6,
       roomScarcitySevereThreshold: 3,
       roomAntiRepetitionWindowSize: 12,
+      roomLoopConfig: defaultRoomLoopConfig(),
     };
     if (!el || !el.textContent) {
       return fallback;
     }
 
     try {
-      return JSON.parse(el.textContent);
+      return {
+        ...fallback,
+        ...JSON.parse(el.textContent),
+      };
     } catch (err) {
       return fallback;
     }
@@ -295,8 +181,19 @@
 
   function createController({ startButton, stopButton, statusEl, playUrlWithLightChain }) {
     const config = readKioskConfig();
-    const roomIntensity = ROOM_INTENSITY_PROFILES[config.roomIntensityProfile] || ROOM_INTENSITY_PROFILES.balanced;
-    const movementPreset = ROOM_MOVEMENT_PRESETS[config.roomMovementPreset] || ROOM_MOVEMENT_PRESETS.balanced;
+    const fallbackConfig = defaultRoomLoopConfig();
+    const loopConfig = config.roomLoopConfig || fallbackConfig;
+    const intensityProfiles = loopConfig.intensityProfiles || fallbackConfig.intensityProfiles;
+    const movementPresets = loopConfig.movementPresets || fallbackConfig.movementPresets;
+    const roomScenes = loopConfig.scenes || fallbackConfig.scenes;
+    const roomMovements = loopConfig.movements || fallbackConfig.movements;
+    const roomTone = loopConfig.tone || fallbackConfig.tone;
+    const roomIntensity = intensityProfiles[config.roomIntensityProfile]
+      || intensityProfiles.balanced
+      || fallbackConfig.intensityProfiles.balanced;
+    const movementPreset = movementPresets[config.roomMovementPreset]
+      || movementPresets.balanced
+      || fallbackConfig.movementPresets.balanced;
 
     let loopRunning = false;
     let loopScene = null;
@@ -332,8 +229,8 @@
     }
 
     function startLoopMovement(index) {
-      loopMovementIndex = index % ROOM_MOVEMENTS.length;
-      loopMovement = resolveMovement(ROOM_MOVEMENTS[loopMovementIndex], movementPreset);
+      loopMovementIndex = index % roomMovements.length;
+      loopMovement = resolveMovement(roomMovements[loopMovementIndex], movementPreset);
       loopMovementBudget = randomIntBetween(loopMovement.minItems, loopMovement.maxItems);
       loopMovementProgress = 0;
       loopScene = null;
@@ -379,7 +276,7 @@
       const recent = loopHistory.slice(-3);
       const last = recent[recent.length - 1];
 
-      let candidates = ROOM_SCENES.filter((scene) => movement.sceneNames.includes(scene.name));
+      let candidates = roomScenes.filter((scene) => movement.sceneNames.includes(scene.name));
       const moodCandidates = candidates.filter((scene) => scene.moods.includes(targetMood));
       if (moodCandidates.length) {
         candidates = moodCandidates;
@@ -391,7 +288,7 @@
         }
       }
 
-      return candidates[Math.floor(Math.random() * candidates.length)] || ROOM_SCENES[0];
+      return candidates[Math.floor(Math.random() * candidates.length)] || roomScenes[0];
     }
 
     function nextLoopCue() {
@@ -427,9 +324,9 @@
     }
 
     function toneLevelForName(name) {
-      if (name === "sparse") return ROOM_TONE.sparseGain;
-      if (name === "duck") return ROOM_TONE.duckGain;
-      return ROOM_TONE.idleGain;
+      if (name === "sparse") return roomTone.sparseGain;
+      if (name === "duck") return roomTone.duckGain;
+      return roomTone.idleGain;
     }
 
     async function ensureRoomTone() {
@@ -485,7 +382,7 @@
     }
 
     function setRoomToneLevel(level, seconds) {
-      const fadeSeconds = seconds === undefined ? ROOM_TONE.fadeSeconds : seconds;
+      const fadeSeconds = seconds === undefined ? roomTone.fadeSeconds : seconds;
       if (!roomToneCtx || !roomToneMasterGain) return;
       const now = roomToneCtx.currentTime;
       roomToneMasterGain.gain.cancelScheduledValues(now);
@@ -518,6 +415,10 @@
 
     async function start() {
       if (loopRunning) return;
+      if (!roomScenes.length || !roomMovements.length) {
+        setStatus("Room loop config is missing.");
+        return;
+      }
 
       loopRunning = true;
       stopMessage = "Stopped";
@@ -533,7 +434,7 @@
       updateButtons();
       setStatus(`Running (${roomIntensity.name} intensity / ${movementPreset.name} preset)...`);
       await ensureRoomTone();
-      setRoomToneLevel(roomToneLevelFor(config, roomIntensity, ROOM_TONE.idleGain, loopKnownPoolSize), 1.0);
+      setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.idleGain, loopKnownPoolSize), 1.0);
 
       while (loopRunning) {
         try {
@@ -571,13 +472,13 @@
           if (response.status === 204) {
             loopKnownPoolSize = 0;
             setStatus(`No ${mood} ${density} memory available in ${movement.name}. Scarcity mode is holding the room tone.`);
-            setRoomToneLevel(roomToneLevelFor(config, roomIntensity, ROOM_TONE.sparseGain, loopKnownPoolSize), 1.8);
+            setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize), 1.8);
             await sleep(Math.round(1500 * adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, true)));
             continue;
           }
           if (!response.ok) {
             setStatus(`Pool error: ${response.status}`);
-            setRoomToneLevel(roomToneLevelFor(config, roomIntensity, ROOM_TONE.sparseGain, loopKnownPoolSize), 1.4);
+            setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize), 1.4);
             await sleep(1500);
             continue;
           }
@@ -593,17 +494,17 @@
               ? `Playing ${laneLabel} in ${movement.name} / ${scene.name} (${scarcityLabel} pool, wear ${payload.wear.toFixed(3)})`
               : `Playing ${laneLabel} in ${movement.name} / ${scene.name} (wear ${payload.wear.toFixed(3)})`,
           );
-          setRoomToneLevel(roomToneLevelFor(config, roomIntensity, ROOM_TONE.duckGain, loopKnownPoolSize), 0.8);
+          setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.duckGain, loopKnownPoolSize), 0.8);
           await playUrlWithLightChain(payload.audio_url, payload.wear);
           advanceLoopMovement();
           if (loopRunning) {
             const gapMultiplier = adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, false);
-            setRoomToneLevel(roomToneLevelFor(config, roomIntensity, ROOM_TONE.idleGain, loopKnownPoolSize), 1.4);
+            setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.idleGain, loopKnownPoolSize), 1.4);
             await sleep(Math.round((cue.gapMs || 900) * gapMultiplier));
           }
         } catch (err) {
           setStatus("Room loop interrupted.");
-          setRoomToneLevel(roomToneLevelFor(config, roomIntensity, ROOM_TONE.sparseGain, loopKnownPoolSize), 1.2);
+          setRoomToneLevel(roomToneLevelFor(config, roomIntensity, roomTone.sparseGain, loopKnownPoolSize), 1.2);
           await sleep(1500);
         }
       }

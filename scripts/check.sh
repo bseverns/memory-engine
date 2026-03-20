@@ -21,6 +21,9 @@ find api/engine/static -type f -name '*.js' | sort | while IFS= read -r script_p
   node --check "${script_path}"
 done
 
+info "Running frontend smoke tests"
+node --test frontend-tests/*.test.js
+
 info "Checking Python syntax"
 "${PYTHON_BIN}" -m py_compile $(find api -type f -name '*.py' | sort)
 

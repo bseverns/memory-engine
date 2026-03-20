@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.shortcuts import render
 
+from .room_composer import ROOM_LOOP_CONFIG
+
 
 def kiosk_view(request):
     return render(request, "engine/kiosk.html", {
@@ -11,6 +13,7 @@ def kiosk_view(request):
             "roomScarcityLowThreshold": int(settings.ROOM_SCARCITY_LOW_THRESHOLD),
             "roomScarcitySevereThreshold": int(settings.ROOM_SCARCITY_SEVERE_THRESHOLD),
             "roomAntiRepetitionWindowSize": int(settings.ROOM_ANTI_REPETITION_WINDOW_SIZE),
+            "roomLoopConfig": ROOM_LOOP_CONFIG,
         },
     })
 

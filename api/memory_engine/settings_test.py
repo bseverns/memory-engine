@@ -1,7 +1,16 @@
+import os
+import tempfile
+
 from .settings import *  # noqa: F403,F401
 
 # Local test profile: keep Django tests self-contained and independent from the
 # compose stack unless a test explicitly opts into external services.
+
+TEST_CACHE_DIR = Path(tempfile.gettempdir()) / "memory-engine-kiosk-test-cache"  # noqa: F405
+TEST_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("MPLCONFIGDIR", str(TEST_CACHE_DIR / "matplotlib"))
+Path(os.environ["MPLCONFIGDIR"]).mkdir(parents=True, exist_ok=True)  # noqa: F405
+Path(STATIC_ROOT).mkdir(parents=True, exist_ok=True)  # noqa: F405
 
 SECRET_KEY = "test-secret-key"
 DEBUG = False

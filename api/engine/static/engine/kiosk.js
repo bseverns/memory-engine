@@ -92,17 +92,8 @@ let wavBlob = null;
 let durationMs = 0;
 let previewUrl = "";
 
-let audioCtx = null;
-let mediaStream = null;
-let sourceNode = null;
-let analyserNode = null;
-let procNode = null;
-let silentGainNode = null;
 let buffers = [];
-let sampleRate = 44100;
 let recStartTs = 0;
-let meterData = null;
-let meterFrame = 0;
 let timerInterval = 0;
 let countdownToken = 0;
 let reviewTimeoutInterval = 0;
@@ -116,21 +107,6 @@ const MAX_RECORDING_MS = 120000;
 const MIC_SIGNAL_THRESHOLD = 0.07;
 const REVIEW_IDLE_TIMEOUT_MS = 90000;
 const ATTRACT_ROTATE_MS = 3600;
-
-const RECORDING_PROCESSING = {
-  trimThreshold: 0.014,
-  edgePaddingMs: 120,
-  minContentMs: 700,
-  targetPeak: 0.92,
-  maxGain: 3.2,
-  fadeMs: 16,
-};
-
-const QUIET_TAKE = {
-  minDurationMs: 1800,
-  rmsThreshold: 0.015,
-  peakThreshold: 0.12,
-};
 
 const ATTRACT_MESSAGES = [
   "Tap Arm microphone or press Space to begin.",
@@ -146,14 +122,19 @@ const PRE_ROLL_TONE = {
   finalFrequency: 659.25,
 };
 
-const PLAYBACK_SMOOTHING = {
-  targetPeak: 0.9,
-  minGain: 0.85,
-  maxGain: 2.1,
-  fadeInSeconds: 0.12,
-  fadeOutSeconds: 0.35,
-  betweenLoopItemsMs: 900,
-};
+const {
+  encodeWavMono16,
+  mergeBuffers,
+  playUrlWithLightChain,
+  processRecordingSamples,
+} = window.MemoryEngineKioskAudio;
+
+const captureController = window.MemoryEngineKioskCapture.createController({
+  onMeterLevel: handleMeterLevel,
+  onMicLabelChange(nextLabel) {
+    micLabel = nextLabel;
+  },
+});
 
 function setFlowState(nextState, options = {}) {
   const previousState = flowState;
@@ -382,7 +363,7 @@ function updateButtons() {
 }
 
 function updateStage() {
-  const hasMic = !!mediaStream;
+  const hasMic = captureController.hasLiveInput();
   const elapsedMs = flowState === FLOW.RECORDING ? (performance.now() - recStartTs) : durationMs;
   const remainingMs = flowState === FLOW.RECORDING
     ? Math.max(0, MAX_RECORDING_MS - elapsedMs)
@@ -446,15 +427,15 @@ function updateStage() {
         ? MODE_COPY[selectedMode].reviewCopy
         : "Use the audio preview if you want. Then choose 1, 2, or 3 to decide how the room should remember this take.";
     }
-    micStatus.textContent = mediaStream ? micLabel : "Microphone asleep";
+    micStatus.textContent = hasMic ? micLabel : "Microphone asleep";
     recStatus.textContent = quietTakeNeedsDecision ? "Very quiet input detected" : (wavBlob ? "Take captured" : "No take captured");
     shortcutHint.textContent = quietTakeNeedsDecision
       ? "Space or Enter: keep this take"
       : (selectedMode ? "Space or Enter: submit selection" : "Press 1, 2, or 3 to choose a memory mode");
-    meterText.textContent = quietTakeNeedsDecision ? "Preview this take before deciding" : (mediaStream ? "Microphone still armed" : "Microphone asleep");
+    meterText.textContent = quietTakeNeedsDecision ? "Preview this take before deciding" : (hasMic ? "Microphone still armed" : "Microphone asleep");
     setMicCheckStatus(
-      quietTakeNeedsDecision ? "Quiet take warning" : (mediaStream ? "Mic check complete" : "Mic check asleep"),
-      quietTakeNeedsDecision ? "quiet" : (mediaStream ? "good" : "quiet"),
+      quietTakeNeedsDecision ? "Quiet take warning" : (hasMic ? "Mic check complete" : "Mic check asleep"),
+      quietTakeNeedsDecision ? "quiet" : (hasMic ? "good" : "quiet"),
     );
   } else if (flowState === FLOW.SUBMITTING) {
     stageBadge.textContent = "Saving";
@@ -491,6 +472,30 @@ function updateStage() {
 
 function setMeterLevel(level) {
   meterFill.style.width = `${Math.max(0, Math.min(100, level * 100))}%`;
+}
+
+function handleMeterLevel(boosted) {
+  setMeterLevel(boosted);
+
+  if (flowState === FLOW.ARMED) {
+    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? "Signal detected" : "Waiting for a voice";
+    setMicCheckStatus(
+      boosted > MIC_SIGNAL_THRESHOLD ? "Mic check: we hear you" : "Mic check: speak a little louder",
+      boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
+    );
+  } else if (flowState === FLOW.COUNTDOWN) {
+    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? "Signal detected" : "Listening closely";
+    setMicCheckStatus(
+      boosted > MIC_SIGNAL_THRESHOLD ? "Mic check: we hear you" : "Mic check: speak a little louder",
+      boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
+    );
+  } else if (flowState === FLOW.RECORDING) {
+    meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? "Recording signal" : "Listening closely";
+    setMicCheckStatus(
+      boosted > MIC_SIGNAL_THRESHOLD ? "Mic check: signal is healthy" : "Mic check: very quiet input",
+      boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
+    );
+  }
 }
 
 function setMicCheckStatus(text, tone) {
@@ -559,84 +564,8 @@ async function armMicrophone() {
 }
 
 async function ensureMicrophoneReady() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    throw new Error("This browser does not support microphone capture.");
-  }
-
-  if (mediaStream && audioCtx) {
-    await audioCtx.resume();
-    return;
-  }
-
-  mediaStream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    },
-    video: false,
-  });
-
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  await audioCtx.resume();
-
-  sampleRate = audioCtx.sampleRate;
-  sourceNode = audioCtx.createMediaStreamSource(mediaStream);
-  analyserNode = audioCtx.createAnalyser();
-  analyserNode.fftSize = 1024;
-  analyserNode.smoothingTimeConstant = 0.82;
-  meterData = new Uint8Array(analyserNode.fftSize);
-
-  sourceNode.connect(analyserNode);
-
-  const [track] = mediaStream.getAudioTracks();
-  micLabel = track && track.label ? track.label : "USB microphone live";
-  startMeterLoop();
-}
-
-function startMeterLoop() {
-  cancelAnimationFrame(meterFrame);
-
-  const tick = () => {
-    if (!analyserNode || !meterData) {
-      setMeterLevel(0);
-      return;
-    }
-
-    analyserNode.getByteTimeDomainData(meterData);
-    let sum = 0;
-    for (let i = 0; i < meterData.length; i += 1) {
-      const normalized = (meterData[i] - 128) / 128;
-      sum += normalized * normalized;
-    }
-    const rms = Math.sqrt(sum / meterData.length);
-    const boosted = Math.min(1, rms * 4.5);
-    setMeterLevel(boosted);
-
-    if (flowState === FLOW.ARMED) {
-      meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? "Signal detected" : "Waiting for a voice";
-      setMicCheckStatus(
-        boosted > MIC_SIGNAL_THRESHOLD ? "Mic check: we hear you" : "Mic check: speak a little louder",
-        boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
-      );
-    } else if (flowState === FLOW.COUNTDOWN) {
-      meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? "Signal detected" : "Listening closely";
-      setMicCheckStatus(
-        boosted > MIC_SIGNAL_THRESHOLD ? "Mic check: we hear you" : "Mic check: speak a little louder",
-        boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
-      );
-    } else if (flowState === FLOW.RECORDING) {
-      meterText.textContent = boosted > MIC_SIGNAL_THRESHOLD ? "Recording signal" : "Listening closely";
-      setMicCheckStatus(
-        boosted > MIC_SIGNAL_THRESHOLD ? "Mic check: signal is healthy" : "Mic check: very quiet input",
-        boosted > MIC_SIGNAL_THRESHOLD ? "good" : "quiet",
-      );
-    }
-
-    meterFrame = window.requestAnimationFrame(tick);
-  };
-
-  meterFrame = window.requestAnimationFrame(tick);
+  await captureController.ensureReady();
+  micLabel = captureController.getMicLabel();
 }
 
 async function startRecording() {
@@ -659,10 +588,10 @@ function startCountdown() {
     countdownLabel.textContent = secondsLeft > 1
       ? "Recording starts in a moment."
       : "Recording starts now.";
-    playPreRollTone(secondsLeft <= 1);
+    captureController.playPreRollTone(PRE_ROLL_TONE, secondsLeft <= 1);
 
     if (secondsLeft <= 1) {
-      beginRecordingCapture();
+      runAction(beginRecordingCapture);
       return;
     }
 
@@ -673,55 +602,18 @@ function startCountdown() {
   window.setTimeout(() => tick(PRE_ROLL_SECONDS), 0);
 }
 
-function playPreRollTone(isFinalBeat = false) {
-  if (!audioCtx) return;
-
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  const now = audioCtx.currentTime;
-  const attackEnd = now + PRE_ROLL_TONE.durationSeconds;
-  const releaseEnd = attackEnd + PRE_ROLL_TONE.tailSeconds;
-
-  osc.type = isFinalBeat ? "sine" : "triangle";
-  osc.frequency.setValueAtTime(
-    isFinalBeat ? PRE_ROLL_TONE.finalFrequency : PRE_ROLL_TONE.countdownFrequency,
-    now,
-  );
-
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.linearRampToValueAtTime(PRE_ROLL_TONE.gain, attackEnd);
-  gain.gain.exponentialRampToValueAtTime(0.0001, releaseEnd);
-
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start(now);
-  osc.stop(releaseEnd + 0.02);
-
-  osc.onended = () => {
-    try { osc.disconnect(); } catch (err) {}
-    try { gain.disconnect(); } catch (err) {}
-  };
-}
-
-function beginRecordingCapture() {
+async function beginRecordingCapture() {
   if (flowState !== FLOW.COUNTDOWN) return;
 
   submitStatus.textContent = "";
   buffers = [];
   recStartTs = performance.now();
 
-  procNode = audioCtx.createScriptProcessor(4096, 1, 1);
-  silentGainNode = audioCtx.createGain();
-  silentGainNode.gain.value = 0;
-
-  sourceNode.connect(procNode);
-  procNode.connect(silentGainNode);
-  silentGainNode.connect(audioCtx.destination);
-
-  procNode.onaudioprocess = (event) => {
-    const input = event.inputBuffer.getChannelData(0);
-    buffers.push(new Float32Array(input));
-  };
+  await captureController.startRecording({
+    onChunk(chunk) {
+      buffers.push(chunk);
+    },
+  });
 
   window.clearInterval(timerInterval);
   timerInterval = window.setInterval(() => {
@@ -743,11 +635,12 @@ function cancelCountdown() {
 }
 
 function stopRecording() {
-  if (flowState !== FLOW.RECORDING || !audioCtx) return;
+  if (flowState !== FLOW.RECORDING) return;
 
   stopRecordingNodes();
 
   const rawData = mergeBuffers(buffers);
+  const sampleRate = captureController.getSampleRate();
   const processed = processRecordingSamples(rawData, sampleRate);
 
   durationMs = Math.round((processed.samples.length / sampleRate) * 1000);
@@ -772,7 +665,7 @@ function cancelCurrentTake() {
 
 async function recordAgain() {
   clearTakeData();
-  if (mediaStream) {
+  if (captureController.hasLiveInput()) {
     setFlowState(FLOW.ARMED);
     return;
   }
@@ -894,49 +787,14 @@ function selectMode(mode) {
 function stopRecordingNodes() {
   window.clearInterval(timerInterval);
   timerInterval = 0;
-
-  if (procNode) {
-    procNode.onaudioprocess = null;
-    try { sourceNode.disconnect(procNode); } catch (err) {}
-    try { procNode.disconnect(); } catch (err) {}
-    procNode = null;
-  }
-
-  if (silentGainNode) {
-    try { silentGainNode.disconnect(); } catch (err) {}
-    silentGainNode = null;
-  }
+  captureController.stopRecording();
 }
 
 async function teardownMicrophone() {
   stopRecordingNodes();
-  cancelAnimationFrame(meterFrame);
-  meterFrame = 0;
+  await captureController.teardown();
   setMeterLevel(0);
-
-  if (sourceNode) {
-    try { sourceNode.disconnect(); } catch (err) {}
-    sourceNode = null;
-  }
-  if (analyserNode) {
-    try { analyserNode.disconnect(); } catch (err) {}
-    analyserNode = null;
-  }
-
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((track) => track.stop());
-    mediaStream = null;
-  }
-
-  if (audioCtx) {
-    try {
-      await audioCtx.close();
-    } catch (err) {}
-    audioCtx = null;
-  }
-
-  meterData = null;
-  micLabel = "Microphone asleep";
+  micLabel = captureController.getMicLabel();
 }
 
 function describeMicError(err) {
@@ -1019,302 +877,6 @@ function runAction(action) {
   Promise.resolve(action()).catch((err) => {
     setFlowState(FLOW.ERROR, { errorMessage: err.message || "Unexpected kiosk error." });
   });
-}
-
-function mergeBuffers(chunks) {
-  const length = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-  const merged = new Float32Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return merged;
-}
-
-function processRecordingSamples(samples, sr) {
-  if (!samples.length) {
-    return { samples, note: "Choose how this take should be handled.", quietWarning: null };
-  }
-
-  const trimmed = trimSilence(
-    samples,
-    sr,
-    RECORDING_PROCESSING.trimThreshold,
-    RECORDING_PROCESSING.edgePaddingMs,
-    RECORDING_PROCESSING.minContentMs,
-  );
-  const quietWarning = analyzeTakeLevel(trimmed, sr);
-  const normalized = normalizeSamples(trimmed, RECORDING_PROCESSING.targetPeak, RECORDING_PROCESSING.maxGain);
-  applyFade(normalized, sr, RECORDING_PROCESSING.fadeMs);
-
-  const changedDuration = samples.length !== trimmed.length;
-  let note = changedDuration
-    ? "Take captured. Quiet edges were trimmed and the level was smoothed."
-    : "Take captured. The level was smoothed for playback.";
-  if (quietWarning) {
-    note = "Take captured. The input stayed very quiet, so please keep or retake it before choosing a memory mode.";
-  }
-
-  return {
-    samples: normalized,
-    note,
-    quietWarning,
-  };
-}
-
-function analyzeTakeLevel(samples, sr) {
-  if (!samples.length) return null;
-
-  const durationMs = (samples.length / sr) * 1000;
-  if (durationMs < QUIET_TAKE.minDurationMs) {
-    return null;
-  }
-
-  let peak = 0;
-  let sumSquares = 0;
-  for (let i = 0; i < samples.length; i += 1) {
-    const value = samples[i];
-    const abs = Math.abs(value);
-    peak = Math.max(peak, abs);
-    sumSquares += value * value;
-  }
-
-  const rms = Math.sqrt(sumSquares / samples.length);
-  if (rms >= QUIET_TAKE.rmsThreshold || peak >= QUIET_TAKE.peakThreshold) {
-    return null;
-  }
-
-  return { peak, rms, durationMs };
-}
-
-function trimSilence(samples, sr, threshold, edgePaddingMs, minContentMs) {
-  const paddingSamples = Math.round((edgePaddingMs / 1000) * sr);
-  const minContentSamples = Math.round((minContentMs / 1000) * sr);
-
-  let start = 0;
-  while (start < samples.length && Math.abs(samples[start]) < threshold) {
-    start += 1;
-  }
-
-  let end = samples.length - 1;
-  while (end >= 0 && Math.abs(samples[end]) < threshold) {
-    end -= 1;
-  }
-
-  if (start >= end) {
-    return samples.slice();
-  }
-
-  start = Math.max(0, start - paddingSamples);
-  end = Math.min(samples.length, end + paddingSamples + 1);
-
-  if ((end - start) < minContentSamples) {
-    return samples.slice();
-  }
-  return samples.slice(start, end);
-}
-
-function normalizeSamples(samples, targetPeak, maxGain) {
-  let peak = 0;
-  for (let i = 0; i < samples.length; i += 1) {
-    peak = Math.max(peak, Math.abs(samples[i]));
-  }
-
-  if (peak < 0.0001) {
-    return samples.slice();
-  }
-
-  const gain = Math.min(maxGain, targetPeak / peak);
-  if (Math.abs(gain - 1) < 0.02) {
-    return samples.slice();
-  }
-
-  const normalized = new Float32Array(samples.length);
-  for (let i = 0; i < samples.length; i += 1) {
-    normalized[i] = clamp(samples[i] * gain, -1, 1);
-  }
-  return normalized;
-}
-
-function applyFade(samples, sr, fadeMs) {
-  const fadeSamples = Math.min(
-    Math.round((fadeMs / 1000) * sr),
-    Math.floor(samples.length / 2),
-  );
-
-  for (let i = 0; i < fadeSamples; i += 1) {
-    const gain = i / Math.max(1, fadeSamples);
-    samples[i] *= gain;
-    samples[samples.length - 1 - i] *= gain;
-  }
-}
-
-function encodeWavMono16(float32Samples, sr) {
-  const numSamples = float32Samples.length;
-  const bytesPerSample = 2;
-  const blockAlign = bytesPerSample;
-  const byteRate = sr * blockAlign;
-  const dataSize = numSamples * bytesPerSample;
-  const buffer = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(buffer);
-
-  function writeStr(offset, value) {
-    for (let i = 0; i < value.length; i += 1) {
-      view.setUint8(offset + i, value.charCodeAt(i));
-    }
-  }
-
-  writeStr(0, "RIFF");
-  view.setUint32(4, 36 + dataSize, true);
-  writeStr(8, "WAVE");
-  writeStr(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sr, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, 16, true);
-  writeStr(36, "data");
-  view.setUint32(40, dataSize, true);
-
-  let pointer = 44;
-  for (let i = 0; i < numSamples; i += 1) {
-    const sample = Math.max(-1, Math.min(1, float32Samples[i]));
-    const value = sample < 0 ? sample * 32768 : sample * 32767;
-    view.setInt16(pointer, value, true);
-    pointer += 2;
-  }
-
-  return new Blob([view], { type: "audio/wav" });
-}
-
-async function fetchArrayBuffer(url) {
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`fetch failed ${response.status}`);
-  }
-  return response.arrayBuffer();
-}
-
-async function playUrlWithLightChain(url, wear) {
-  const amount = smoothstep(clamp(wear, 0, 1));
-  const arrayBuffer = await fetchArrayBuffer(url);
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
-  const peak = getBufferPeak(buffer);
-
-  const src = ctx.createBufferSource();
-  src.buffer = buffer;
-
-  // The playback chain turns accumulated wear into subtle audible patina rather
-  // than obvious lo-fi effects: less air, a little grain, slight instability.
-  const lowpass = ctx.createBiquadFilter();
-  lowpass.type = "lowpass";
-  lowpass.frequency.value = lerp(16000, 4500, amount);
-  lowpass.Q.value = 0.6;
-
-  const shelf = ctx.createBiquadFilter();
-  shelf.type = "highshelf";
-  shelf.frequency.value = 6000;
-  shelf.gain.value = lerp(0, -10, amount);
-
-  const crush = ctx.createScriptProcessor(1024, 1, 1);
-  const bitDepth = Math.round(lerp(16, 12, amount));
-  const step = Math.pow(0.5, bitDepth);
-  const holdN = Math.round(lerp(1, 3, amount));
-  const noiseAmp = lerp(0.0, 0.004, amount);
-  const dropoutProb = lerp(0.0, 0.003, amount);
-
-  let holdCounter = 0;
-  let held = 0.0;
-
-  crush.onaudioprocess = (event) => {
-    const input = event.inputBuffer.getChannelData(0);
-    const output = event.outputBuffer.getChannelData(0);
-
-    for (let i = 0; i < input.length; i += 1) {
-      if (holdCounter === 0) {
-        held = input[i];
-      }
-      holdCounter = (holdCounter + 1) % holdN;
-
-      let sample = Math.round(held / step) * step;
-      if (Math.random() < dropoutProb) sample = 0.0;
-      sample += (Math.random() * 2 - 1) * noiseAmp;
-      output[i] = sample;
-    }
-  };
-
-  const lfo = ctx.createOscillator();
-  lfo.type = "sine";
-  lfo.frequency.value = lerp(0.05, 0.12, amount);
-
-  const lfoGain = ctx.createGain();
-  lfoGain.gain.value = lerp(0, 180, amount);
-  lfo.connect(lfoGain);
-  lfoGain.connect(lowpass.frequency);
-
-  const gain = ctx.createGain();
-  // Normalize contributions toward a shared room level, then fade the edges so
-  // back-to-back playback feels placed in space instead of hard-cut together.
-  const normalizedGain = peak > 0.0001
-    ? clamp(PLAYBACK_SMOOTHING.targetPeak / peak, PLAYBACK_SMOOTHING.minGain, PLAYBACK_SMOOTHING.maxGain)
-    : 1.0;
-  const fadeInSeconds = Math.min(PLAYBACK_SMOOTHING.fadeInSeconds, Math.max(0.02, buffer.duration / 4));
-  const fadeOutSeconds = Math.min(PLAYBACK_SMOOTHING.fadeOutSeconds, Math.max(0.04, buffer.duration / 3));
-  const releaseAt = Math.max(fadeInSeconds, buffer.duration - fadeOutSeconds);
-  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(normalizedGain * 0.95, ctx.currentTime + fadeInSeconds);
-  gain.gain.setValueAtTime(normalizedGain * 0.95, ctx.currentTime + releaseAt);
-  gain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + buffer.duration);
-
-  src.connect(lowpass);
-  lowpass.connect(shelf);
-  shelf.connect(crush);
-  crush.connect(gain);
-  gain.connect(ctx.destination);
-
-  lfo.start();
-
-  return new Promise((resolve) => {
-    src.onended = async () => {
-      try { lfo.stop(); } catch (err) {}
-      try { lfo.disconnect(); } catch (err) {}
-      try { lfoGain.disconnect(); } catch (err) {}
-      try { crush.disconnect(); } catch (err) {}
-      try { shelf.disconnect(); } catch (err) {}
-      try { lowpass.disconnect(); } catch (err) {}
-      try { gain.disconnect(); } catch (err) {}
-      await ctx.close();
-      resolve();
-    };
-    src.start();
-  });
-}
-
-function getBufferPeak(buffer) {
-  let peak = 0;
-  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
-    const data = buffer.getChannelData(channel);
-    for (let i = 0; i < data.length; i += 1) {
-      peak = Math.max(peak, Math.abs(data[i]));
-    }
-  }
-  return peak;
-}
-
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function smoothstep(value) {
-  return value * value * (3 - 2 * value);
 }
 
 const roomLoopController = window.MemoryEngineRoomLoop.createController({

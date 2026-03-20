@@ -197,7 +197,7 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 - `docs/maintenance.md` — deployment, status, backup, restore, and troubleshooting runbook
 - `docs/installation-checklist.md` — hardware, browser kiosk mode, audio, and auto-start install checklist
 - `docs/roadmap.md` — landed changes and the next likely improvements
-- `scripts/check.sh` — syntax, Django behavior tests, and patch-hygiene validation
+- `scripts/check.sh` — browser syntax, frontend smoke tests, Django behavior tests, and patch-hygiene validation
 - `scripts/doctor.sh` — operator-focused env, compose, storage, and browser-constraint checks
 - `scripts/deploy.sh` — server-side deploy helper for IP-now / domain-later rollout
 - `scripts/first_boot.sh` — bootstrap strong secrets and node identity before deployment
