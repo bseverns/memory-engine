@@ -49,6 +49,7 @@ function healthyNodeStatusPayload(overrides = {}) {
       intake_paused: false,
       playback_paused: false,
       quieter_mode: false,
+      mood_bias: "",
     },
     ...overrides,
   };
@@ -73,6 +74,50 @@ async function signIntoOps(page) {
   await expect(page.getByRole("heading", { name: "Room Memory Status" })).toBeVisible();
 }
 
+function fossilDataUrl(label = "Fossil Drift") {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+      <defs>
+        <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#1f1713"/>
+          <stop offset="100%" stop-color="#3c2e25"/>
+        </linearGradient>
+      </defs>
+      <rect width="1280" height="720" fill="url(#bg)"/>
+      <g fill="none" stroke="#c9efe8" stroke-width="3" opacity="0.62">
+        <path d="M40 520 C180 300 280 610 420 390 S700 120 860 350 1120 610 1240 260"/>
+        <path d="M60 460 C220 220 330 600 500 330 S820 170 980 420 1140 590 1220 220" opacity="0.36"/>
+      </g>
+      <text x="80" y="96" fill="#f4ede3" font-size="42" font-family="Helvetica Neue, Arial, sans-serif">${label}</text>
+    </svg>
+  `.trim();
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+async function mockSpectrograms(target) {
+  await target.route("**/api/v1/derivatives/spectrograms", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: 1,
+          artifact_id: 18,
+          kind: "spectrogram_png",
+          created_at: "2026-03-20T14:00:00Z",
+          image_url: fossilDataUrl("Fossil 18"),
+        },
+        {
+          id: 2,
+          artifact_id: 14,
+          kind: "spectrogram_png",
+          created_at: "2026-03-18T10:30:00Z",
+          image_url: fossilDataUrl("Fossil 14"),
+        },
+      ]),
+    });
+  });
+}
+
 async function setCheckboxState(locator, checked) {
   if ((await locator.isChecked()) !== checked) {
     await locator.click();
@@ -83,17 +128,20 @@ async function applyStewardControls(page, {
   intakePaused = false,
   playbackPaused = false,
   quieterMode = false,
+  moodBias = "",
 } = {}) {
   await signIntoOps(page);
   await setCheckboxState(page.locator("#opsIntakePaused"), intakePaused);
   await setCheckboxState(page.locator("#opsPlaybackPaused"), playbackPaused);
   await setCheckboxState(page.locator("#opsQuieterMode"), quieterMode);
+  await page.locator("#opsMoodBias").selectOption(moodBias);
   await page.locator("#opsControlsSave").click();
 
   const expectedStatus = [];
   if (intakePaused) expectedStatus.push("intake paused");
   if (playbackPaused) expectedStatus.push("playback paused");
   if (quieterMode) expectedStatus.push("quieter mode");
+  if (moodBias) expectedStatus.push(`mood bias: ${moodBias}`);
 
   if (expectedStatus.length) {
     for (const phrase of expectedStatus) {
@@ -116,6 +164,7 @@ test.describe("visual stack walkthrough", () => {
 
   test("captures the dedicated playback surface", async ({ page }) => {
     await mockHealthyOpsStatus(page);
+    await mockSpectrograms(page.context());
     await applyStewardControls(page, {});
     await page.goto("/room/?autostart=0");
     await expect(page.getByRole("heading", { name: "Room Memory" })).toBeVisible();
@@ -133,6 +182,7 @@ test.describe("visual stack walkthrough", () => {
             intake_paused: false,
             playback_paused: false,
             quieter_mode: false,
+            mood_bias: "",
           },
           recent_actions: [],
         }),
@@ -183,6 +233,7 @@ test.describe("visual stack walkthrough", () => {
         intake_paused: true,
         playback_paused: false,
         quieter_mode: true,
+        mood_bias: "weathered",
       },
     });
     await page.route("**/api/v1/operator/controls", async (route) => {
@@ -193,6 +244,7 @@ test.describe("visual stack walkthrough", () => {
             intake_paused: true,
             playback_paused: false,
             quieter_mode: true,
+            mood_bias: "weathered",
           },
           recent_actions: [
             {
@@ -229,7 +281,8 @@ test.describe("visual stack walkthrough", () => {
 
   test("captures the listening surface after quieter mode is applied live", async ({ page }) => {
     await mockHealthyOpsStatus(page);
-    await applyStewardControls(page, { quieterMode: true });
+    await mockSpectrograms(page.context());
+    await applyStewardControls(page, { quieterMode: true, moodBias: "weathered" });
 
     const roomPage = await page.context().newPage();
     await roomPage.goto("/room/?autostart=0");

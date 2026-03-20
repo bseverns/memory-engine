@@ -98,6 +98,7 @@ class StewardState(models.Model):
     playback_paused = models.BooleanField(default=False)
     quieter_mode = models.BooleanField(default=False)
     maintenance_mode = models.BooleanField(default=False)
+    mood_bias = models.CharField(max_length=32, blank=True, default="")
     updated_at = models.DateTimeField(auto_now=True)
 
     @classmethod

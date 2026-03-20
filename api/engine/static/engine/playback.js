@@ -3,12 +3,33 @@
   const stopButton = document.getElementById("btnPlaybackStop");
   const statusEl = document.getElementById("playbackStatus");
   const autostartNote = document.getElementById("playbackAutostartNote");
+  const fossilVisualsEl = document.getElementById("playbackFossilVisuals");
+  const fossilVisualShell = document.getElementById("playbackVisualShell");
+  const fossilFrame = document.getElementById("playbackFossilFrame");
+  const fossilImage = document.getElementById("playbackFossilImage");
+  const fossilFallback = document.getElementById("playbackFossilFallback");
+  const fossilTitle = document.getElementById("playbackFossilTitle");
+  const fossilMeta = document.getElementById("playbackFossilMeta");
   const SURFACE_STATE_POLL_MS = 5000;
 
   if (!startButton || !stopButton || !statusEl || !autostartNote) {
     return;
   }
 
+  function readKioskConfig() {
+    const el = document.getElementById("kiosk-config");
+    if (!el || !el.textContent) {
+      return { roomFossilVisualsEnabled: false };
+    }
+    try {
+      return JSON.parse(el.textContent);
+    } catch (error) {
+      return { roomFossilVisualsEnabled: false };
+    }
+  }
+
+  const config = readKioskConfig();
+  const fossilVisualPollMs = Number(config.roomLoopConfig?.fossilVisuals?.refreshMs || 18000);
   const roomLoopController = global.MemoryEngineRoomLoop.createController({
     startButton,
     stopButton,
@@ -17,9 +38,80 @@
   });
   let autostartRequested = false;
   let surfaceStateInterval = 0;
+  let fossilVisualInterval = 0;
+  let fossilVisualIndex = 0;
 
   function updateSurfaceNote(message) {
     autostartNote.textContent = message;
+  }
+
+  function renderNoFossilVisuals(message) {
+    if (!fossilVisualsEl || !fossilFrame || !fossilFallback || !fossilMeta || !fossilTitle) {
+      return;
+    }
+    fossilVisualsEl.hidden = false;
+    fossilFrame.classList.add("empty");
+    fossilFallback.hidden = false;
+    if (fossilImage) {
+      fossilImage.hidden = true;
+      fossilImage.removeAttribute("src");
+    }
+    fossilTitle.textContent = "Ambient spectrogram drift";
+    fossilMeta.textContent = message;
+  }
+
+  function renderFossilVisualsEnabled(enabled) {
+    if (!fossilVisualsEl || !fossilVisualShell) {
+      return;
+    }
+    fossilVisualsEl.hidden = !enabled;
+    fossilVisualShell.classList.toggle("compact", !enabled);
+  }
+
+  function describeFossilEntry(entry) {
+    if (!entry) {
+      return "Waiting for recent fossils.";
+    }
+    const createdAt = entry.created_at ? new Date(entry.created_at).toLocaleString() : "Unknown time";
+    return `Recent fossil ${entry.artifact_id} · ${createdAt}`;
+  }
+
+  async function refreshFossilVisuals() {
+    if (!config.roomFossilVisualsEnabled) {
+      renderFossilVisualsEnabled(false);
+      return;
+    }
+    renderFossilVisualsEnabled(true);
+    try {
+      const response = await fetch("/api/v1/derivatives/spectrograms", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`Fossil visuals failed (${response.status})`);
+      }
+      const entries = (await response.json()).filter((entry) => entry.image_url);
+      if (!entries.length) {
+        renderNoFossilVisuals("No fossil spectrograms are available yet.");
+        return;
+      }
+      fossilVisualIndex = fossilVisualIndex % entries.length;
+      const entry = entries[fossilVisualIndex];
+      fossilVisualIndex += 1;
+      fossilFrame?.classList.remove("empty");
+      if (fossilFallback) {
+        fossilFallback.hidden = true;
+      }
+      if (fossilImage) {
+        fossilImage.hidden = false;
+        fossilImage.src = entry.image_url;
+      }
+      if (fossilTitle) {
+        fossilTitle.textContent = `Fossil ${entry.artifact_id}`;
+      }
+      if (fossilMeta) {
+        fossilMeta.textContent = describeFossilEntry(entry);
+      }
+    } catch (error) {
+      renderNoFossilVisuals("Unable to refresh fossil visuals right now.");
+    }
   }
 
   async function refreshSurfaceState() {
@@ -48,8 +140,12 @@
         return;
       }
 
-      if (operatorState.quieter_mode) {
+      if (operatorState.quieter_mode && operatorState.mood_bias) {
+        updateSurfaceNote(`Quieter mode is active, with a ${operatorState.mood_bias} mood bias on this listening surface.`);
+      } else if (operatorState.quieter_mode) {
         updateSurfaceNote("Quieter mode is active on this listening surface.");
+      } else if (operatorState.mood_bias) {
+        updateSurfaceNote(`The steward is nudging this room toward ${operatorState.mood_bias} material.`);
       } else if (roomLoopController.isRunning()) {
         updateSurfaceNote("Playback is running here. Recording stays on the separate kiosk.");
       }
@@ -122,6 +218,7 @@
 
   global.addEventListener("beforeunload", () => {
     global.clearInterval(surfaceStateInterval);
+    global.clearInterval(fossilVisualInterval);
     roomLoopController.teardown();
   });
 
@@ -134,7 +231,11 @@
     statusEl.textContent = "Ready to start room playback.";
   }
   void refreshSurfaceState();
+  void refreshFossilVisuals();
   surfaceStateInterval = global.setInterval(() => {
     void refreshSurfaceState();
   }, SURFACE_STATE_POLL_MS);
+  fossilVisualInterval = global.setInterval(() => {
+    void refreshFossilVisuals();
+  }, fossilVisualPollMs);
 }(window));

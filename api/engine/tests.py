@@ -234,6 +234,60 @@ class EngineBehaviorTests(TestCase):
 
         self.assertGreater(settled_weight, fresh_weight)
 
+    def test_pool_weight_prefers_light_release_after_dense_cluster(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        dense = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/dense.wav",
+            duration_ms=24000,
+            created_at=now - timedelta(hours=16),
+            last_access_at=now - timedelta(hours=6),
+        )
+        light = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/light.wav",
+            duration_ms=3000,
+            created_at=now - timedelta(hours=16),
+            last_access_at=now - timedelta(hours=6),
+        )
+
+        dense_weight = pool_weight(
+            dense,
+            now,
+            cooldown_seconds=90,
+            recent_densities=["dense", "dense", "medium"],
+        )
+        light_weight = pool_weight(
+            light,
+            now,
+            cooldown_seconds=90,
+            recent_densities=["dense", "dense", "medium"],
+        )
+
+        self.assertGreater(light_weight, dense_weight)
+
+    def test_pool_weight_boosts_featured_return_after_long_absence(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        older_return = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/older-return.wav",
+            created_at=now - timedelta(days=12),
+            last_access_at=now - timedelta(days=8),
+        )
+        merely_old = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/merely-old.wav",
+            created_at=now - timedelta(days=12),
+            last_access_at=now - timedelta(hours=10),
+        )
+
+        return_weight = pool_weight(older_return, now, cooldown_seconds=90)
+        old_weight = pool_weight(merely_old, now, cooldown_seconds=90)
+
+        self.assertGreater(return_weight, old_weight)
+
     @patch("engine.api_views.health_component_status")
     def test_healthz_returns_503_when_dependency_check_fails(self, health_mock):
         health_mock.return_value = (
@@ -266,6 +320,7 @@ class EngineBehaviorTests(TestCase):
                 "intake_paused": True,
                 "playback_paused": True,
                 "quieter_mode": True,
+                "mood_bias": "weathered",
             },
             content_type="application/json",
         )
@@ -276,11 +331,13 @@ class EngineBehaviorTests(TestCase):
         self.assertTrue(state.intake_paused)
         self.assertTrue(state.playback_paused)
         self.assertTrue(state.quieter_mode)
-        self.assertEqual(StewardAction.objects.count(), 4)
+        self.assertEqual(state.mood_bias, "weathered")
+        self.assertEqual(StewardAction.objects.count(), 5)
         payload = response.json()
         self.assertTrue(payload["operator_state"]["maintenance_mode"])
+        self.assertEqual(payload["operator_state"]["mood_bias"], "weathered")
         self.assertTrue(payload["operator_state"]["intake_paused"])
-        self.assertEqual(len(payload["changes"]), 4)
+        self.assertEqual(len(payload["changes"]), 5)
 
     @patch("engine.api_views.put_bytes")
     def test_intake_pause_blocks_new_audio_artifact_creation(self, put_bytes_mock):
@@ -517,6 +574,11 @@ class EngineBehaviorTests(TestCase):
             POOL_CANDIDATE_LIMIT=40,
             POOL_FRESH_MAX_AGE_HOURS=8.0,
             POOL_WORN_MIN_AGE_HOURS=18.0,
+            POOL_FEATURED_RETURN_MIN_AGE_HOURS=168.0,
+            POOL_FEATURED_RETURN_MIN_ABSENCE_HOURS=96.0,
+            POOL_FEATURED_RETURN_BOOST=1.45,
+            POOL_DENSITY_CLUSTER_PENALTY=0.62,
+            POOL_DENSITY_RELEASE_BOOST=1.18,
             RAW_TTL_HOURS_ROOM=48,
             RAW_TTL_HOURS_FOSSIL=48,
             DERIVATIVE_TTL_DAYS_FOSSIL=365,
@@ -525,9 +587,17 @@ class EngineBehaviorTests(TestCase):
             ROOM_QUIET_HOURS_GAP_MULTIPLIER=1.2,
             ROOM_QUIET_HOURS_TONE_MULTIPLIER=0.78,
             ROOM_QUIET_HOURS_OUTPUT_GAIN_MULTIPLIER=0.72,
+            ROOM_TONE_SOURCE_MODE="synthetic",
+            ROOM_TONE_SOURCE_URL="",
             ROOM_SCARCITY_SEVERE_THRESHOLD=3,
             ROOM_SCARCITY_LOW_THRESHOLD=6,
             ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            ROOM_OVERLAP_CHANCE=0.1,
+            ROOM_OVERLAP_MIN_POOL_SIZE=6,
+            ROOM_OVERLAP_MAX_LAYERS=2,
+            ROOM_OVERLAP_MIN_DELAY_MS=180,
+            ROOM_OVERLAP_MAX_DELAY_MS=520,
+            ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
             OPS_SESSION_TTL_SECONDS=43200,
             OPS_POOL_LOW_COUNT=6,
             OPS_POOL_IMBALANCE_RATIO=0.72,
@@ -553,6 +623,11 @@ class EngineBehaviorTests(TestCase):
             POOL_CANDIDATE_LIMIT=40,
             POOL_FRESH_MAX_AGE_HOURS=8.0,
             POOL_WORN_MIN_AGE_HOURS=6.0,
+            POOL_FEATURED_RETURN_MIN_AGE_HOURS=168.0,
+            POOL_FEATURED_RETURN_MIN_ABSENCE_HOURS=96.0,
+            POOL_FEATURED_RETURN_BOOST=1.45,
+            POOL_DENSITY_CLUSTER_PENALTY=0.62,
+            POOL_DENSITY_RELEASE_BOOST=1.18,
             RAW_TTL_HOURS_ROOM=48,
             RAW_TTL_HOURS_FOSSIL=48,
             DERIVATIVE_TTL_DAYS_FOSSIL=365,
@@ -561,9 +636,17 @@ class EngineBehaviorTests(TestCase):
             ROOM_QUIET_HOURS_GAP_MULTIPLIER=1.2,
             ROOM_QUIET_HOURS_TONE_MULTIPLIER=0.78,
             ROOM_QUIET_HOURS_OUTPUT_GAIN_MULTIPLIER=0.72,
+            ROOM_TONE_SOURCE_MODE="synthetic",
+            ROOM_TONE_SOURCE_URL="",
             ROOM_SCARCITY_SEVERE_THRESHOLD=8,
             ROOM_SCARCITY_LOW_THRESHOLD=6,
             ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            ROOM_OVERLAP_CHANCE=0.1,
+            ROOM_OVERLAP_MIN_POOL_SIZE=6,
+            ROOM_OVERLAP_MAX_LAYERS=2,
+            ROOM_OVERLAP_MIN_DELAY_MS=180,
+            ROOM_OVERLAP_MAX_DELAY_MS=520,
+            ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
             OPS_SESSION_TTL_SECONDS=43200,
             OPS_POOL_LOW_COUNT=6,
             OPS_POOL_IMBALANCE_RATIO=0.72,
@@ -594,6 +677,11 @@ class EngineBehaviorTests(TestCase):
             POOL_CANDIDATE_LIMIT=40,
             POOL_FRESH_MAX_AGE_HOURS=8.0,
             POOL_WORN_MIN_AGE_HOURS=18.0,
+            POOL_FEATURED_RETURN_MIN_AGE_HOURS=168.0,
+            POOL_FEATURED_RETURN_MIN_ABSENCE_HOURS=96.0,
+            POOL_FEATURED_RETURN_BOOST=1.45,
+            POOL_DENSITY_CLUSTER_PENALTY=0.62,
+            POOL_DENSITY_RELEASE_BOOST=1.18,
             RAW_TTL_HOURS_ROOM=48,
             RAW_TTL_HOURS_FOSSIL=48,
             DERIVATIVE_TTL_DAYS_FOSSIL=365,
@@ -602,9 +690,17 @@ class EngineBehaviorTests(TestCase):
             ROOM_QUIET_HOURS_GAP_MULTIPLIER=1.2,
             ROOM_QUIET_HOURS_TONE_MULTIPLIER=0.78,
             ROOM_QUIET_HOURS_OUTPUT_GAIN_MULTIPLIER=0.72,
+            ROOM_TONE_SOURCE_MODE="synthetic",
+            ROOM_TONE_SOURCE_URL="",
             ROOM_SCARCITY_SEVERE_THRESHOLD=3,
             ROOM_SCARCITY_LOW_THRESHOLD=6,
             ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            ROOM_OVERLAP_CHANCE=0.1,
+            ROOM_OVERLAP_MIN_POOL_SIZE=6,
+            ROOM_OVERLAP_MAX_LAYERS=2,
+            ROOM_OVERLAP_MIN_DELAY_MS=180,
+            ROOM_OVERLAP_MAX_DELAY_MS=520,
+            ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
             OPS_SESSION_TTL_SECONDS=43200,
             OPS_POOL_LOW_COUNT=6,
             OPS_POOL_IMBALANCE_RATIO=0.72,
@@ -661,6 +757,9 @@ class EngineBehaviorTests(TestCase):
             quiet_hours_gap_multiplier=1.25,
             quiet_hours_tone_multiplier=0.7,
             quiet_hours_output_gain_multiplier=0.65,
+            tone_profile="warm_hiss",
+            tone_source_mode="synthetic",
+            tone_source_url="",
             now=timezone.make_aware(datetime(2026, 3, 20, 23, 0, 0), timezone.get_current_timezone()),
         )
 
@@ -668,8 +767,86 @@ class EngineBehaviorTests(TestCase):
         self.assertEqual(schedule["quietHoursGapMultiplier"], 1.25)
         self.assertEqual(schedule["quietHoursToneMultiplier"], 0.7)
         self.assertEqual(schedule["quietHoursOutputGainMultiplier"], 0.65)
+        self.assertEqual(schedule["roomToneProfile"], "warm_hiss")
+        self.assertEqual(schedule["roomToneSourceMode"], "synthetic")
 
     def test_quiet_hours_active_for_hour_handles_overnight_windows(self):
         self.assertTrue(quiet_hours_active_for_hour(23, enabled=True, start_hour=22, end_hour=6))
         self.assertTrue(quiet_hours_active_for_hour(4, enabled=True, start_hour=22, end_hour=6))
         self.assertFalse(quiet_hours_active_for_hour(14, enabled=True, start_hour=22, end_hour=6))
+
+    def test_runtime_config_validation_requires_site_ambience_url_when_enabled(self):
+        config = SimpleNamespace(
+            ALLOWED_HOSTS=["localhost"],
+            CSRF_TRUSTED_ORIGINS=["http://localhost"],
+            MINIO_ENDPOINT="http://minio:9000",
+            SECURE_SSL_REDIRECT=False,
+            SESSION_COOKIE_SECURE=False,
+            CSRF_COOKIE_SECURE=False,
+            WEAR_EPSILON_PER_PLAY=0.003,
+            POOL_PLAY_COOLDOWN_SECONDS=90,
+            POOL_CANDIDATE_LIMIT=40,
+            POOL_FRESH_MAX_AGE_HOURS=8.0,
+            POOL_WORN_MIN_AGE_HOURS=18.0,
+            POOL_FEATURED_RETURN_MIN_AGE_HOURS=168.0,
+            POOL_FEATURED_RETURN_MIN_ABSENCE_HOURS=96.0,
+            POOL_FEATURED_RETURN_BOOST=1.45,
+            POOL_DENSITY_CLUSTER_PENALTY=0.62,
+            POOL_DENSITY_RELEASE_BOOST=1.18,
+            RAW_TTL_HOURS_ROOM=48,
+            RAW_TTL_HOURS_FOSSIL=48,
+            DERIVATIVE_TTL_DAYS_FOSSIL=365,
+            ROOM_QUIET_HOURS_START_HOUR=22,
+            ROOM_QUIET_HOURS_END_HOUR=6,
+            ROOM_QUIET_HOURS_GAP_MULTIPLIER=1.2,
+            ROOM_QUIET_HOURS_TONE_MULTIPLIER=0.78,
+            ROOM_QUIET_HOURS_OUTPUT_GAIN_MULTIPLIER=0.72,
+            ROOM_TONE_SOURCE_MODE="site_ambience",
+            ROOM_TONE_SOURCE_URL="",
+            ROOM_SCARCITY_SEVERE_THRESHOLD=3,
+            ROOM_SCARCITY_LOW_THRESHOLD=6,
+            ROOM_ANTI_REPETITION_WINDOW_SIZE=12,
+            ROOM_OVERLAP_CHANCE=0.1,
+            ROOM_OVERLAP_MIN_POOL_SIZE=6,
+            ROOM_OVERLAP_MAX_LAYERS=2,
+            ROOM_OVERLAP_MIN_DELAY_MS=180,
+            ROOM_OVERLAP_MAX_DELAY_MS=520,
+            ROOM_OVERLAP_GAIN_MULTIPLIER=0.68,
+            OPS_SESSION_TTL_SECONDS=43200,
+            OPS_POOL_LOW_COUNT=6,
+            OPS_POOL_IMBALANCE_RATIO=0.72,
+            OPS_DISK_CRITICAL_FREE_GB=3.0,
+            OPS_DISK_WARNING_FREE_GB=8.0,
+            OPS_DISK_CRITICAL_FREE_PERCENT=8.0,
+            OPS_DISK_WARNING_FREE_PERCENT=15.0,
+            OPS_RETENTION_SOON_HOURS=24,
+        )
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("ROOM_TONE_SOURCE_URL", str(ctx.exception))
+
+    @patch("engine.api_views.stream_key")
+    def test_spectrogram_list_and_blob_proxy_expose_public_visual_url(self, stream_key_mock):
+        artifact = self.make_active_artifact(
+            raw_uri="raw/fossil.wav",
+            created_at=timezone.now() - timedelta(days=3),
+        )
+        Derivative.objects.create(
+            artifact=artifact,
+            kind=Derivative.KIND_SPECTROGRAM_PNG,
+            uri="derivatives/fossil/spectrogram.png",
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+        stream_key_mock.return_value = (io.BytesIO(b"PNG"), "image/png")
+
+        listing = self.client.get("/api/v1/derivatives/spectrograms")
+
+        self.assertEqual(listing.status_code, 200)
+        self.assertEqual(listing.json()[0]["image_url"], f"/api/v1/blob/{artifact.id}/spectrogram")
+
+        blob = self.client.get(f"/api/v1/blob/{artifact.id}/spectrogram")
+
+        self.assertEqual(blob.status_code, 200)
+        stream_key_mock.assert_called_once_with("derivatives/fossil/spectrogram.png")

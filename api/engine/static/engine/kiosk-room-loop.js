@@ -22,6 +22,15 @@
       scenes: [],
       movements: [],
       dayparts: [],
+      overlap: {
+        label: "Layered return",
+        densityLimit: "medium",
+      },
+      fossilVisuals: {
+        label: "Fossil drift",
+        refreshMs: 18000,
+        maxItems: 12,
+      },
       tone: {
         idleGain: 0.011,
         sparseGain: 0.017,
@@ -47,15 +56,25 @@
       roomQuietHoursGapMultiplier: 1.2,
       roomQuietHoursToneMultiplier: 0.78,
       roomQuietHoursOutputGainMultiplier: 0.72,
+      roomToneProfile: "soft_air",
+      roomToneSourceMode: "synthetic",
+      roomToneSourceUrl: "",
       roomScarcityEnabled: true,
       roomScarcityLowThreshold: 6,
       roomScarcitySevereThreshold: 3,
       roomAntiRepetitionWindowSize: 12,
+      roomOverlapChance: 0.1,
+      roomOverlapMinPoolSize: 6,
+      roomOverlapMaxLayers: 2,
+      roomOverlapMinDelayMs: 180,
+      roomOverlapMaxDelayMs: 520,
+      roomOverlapGainMultiplier: 0.68,
       operatorState: {
         intake_paused: false,
         playback_paused: false,
         quieter_mode: false,
         maintenance_mode: false,
+        mood_bias: "",
       },
       roomLoopConfig: defaultRoomLoopConfig(),
     };
@@ -260,6 +279,8 @@
     let roomToneMasterGain = null;
     let roomToneLfo = null;
     let roomToneLfoGain = null;
+    let roomToneMediaElement = null;
+    let roomToneMediaSource = null;
 
     function setStatus(message) {
       if (statusEl) {
@@ -273,6 +294,11 @@
 
     function playbackPausedBySteward() {
       return Boolean(surfaceState.playback_paused);
+    }
+
+    function currentMoodBias() {
+      const value = String(surfaceState.mood_bias || "").toLowerCase();
+      return ["clear", "hushed", "suspended", "weathered", "gathering"].includes(value) ? value : "";
     }
 
     function updateButtons() {
@@ -312,6 +338,36 @@
           || movementPresets.balanced
           || fallbackConfig.movementPresets.balanced,
       };
+    }
+
+    function recentDensityWindow() {
+      return loopHistory
+        .slice(-4)
+        .map((item) => item.density)
+        .filter((density) => ["light", "medium", "dense"].includes(density));
+    }
+
+    function chooseTargetDensity(movement, recent) {
+      const densities = recent
+        .slice(-4)
+        .map((item) => item.density)
+        .filter((density) => ["light", "medium", "dense"].includes(density));
+      const denseCount = densities.filter((density) => density === "dense").length;
+      const lightCount = densities.filter((density) => density === "light").length;
+
+      if (denseCount >= 2) {
+        return movement.name === "weathering" ? "medium" : "light";
+      }
+      if (lightCount >= 2) {
+        return movement.name === "gathering" ? "dense" : "medium";
+      }
+      if (movement.name === "weathering") {
+        return "medium";
+      }
+      if (movement.name === "gathering") {
+        return "medium";
+      }
+      return densities[densities.length - 1] || "medium";
     }
 
     function daypartLabel(profiles) {
@@ -355,6 +411,14 @@
     }
 
     function chooseTargetMood(movement, recent) {
+      const stewardMoodBias = currentMoodBias();
+      if (stewardMoodBias) {
+        const recentBiasCount = recent.filter((item) => item.mood === stewardMoodBias).length;
+        if (recentBiasCount < 2 || Math.random() < 0.72) {
+          return stewardMoodBias;
+        }
+      }
+
       const last = recent[recent.length - 1];
       if (!last) {
         return movement.preferredMoods[0];
@@ -374,7 +438,7 @@
       return movement.preferredMoods[loopMovementProgress % movement.preferredMoods.length];
     }
 
-    function chooseNextScene(movement, targetMood) {
+    function chooseNextScene(movement, targetMood, targetDensity) {
       const recent = loopHistory.slice(-3);
       const last = recent[recent.length - 1];
 
@@ -390,15 +454,24 @@
         }
       }
 
+      if (targetDensity) {
+        const densityCandidates = candidates.filter((scene) => scene.cues.some((cue) => cue.density === targetDensity));
+        if (densityCandidates.length) {
+          candidates = densityCandidates;
+        }
+      }
+
       return candidates[Math.floor(Math.random() * candidates.length)] || roomScenes[0];
     }
 
     function nextLoopCue() {
       const movement = ensureLoopMovement();
-      const targetMood = chooseTargetMood(movement, loopHistory.slice(-4));
+      const recent = loopHistory.slice(-4);
+      const targetMood = chooseTargetMood(movement, recent);
+      const targetDensity = chooseTargetDensity(movement, recent);
 
       if (!loopScene || loopSceneCueIndex >= loopScene.cues.length) {
-        loopScene = chooseNextScene(movement, targetMood);
+        loopScene = chooseNextScene(movement, targetMood, targetDensity);
         loopSceneCueIndex = 0;
       }
 
@@ -409,6 +482,7 @@
         scene: loopScene,
         cue: {
           ...cue,
+          density: cue.density || targetDensity,
           mood: cue.mood || targetMood,
         },
       };
@@ -431,21 +505,119 @@
       return roomTone.idleGain;
     }
 
+    function overlapAllowedForCue(cue, poolSize) {
+      if (poolSize < Number(config.roomOverlapMinPoolSize || 0)) {
+        return false;
+      }
+      if (quieterModeEnabled() || quietHoursActive(config)) {
+        return Math.random() < (Number(config.roomOverlapChance || 0) * 0.45);
+      }
+      if (cue.density === "dense") {
+        return false;
+      }
+      const densityLimit = String(loopConfig.overlap?.densityLimit || "medium");
+      if (densityLimit === "light" && cue.density !== "light") {
+        return false;
+      }
+      return Math.random() < Number(config.roomOverlapChance || 0);
+    }
+
+    function randomDelayBetween(min, max) {
+      const start = Number.isFinite(Number(min)) ? Number(min) : 0;
+      const end = Number.isFinite(Number(max)) ? Number(max) : start;
+      return Math.round(start + (Math.random() * Math.max(0, end - start)));
+    }
+
+    async function fetchLayerPayload({ cue, primaryArtifactId }) {
+      const excludedIds = recentArtifactIdsForExclusion(config, persistentLoopWindow);
+      const combinedExclusions = Array.from(new Set([...excludedIds, Number(primaryArtifactId)]));
+      const params = new URLSearchParams({
+        context: "kiosk",
+        lane: cue.lane === "worn" ? "mid" : "any",
+        density: cue.density === "dense" ? "medium" : (cue.density || "medium"),
+        mood: cue.mood || currentMoodBias() || "any",
+      });
+      if (combinedExclusions.length) {
+        params.set("exclude_ids", combinedExclusions.join(","));
+      }
+      const recentDensities = recentDensityWindow();
+      if (recentDensities.length) {
+        params.set("recent_densities", recentDensities.join(","));
+      }
+      const response = await fetch(`/api/v1/pool/next?${params.toString()}`, { cache: "no-store" });
+      if (response.status === 204) {
+        return null;
+      }
+      if (!response.ok) {
+        return null;
+      }
+      const payload = await response.json();
+      if (!payload || Number(payload.artifact_id) === Number(primaryArtifactId)) {
+        return null;
+      }
+      return payload;
+    }
+
+    async function playLayeredPayload(payload, options = {}) {
+      const delayMs = Number(options.delayMs || 0);
+      await sleep(delayMs);
+      if (!loopRunning || playbackPausedBySteward()) {
+        return;
+      }
+      await playUrlWithLightChain(payload.audio_url, payload.wear, {
+        outputGainMultiplier: surfaceOutputGainMultiplier() * Number(config.roomOverlapGainMultiplier || 0.68),
+      });
+    }
+
+    function selectedToneProfile() {
+      const profiles = roomTone.profiles || {};
+      return profiles[config.roomToneProfile]
+        || profiles.soft_air
+        || {
+          highpassHz: 110,
+          lowpassHz: 980,
+          lfoHz: 0.025,
+          lfoDepth: 65,
+          noiseStep: 0.06,
+          noiseDamping: 0.985,
+        };
+    }
+
     async function ensureRoomTone() {
       if (roomToneCtx && roomToneMasterGain) {
         await roomToneCtx.resume();
+        if (roomToneMediaElement) {
+          try { await roomToneMediaElement.play(); } catch (err) {}
+        }
         return;
       }
 
       roomToneCtx = new (global.AudioContext || global.webkitAudioContext)();
       await roomToneCtx.resume();
 
+      roomToneMasterGain = roomToneCtx.createGain();
+      roomToneMasterGain.gain.value = 0.0001;
+      roomToneMasterGain.connect(roomToneCtx.destination);
+
+      if (config.roomToneSourceMode === "site_ambience" && config.roomToneSourceUrl) {
+        roomToneMediaElement = new global.Audio(config.roomToneSourceUrl);
+        roomToneMediaElement.crossOrigin = "anonymous";
+        roomToneMediaElement.loop = true;
+        roomToneMediaElement.preload = "auto";
+        roomToneMediaElement.volume = 1.0;
+        roomToneMediaSource = roomToneCtx.createMediaElementSource(roomToneMediaElement);
+        roomToneMediaSource.connect(roomToneMasterGain);
+        await roomToneMediaElement.play();
+        return;
+      }
+
+      const profile = selectedToneProfile();
       const bufferSeconds = 2;
       const noiseBuffer = roomToneCtx.createBuffer(1, roomToneCtx.sampleRate * bufferSeconds, roomToneCtx.sampleRate);
       const data = noiseBuffer.getChannelData(0);
       let brown = 0;
       for (let i = 0; i < data.length; i += 1) {
-        brown = (brown + (Math.random() * 2 - 1) * 0.06) * 0.985;
+        brown = (brown + (Math.random() * 2 - 1) * profile.noiseStep) * profile.noiseDamping;
         data[i] = brown;
       }
 
@@ -455,29 +627,25 @@
 
       const highpass = roomToneCtx.createBiquadFilter();
       highpass.type = "highpass";
-      highpass.frequency.value = 110;
+      highpass.frequency.value = profile.highpassHz;
 
       const lowpass = roomToneCtx.createBiquadFilter();
       lowpass.type = "lowpass";
-      lowpass.frequency.value = 980;
+      lowpass.frequency.value = profile.lowpassHz;
       lowpass.Q.value = 0.4;
-
-      roomToneMasterGain = roomToneCtx.createGain();
-      roomToneMasterGain.gain.value = 0.0001;
 
       roomToneLfo = roomToneCtx.createOscillator();
       roomToneLfo.type = "sine";
-      roomToneLfo.frequency.value = 0.025;
+      roomToneLfo.frequency.value = profile.lfoHz;
 
       roomToneLfoGain = roomToneCtx.createGain();
-      roomToneLfoGain.gain.value = 65;
+      roomToneLfoGain.gain.value = profile.lfoDepth;
       roomToneLfo.connect(roomToneLfoGain);
       roomToneLfoGain.connect(lowpass.frequency);
 
       roomToneNoiseSource.connect(highpass);
       highpass.connect(lowpass);
       lowpass.connect(roomToneMasterGain);
-      roomToneMasterGain.connect(roomToneCtx.destination);
 
       roomToneNoiseSource.start();
       roomToneLfo.start();
@@ -500,9 +668,11 @@
         await sleep(650);
       } catch (err) {}
 
+      try { roomToneMediaElement?.pause(); } catch (err) {}
       try { roomToneNoiseSource?.stop(); } catch (err) {}
       try { roomToneLfo?.stop(); } catch (err) {}
       try { roomToneNoiseSource?.disconnect(); } catch (err) {}
+      try { roomToneMediaSource?.disconnect(); } catch (err) {}
       try { roomToneLfo?.disconnect(); } catch (err) {}
       try { roomToneLfoGain?.disconnect(); } catch (err) {}
       try { roomToneMasterGain?.disconnect(); } catch (err) {}
@@ -513,6 +683,8 @@
       roomToneMasterGain = null;
       roomToneLfo = null;
       roomToneLfoGain = null;
+      roomToneMediaElement = null;
+      roomToneMediaSource = null;
     }
 
     async function start() {
@@ -593,6 +765,10 @@
             density,
             mood,
           });
+          const recentDensities = recentDensityWindow();
+          if (recentDensities.length) {
+            params.set("recent_densities", recentDensities.join(","));
+          }
           if (excludedIds.length) {
             params.set("exclude_ids", excludedIds.join(","));
           }
@@ -616,16 +792,34 @@
           rememberLoopPayload(payload, scene, movement);
           persistentLoopWindow = rememberPersistentArtifactId(config, persistentLoopWindow, payload.artifact_id);
           const laneLabel = payload.lane ? `${payload.lane} ${payload.density || "memory"} memory` : "memory";
+          const featuredLabel = payload.featured_return ? " / featured return" : "";
           const scarcityLabel = scarcityProfile(config, loopKnownPoolSize).label;
+          let layerPayload = null;
+          if (Number(config.roomOverlapMaxLayers || 0) > 1 && overlapAllowedForCue(cue, loopKnownPoolSize)) {
+            layerPayload = await fetchLayerPayload({
+              cue,
+              primaryArtifactId: payload.artifact_id,
+            });
+            if (layerPayload) {
+              rememberLoopPayload(layerPayload, scene, movement);
+              persistentLoopWindow = rememberPersistentArtifactId(config, persistentLoopWindow, layerPayload.artifact_id);
+            }
+          }
           setStatus(
             scarcityLabel
-              ? `Playing ${laneLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name} (${scarcityLabel} pool, wear ${payload.wear.toFixed(3)})`
-              : `Playing ${laneLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name} (wear ${payload.wear.toFixed(3)})`,
+              ? `Playing ${laneLabel}${featuredLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name}${layerPayload ? " / layered return" : ""} (${scarcityLabel} pool, wear ${payload.wear.toFixed(3)})`
+              : `Playing ${laneLabel}${featuredLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name}${layerPayload ? " / layered return" : ""} (wear ${payload.wear.toFixed(3)})`,
           );
           setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, roomIntensity, roomTone.duckGain, loopKnownPoolSize)), 0.8);
-          await playUrlWithLightChain(payload.audio_url, payload.wear, {
+          const playbackPromises = [playUrlWithLightChain(payload.audio_url, payload.wear, {
             outputGainMultiplier: surfaceOutputGainMultiplier(),
-          });
+          })];
+          if (layerPayload) {
+            playbackPromises.push(playLayeredPayload(layerPayload, {
+              delayMs: randomDelayBetween(config.roomOverlapMinDelayMs, config.roomOverlapMaxDelayMs),
+            }));
+          }
+          await Promise.allSettled(playbackPromises);
           advanceLoopMovement();
           if (loopRunning) {
             const gapMultiplier = applySurfaceGapMultiplier(adaptiveGapMultiplier(config, roomIntensity, loopKnownPoolSize, movement, false));

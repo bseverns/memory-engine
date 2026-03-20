@@ -28,22 +28,38 @@
         <p class="muted playback-status-copy">If the browser blocks audio after boot, tap the start button once. After that, this surface can remain dedicated to playback.</p>
       </div>
 
-      <div class="playback-note-grid">
-        <article class="playback-note-card">
-          <p class="section-kicker">Fresh</p>
-          <strong>Nearer voices</strong>
-          <span>Newer material stays a little clearer and more immediate when it first enters the room.</span>
-        </article>
-        <article class="playback-note-card">
-          <p class="section-kicker">Weathering</p>
-          <strong>Patina, not collapse</strong>
-          <span>Repeatedly heard memories pick up a little grain and softness instead of turning into caricature.</span>
-        </article>
-        <article class="playback-note-card">
-          <p class="section-kicker">Pacing</p>
-          <strong>Composed drift</strong>
-          <span>The loop moves through arrival, gathering, weathering, and release rather than behaving like a flat shuffle.</span>
-        </article>
+      <div id="playbackVisualShell" class="playback-visual-shell">
+        <div class="playback-note-grid">
+          <article class="playback-note-card">
+            <p class="section-kicker">Fresh</p>
+            <strong>Nearer voices</strong>
+            <span>Newer material stays a little clearer and more immediate when it first enters the room.</span>
+          </article>
+          <article class="playback-note-card">
+            <p class="section-kicker">Weathering</p>
+            <strong>Patina, not collapse</strong>
+            <span>Repeatedly heard memories pick up a little grain and softness instead of turning into caricature.</span>
+          </article>
+          <article class="playback-note-card">
+            <p class="section-kicker">Pacing</p>
+            <strong>Composed drift</strong>
+            <span>The loop moves through arrival, gathering, weathering, and release rather than behaving like a flat shuffle.</span>
+          </article>
+        </div>
+
+        <aside id="playbackFossilVisuals" class="fossil-visual-card" hidden>
+          <p class="section-kicker">Fossil drift</p>
+          <figure class="fossil-visual">
+            <div id="playbackFossilFrame" class="fossil-visual-frame empty">
+              <span id="playbackFossilFallback">No fossil visuals are available yet.</span>
+              <img id="playbackFossilImage" alt="Ambient spectrogram drift" hidden/>
+            </div>
+            <figcaption>
+              <strong id="playbackFossilTitle">Ambient spectrogram drift</strong>
+              <span id="playbackFossilMeta">Waiting for recent fossils.</span>
+            </figcaption>
+          </figure>
+        </aside>
       </div>
 
       <div class="action-row">

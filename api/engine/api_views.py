@@ -19,6 +19,7 @@ from .ops import disk_status, health_component_status, pool_warnings, retention_
 from .pool import (
     artifact_age_hours,
     artifact_density,
+    artifact_is_featured_return,
     artifact_lane,
     artifact_mood,
     artifact_playback_key,
@@ -65,6 +66,17 @@ def intake_suspended() -> bool:
 def playback_suspended() -> bool:
     state = load_steward_state()
     return bool(state.maintenance_mode or state.playback_paused)
+
+
+def artifact_latest_spectrogram(artifact: Artifact, now):
+    return artifact.derivative_set.filter(
+        kind=Derivative.KIND_SPECTROGRAM_PNG,
+    ).filter(
+        expires_at__isnull=True,
+    ).order_by("-created_at").first() or artifact.derivative_set.filter(
+        kind=Derivative.KIND_SPECTROGRAM_PNG,
+        expires_at__gt=now,
+    ).order_by("-created_at").first()
 
 
 @api_view(["POST"])
@@ -262,12 +274,21 @@ def pool_next(request):
             except ValueError:
                 continue
 
+    recent_densities = []
+    raw_recent_densities = (request.query_params.get("recent_densities") or "").strip().lower()
+    if raw_recent_densities:
+        recent_densities = [
+            chunk for chunk in (piece.strip() for piece in raw_recent_densities.split(",")[:6])
+            if chunk in {"light", "medium", "dense"}
+        ]
+
     artifact, selected_lane = select_pool_artifact(
         now,
         requested_lane,
         requested_density,
         requested_mood,
         excluded_ids=excluded_ids,
+        recent_densities=recent_densities,
     )
     if not artifact:
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -275,6 +296,7 @@ def pool_next(request):
     age_hours = artifact_age_hours(artifact, now)
     density = artifact_density(artifact)
     mood = artifact_mood(artifact, now)
+    featured_return = artifact_is_featured_return(artifact, now)
 
     with transaction.atomic():
         artifact = Artifact.objects.select_for_update().get(id=artifact.id)
@@ -295,6 +317,7 @@ def pool_next(request):
         "duration_ms": artifact.duration_ms,
         "age_hours": round(age_hours, 3),
         "wear": artifact.wear,
+        "featured_return": featured_return,
         "play_count": artifact.play_count,
         "pool_size": playable_count,
         "audio_url": f"/api/v1/blob/{artifact.id}/raw",
@@ -406,6 +429,7 @@ def operator_controls(request):
         playback_paused=parse_boolish(request.data.get("playback_paused", state.playback_paused)),
         quieter_mode=parse_boolish(request.data.get("quieter_mode", state.quieter_mode)),
         maintenance_mode=parse_boolish(request.data.get("maintenance_mode", state.maintenance_mode)),
+        mood_bias=request.data.get("mood_bias", state.mood_bias),
         actor=request_operator_label(request),
     )
     return Response({
@@ -429,7 +453,32 @@ def blob_proxy_raw(request, artifact_id: int):
     return response
 
 
+def blob_proxy_spectrogram(request, artifact_id: int):
+    try:
+        artifact = Artifact.objects.get(id=int(artifact_id))
+    except Artifact.DoesNotExist:
+        raise Http404("Artifact not found")
+
+    derivative = artifact_latest_spectrogram(artifact, timezone.now())
+    if not derivative:
+        raise Http404("No spectrogram available")
+
+    stream, content_type = stream_key(derivative.uri)
+    response = FileResponse(stream, content_type=content_type)
+    response["Cache-Control"] = "no-store"
+    return response
+
+
 @api_view(["GET"])
 def list_spectrograms(request):
     queryset = Derivative.objects.filter(kind="spectrogram_png").order_by("-created_at")[:50]
-    return Response(DerivativeSerializer(queryset, many=True).data)
+    now = timezone.now()
+    return Response([
+        {
+            **DerivativeSerializer(derivative).data,
+            "image_url": f"/api/v1/blob/{derivative.artifact_id}/spectrogram",
+            "is_expired": bool(derivative.expires_at and derivative.expires_at <= now),
+        }
+        for derivative in queryset
+        if not derivative.expires_at or derivative.expires_at > now
+    ])

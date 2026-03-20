@@ -70,6 +70,12 @@
 - Adaptive gap timing based on total pool size so a sparse archive feels spacious and a deep archive feels alive
 - Daypart scheduling so movement pacing and intensity can shift across morning, afternoon, evening, and night
 - Quiet-hours mode so spaces can soften room pacing and playback intensity on a schedule
+- Steward-tunable room-tone options, including the ability to swap the synthetic bed for site-specific ambience
+- Rare overlap or layering events so the room can occasionally feel accumulative instead of strictly sequential
+- More explicit density balancing so long or heavy material is less likely to cluster by accident
+- A "featured return" path for older material that has been absent long enough to feel newly arrived again
+- Optional audience-facing fossil visuals via ambient spectrogram drift on the playback surface
+- Steward-selectable mood bias so performances or guided sessions can temporarily lean toward one listening posture
 - Steward-tunable movement presets so one installation can feel meditative while another feels more active
 - Code comments around playback selection, scene composition, room tone, and wear processing
 - `README.md` audience-experience notes describing the intended listening effect
@@ -94,12 +100,6 @@
 - Push beyond metadata-derived mood shaping into a room state that responds to context
   - learn from time-of-day or room activity patterns
   - explore whether semantic or transcript-aware grouping is worth the complexity
-- Add steward-tunable room-tone options, including the ability to swap the synthetic bed for site-specific ambience
-- Add rare overlap or layering events so the room can occasionally feel accumulative instead of strictly sequential
-- Add more explicit density balancing so long or heavy material does not cluster too often by accident
-- Add a "featured return" mechanism for older material that should occasionally re-enter the room after long absence
-- Add audience-facing fossil visuals or ambient spectrogram display if the installation benefits from a visual layer
-- Add a way to pin or bias certain moods temporarily during performances or steward-led sessions
 
 ### Operator / stewardship
 - Add one-command firewall / restart-on-boot setup for a specific server OS target

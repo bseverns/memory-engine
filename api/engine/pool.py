@@ -49,7 +49,55 @@ def artifact_age_hours(artifact: Artifact, now) -> float:
     return max(0.0, (now - artifact.created_at).total_seconds() / 3600.0)
 
 
-def pool_weight(artifact: Artifact, now, cooldown_seconds: int, preferred_mood: str = "any") -> float:
+def artifact_absence_hours(artifact: Artifact, now) -> float:
+    if artifact.last_access_at:
+        return max(0.0, (now - artifact.last_access_at).total_seconds() / 3600.0)
+    return artifact_age_hours(artifact, now)
+
+
+def artifact_is_featured_return(artifact: Artifact, now) -> bool:
+    return bool(
+        artifact_age_hours(artifact, now) >= settings.POOL_FEATURED_RETURN_MIN_AGE_HOURS
+        and artifact_absence_hours(artifact, now) >= settings.POOL_FEATURED_RETURN_MIN_ABSENCE_HOURS
+    )
+
+
+def density_balance_factor(artifact: Artifact, now, recent_densities: list[str] | None = None) -> float:
+    recent = [density for density in (recent_densities or []) if density in {"light", "medium", "dense"}]
+    if len(recent) < 2:
+        return 1.0
+
+    candidate_density = artifact_density(artifact)
+    penalty = float(settings.POOL_DENSITY_CLUSTER_PENALTY)
+    release_boost = float(settings.POOL_DENSITY_RELEASE_BOOST)
+    trailing = recent[-3:]
+    dense_cluster = trailing.count("dense") >= 2
+    light_cluster = trailing.count("light") >= 2
+
+    if dense_cluster:
+        if candidate_density == "dense":
+            return penalty
+        if candidate_density == "light":
+            return release_boost
+        return 1.08
+
+    if light_cluster:
+        if candidate_density == "light":
+            return max(0.78, penalty + 0.18)
+        if candidate_density == "medium":
+            return max(1.05, release_boost - 0.06)
+        return max(1.0, release_boost - 0.12)
+
+    return 1.0
+
+
+def pool_weight(
+    artifact: Artifact,
+    now,
+    cooldown_seconds: int,
+    preferred_mood: str = "any",
+    recent_densities: list[str] | None = None,
+) -> float:
     seconds_since_access = cooldown_seconds * 4
     if artifact.last_access_at:
         seconds_since_access = max(0.0, (now - artifact.last_access_at).total_seconds())
@@ -87,7 +135,10 @@ def pool_weight(artifact: Artifact, now, cooldown_seconds: int, preferred_mood: 
         else:
             mood_factor = 0.88
 
-    return max(0.1, cooldown_factor * rarity_factor * wear_factor * age_factor * mood_factor)
+    featured_return_factor = float(settings.POOL_FEATURED_RETURN_BOOST) if artifact_is_featured_return(artifact, now) else 1.0
+    density_factor = density_balance_factor(artifact, now, recent_densities)
+
+    return max(0.1, cooldown_factor * rarity_factor * wear_factor * age_factor * mood_factor * featured_return_factor * density_factor)
 
 
 def artifact_lane(artifact: Artifact, now) -> str:
@@ -139,6 +190,7 @@ def select_pool_artifact(
     preferred_density: str = "any",
     preferred_mood: str = "any",
     excluded_ids: set[int] | None = None,
+    recent_densities: list[str] | None = None,
 ):
     cooldown_seconds = max(1, int(settings.POOL_PLAY_COOLDOWN_SECONDS))
     cooldown_threshold = now - timedelta(seconds=cooldown_seconds)
@@ -180,6 +232,15 @@ def select_pool_artifact(
         if mood_candidates:
             candidates = mood_candidates
 
-    weights = [pool_weight(artifact, now, cooldown_seconds, preferred_mood) for artifact in candidates]
+    weights = [
+        pool_weight(
+            artifact,
+            now,
+            cooldown_seconds,
+            preferred_mood,
+            recent_densities=recent_densities,
+        )
+        for artifact in candidates
+    ]
     selected = random.choices(candidates, weights=weights, k=1)[0]
     return selected, artifact_lane(selected, now)

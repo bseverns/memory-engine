@@ -8,5 +8,6 @@ from .settings_test import *  # noqa: F403,F401
 # Playwright can render the real kiosk and operator UI.
 
 DEBUG = True
+ROOM_FOSSIL_VISUALS_ENABLED = True
 
 validate_runtime_settings(sys.modules[__name__])

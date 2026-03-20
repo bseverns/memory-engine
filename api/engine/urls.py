@@ -12,5 +12,6 @@ urlpatterns = [
     path("node/status", api_views.node_status),
     path("operator/controls", api_views.operator_controls),
     path("blob/<int:artifact_id>/raw", api_views.blob_proxy_raw),
+    path("blob/<int:artifact_id>/spectrogram", api_views.blob_proxy_spectrogram),
     path("derivatives/spectrograms", api_views.list_spectrograms),
 ]

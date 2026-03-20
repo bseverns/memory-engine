@@ -178,10 +178,51 @@ ROOM_LOOP_CONFIG = {
         "label": "Quiet hours",
     },
     "tone": {
+        "profiles": {
+            "soft_air": {
+                "name": "soft_air",
+                "label": "Soft air",
+                "highpassHz": 110,
+                "lowpassHz": 980,
+                "lfoHz": 0.025,
+                "lfoDepth": 65,
+                "noiseStep": 0.06,
+                "noiseDamping": 0.985,
+            },
+            "warm_hiss": {
+                "name": "warm_hiss",
+                "label": "Warm hiss",
+                "highpassHz": 160,
+                "lowpassHz": 1550,
+                "lfoHz": 0.018,
+                "lfoDepth": 120,
+                "noiseStep": 0.08,
+                "noiseDamping": 0.978,
+            },
+            "low_vent": {
+                "name": "low_vent",
+                "label": "Low vent",
+                "highpassHz": 55,
+                "lowpassHz": 540,
+                "lfoHz": 0.012,
+                "lfoDepth": 28,
+                "noiseStep": 0.035,
+                "noiseDamping": 0.992,
+            },
+        },
         "idleGain": 0.011,
         "sparseGain": 0.017,
         "duckGain": 0.002,
         "fadeSeconds": 1.25,
+    },
+    "overlap": {
+        "label": "Layered return",
+        "densityLimit": "medium",
+    },
+    "fossilVisuals": {
+        "label": "Fossil drift",
+        "refreshMs": 18000,
+        "maxItems": 12,
     },
 }
 
@@ -219,6 +260,9 @@ def room_schedule_snapshot(
     quiet_hours_gap_multiplier: float = 1.18,
     quiet_hours_tone_multiplier: float = 0.78,
     quiet_hours_output_gain_multiplier: float = 0.72,
+    tone_profile: str = "soft_air",
+    tone_source_mode: str = "synthetic",
+    tone_source_url: str = "",
     now=None,
     loop_config: dict | None = None,
 ) -> dict:
@@ -245,4 +289,7 @@ def room_schedule_snapshot(
         "quietHoursGapMultiplier": float(quiet_hours_gap_multiplier),
         "quietHoursToneMultiplier": float(quiet_hours_tone_multiplier),
         "quietHoursOutputGainMultiplier": float(quiet_hours_output_gain_multiplier),
+        "roomToneProfile": str(tone_profile or "soft_air"),
+        "roomToneSourceMode": str(tone_source_mode or "synthetic"),
+        "roomToneSourceUrl": str(tone_source_url or "").strip(),
     }

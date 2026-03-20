@@ -39,11 +39,30 @@ def validate_runtime_settings(settings_obj) -> None:
     if not (minio_endpoint.startswith("http://") or minio_endpoint.startswith("https://")):
         errors.append("MINIO_ENDPOINT must start with http:// or https://.")
 
+    room_tone_source_mode = str(getattr(settings_obj, "ROOM_TONE_SOURCE_MODE", "synthetic") or "").strip().lower()
+    room_tone_source_url = str(getattr(settings_obj, "ROOM_TONE_SOURCE_URL", "") or "").strip()
+    if room_tone_source_mode not in {"synthetic", "site_ambience"}:
+        errors.append("ROOM_TONE_SOURCE_MODE must be 'synthetic' or 'site_ambience'.")
+    if room_tone_source_mode == "site_ambience":
+        if not room_tone_source_url:
+            errors.append("ROOM_TONE_SOURCE_URL must be set when ROOM_TONE_SOURCE_MODE=site_ambience.")
+        elif not (
+            room_tone_source_url.startswith("/")
+            or room_tone_source_url.startswith("http://")
+            or room_tone_source_url.startswith("https://")
+        ):
+            errors.append("ROOM_TONE_SOURCE_URL must start with /, http://, or https://.")
+
     ensure_positive(errors, settings_obj, "WEAR_EPSILON_PER_PLAY", upper_bound=1.0)
     ensure_non_negative(errors, settings_obj, "POOL_PLAY_COOLDOWN_SECONDS")
     ensure_positive(errors, settings_obj, "POOL_CANDIDATE_LIMIT")
     ensure_positive(errors, settings_obj, "POOL_FRESH_MAX_AGE_HOURS")
     ensure_positive(errors, settings_obj, "POOL_WORN_MIN_AGE_HOURS")
+    ensure_positive(errors, settings_obj, "POOL_FEATURED_RETURN_MIN_AGE_HOURS")
+    ensure_positive(errors, settings_obj, "POOL_FEATURED_RETURN_MIN_ABSENCE_HOURS")
+    ensure_positive(errors, settings_obj, "POOL_FEATURED_RETURN_BOOST")
+    ensure_between(errors, settings_obj, "POOL_DENSITY_CLUSTER_PENALTY", 0.0, 1.0, inclusive_min=False, inclusive_max=False)
+    ensure_positive(errors, settings_obj, "POOL_DENSITY_RELEASE_BOOST")
     ensure_positive(errors, settings_obj, "RAW_TTL_HOURS_ROOM")
     ensure_positive(errors, settings_obj, "RAW_TTL_HOURS_FOSSIL")
     ensure_positive(errors, settings_obj, "DERIVATIVE_TTL_DAYS_FOSSIL")
@@ -55,6 +74,12 @@ def validate_runtime_settings(settings_obj) -> None:
     ensure_non_negative(errors, settings_obj, "ROOM_SCARCITY_SEVERE_THRESHOLD")
     ensure_non_negative(errors, settings_obj, "ROOM_SCARCITY_LOW_THRESHOLD")
     ensure_between(errors, settings_obj, "ROOM_ANTI_REPETITION_WINDOW_SIZE", 0, 50)
+    ensure_between(errors, settings_obj, "ROOM_OVERLAP_CHANCE", 0.0, 1.0, inclusive_min=True, inclusive_max=True)
+    ensure_positive(errors, settings_obj, "ROOM_OVERLAP_MIN_POOL_SIZE")
+    ensure_positive(errors, settings_obj, "ROOM_OVERLAP_MAX_LAYERS")
+    ensure_non_negative(errors, settings_obj, "ROOM_OVERLAP_MIN_DELAY_MS")
+    ensure_non_negative(errors, settings_obj, "ROOM_OVERLAP_MAX_DELAY_MS")
+    ensure_between(errors, settings_obj, "ROOM_OVERLAP_GAIN_MULTIPLIER", 0.0, 1.0, inclusive_min=False, inclusive_max=True)
     ensure_positive(errors, settings_obj, "OPS_SESSION_TTL_SECONDS")
     ensure_non_negative(errors, settings_obj, "OPS_POOL_LOW_COUNT")
     ensure_between(errors, settings_obj, "OPS_POOL_IMBALANCE_RATIO", 0.0, 1.0, inclusive_min=False, inclusive_max=False)
@@ -83,6 +108,11 @@ def validate_runtime_settings(settings_obj) -> None:
     disk_warning_percent = float(getattr(settings_obj, "OPS_DISK_WARNING_FREE_PERCENT", 0.0))
     if disk_critical_percent > disk_warning_percent:
         errors.append("OPS_DISK_CRITICAL_FREE_PERCENT must be less than or equal to OPS_DISK_WARNING_FREE_PERCENT.")
+
+    overlap_min_delay = int(getattr(settings_obj, "ROOM_OVERLAP_MIN_DELAY_MS", 0))
+    overlap_max_delay = int(getattr(settings_obj, "ROOM_OVERLAP_MAX_DELAY_MS", 0))
+    if overlap_min_delay > overlap_max_delay:
+        errors.append("ROOM_OVERLAP_MIN_DELAY_MS must be less than or equal to ROOM_OVERLAP_MAX_DELAY_MS.")
 
     if errors:
         raise ImproperlyConfigured("Invalid runtime configuration:\n- " + "\n- ".join(errors))

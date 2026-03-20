@@ -218,6 +218,7 @@
       opsIntakePaused: doc.getElementById("opsIntakePaused"),
       opsPlaybackPaused: doc.getElementById("opsPlaybackPaused"),
       opsQuieterMode: doc.getElementById("opsQuieterMode"),
+      opsMoodBias: doc.getElementById("opsMoodBias"),
       opsControlsSave: doc.getElementById("opsControlsSave"),
       opsControlStatus: doc.getElementById("opsControlStatus"),
       opsRecentActions: doc.getElementById("opsRecentActions"),
@@ -232,6 +233,9 @@
     dom.opsIntakePaused.checked = Boolean(operatorState.intake_paused);
     dom.opsPlaybackPaused.checked = Boolean(operatorState.playback_paused);
     dom.opsQuieterMode.checked = Boolean(operatorState.quieter_mode);
+    if (dom.opsMoodBias) {
+      dom.opsMoodBias.value = String(operatorState.mood_bias || "");
+    }
   }
 
   function renderPayload(doc, dom, payload) {
@@ -270,6 +274,7 @@
       if (state.intake_paused) labels.push("intake paused");
       if (state.playback_paused) labels.push("playback paused");
       if (state.quieter_mode) labels.push("quieter mode");
+      if (state.mood_bias) labels.push(`mood bias: ${state.mood_bias}`);
       dom.opsControlStatus.textContent = labels.length
         ? `Active controls: ${labels.join(", ")}.`
         : "No live control overrides are active.";
@@ -347,6 +352,7 @@
             intake_paused: Boolean(dom.opsIntakePaused?.checked),
             playback_paused: Boolean(dom.opsPlaybackPaused?.checked),
             quieter_mode: Boolean(dom.opsQuieterMode?.checked),
+            mood_bias: String(dom.opsMoodBias?.value || ""),
           }),
         });
         renderControlPayload(doc, dom, payload);
