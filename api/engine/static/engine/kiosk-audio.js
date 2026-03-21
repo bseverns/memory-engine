@@ -37,15 +37,102 @@
     }
   }
 
-  const MEMORY_COLOR_PROFILE_ORDER = (() => {
+  const MEMORY_COLOR_CATALOG = (() => {
     const catalog = readMemoryColorCatalogFromDom();
-    const ordered = Array.isArray(catalog?.profiles)
-      ? catalog.profiles
+    if (catalog && Array.isArray(catalog.profiles) && catalog.profiles.length) {
+      return catalog;
+    }
+    return {
+      default: "clear",
+      profiles: [
+        {
+          code: "clear",
+          processing: {
+            engine: "chain_v1",
+            kind: "clear",
+            highpass_hz: 72,
+            highpass_q: 0.66,
+            presence_hz: 2100,
+            presence_q: 0.8,
+            presence_gain_db: 1.6,
+            air_hz: 5600,
+            air_gain_db: 1.4,
+            output_gain: 0.98,
+          },
+        },
+        {
+          code: "warm",
+          processing: {
+            engine: "chain_v1",
+            kind: "warm",
+            lowshelf_hz: 220,
+            lowshelf_gain_db: 4.6,
+            lowpass_hz: 7600,
+            lowpass_q: 0.62,
+            highshelf_hz: 4200,
+            highshelf_gain_db: -2.8,
+            compressor_threshold_db: -20,
+            compressor_knee_db: 18,
+            compressor_ratio: 2.1,
+            compressor_attack_s: 0.01,
+            compressor_release_s: 0.18,
+            output_gain: 1.02,
+          },
+        },
+        {
+          code: "radio",
+          processing: {
+            engine: "chain_v1",
+            kind: "radio",
+            highpass_hz: 290,
+            highpass_q: 0.9,
+            lowpass_hz: 3350,
+            lowpass_q: 0.92,
+            mid_hz: 1450,
+            mid_q: 1.1,
+            mid_gain_db: 3.4,
+            drive_amount: 9,
+            output_gain: 0.86,
+          },
+        },
+        {
+          code: "dream",
+          processing: {
+            engine: "chain_v1",
+            kind: "dream",
+            lowpass_hz: 5200,
+            lowpass_q: 0.5,
+            dry_gain: 0.82,
+            wet_source_gain: 0.38,
+            delay_s: 0.18,
+            feedback_gain: 0.24,
+            impulse_seconds: 1.5,
+            impulse_decay: 3.2,
+            wet_gain: 0.28,
+            output_gain: 0.96,
+          },
+        },
+      ],
+    };
+  })();
+
+  const MEMORY_COLOR_PROFILE_MAP = new Map(
+    MEMORY_COLOR_CATALOG.profiles.map((profile) => [String(profile?.code || "").trim().toLowerCase(), profile]),
+  );
+
+  const MEMORY_COLOR_PROFILE_ORDER = (() => {
+    const ordered = Array.isArray(MEMORY_COLOR_CATALOG?.profiles)
+      ? MEMORY_COLOR_CATALOG.profiles
         .map((profile) => String(profile?.code || "").trim().toLowerCase())
         .filter(Boolean)
       : [];
-    return ordered.length ? ordered : ["clear", "warm", "radio", "dream"];
+    return ordered.length ? ordered : ["clear"];
   })();
+
+  function memoryColorProfileSpec(profile) {
+    const normalized = normalizeMemoryColorProfile(profile, MEMORY_COLOR_CATALOG.default || "clear");
+    return MEMORY_COLOR_PROFILE_MAP.get(normalized) || null;
+  }
 
   async function ensureWorkletModule(audioContext) {
     if (!audioContext.audioWorklet) {
@@ -259,22 +346,61 @@
     return curve;
   }
 
-  function createDreamImpulseResponse(ctx, seconds = 1.2, decay = 3.0) {
+  function hashStringToSeed(input) {
+    let hash = 2166136261;
+    const text = String(input || "");
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function createSeededRandom(seed) {
+    let state = (seed >>> 0) || 0x6d2b79f5;
+    return () => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function memoryColorSeedForBuffer(buffer, profile) {
+    const normalized = normalizeMemoryColorProfile(profile);
+    let hash = hashStringToSeed(`${normalized}:${buffer.numberOfChannels}:${buffer.length}:${buffer.sampleRate}`);
+    for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+      const data = buffer.getChannelData(channel);
+      const stride = Math.max(1, Math.floor(data.length / 64));
+      for (let index = 0; index < data.length; index += stride) {
+        const quantized = Math.max(-32768, Math.min(32767, Math.round(data[index] * 32767)));
+        hash ^= quantized & 0xffff;
+        hash = Math.imul(hash, 16777619) >>> 0;
+      }
+    }
+    return hash >>> 0;
+  }
+
+  function createDreamImpulseResponse(ctx, seconds = 1.2, decay = 3.0, seed = 1) {
     const length = Math.max(1, Math.round(ctx.sampleRate * seconds));
     const channels = Math.max(1, ctx.destination?.channelCount || 1);
     const impulse = ctx.createBuffer(channels, length, ctx.sampleRate);
+    const rand = createSeededRandom(seed);
     for (let channel = 0; channel < channels; channel += 1) {
       const data = impulse.getChannelData(channel);
       for (let index = 0; index < length; index += 1) {
         const fade = Math.pow(1 - (index / length), decay);
-        data[index] = ((Math.random() * 2) - 1) * fade * 0.28;
+        data[index] = ((rand() * 2) - 1) * fade * 0.28;
       }
     }
     return impulse;
   }
 
-  function buildMemoryColorChain(ctx, sourceNode, profile) {
+  function buildMemoryColorChain(ctx, sourceNode, profile, options = {}) {
     const normalized = normalizeMemoryColorProfile(profile);
+    const spec = memoryColorProfileSpec(normalized);
+    const processing = spec?.processing && typeof spec.processing === "object" ? spec.processing : {};
     if (!normalized) {
       return {
         output: sourceNode,
@@ -290,56 +416,56 @@
 
     let output = sourceNode;
 
-    if (normalized === "clear") {
+    if ((processing.kind || normalized) === "clear") {
       const highpass = track(ctx.createBiquadFilter());
       highpass.type = "highpass";
-      highpass.frequency.value = 72;
-      highpass.Q.value = 0.66;
+      highpass.frequency.value = Number(processing.highpass_hz || 72);
+      highpass.Q.value = Number(processing.highpass_q || 0.66);
 
       const presence = track(ctx.createBiquadFilter());
       presence.type = "peaking";
-      presence.frequency.value = 2100;
-      presence.Q.value = 0.8;
-      presence.gain.value = 1.6;
+      presence.frequency.value = Number(processing.presence_hz || 2100);
+      presence.Q.value = Number(processing.presence_q || 0.8);
+      presence.gain.value = Number(processing.presence_gain_db || 1.6);
 
       const air = track(ctx.createBiquadFilter());
       air.type = "highshelf";
-      air.frequency.value = 5600;
-      air.gain.value = 1.4;
+      air.frequency.value = Number(processing.air_hz || 5600);
+      air.gain.value = Number(processing.air_gain_db || 1.4);
 
       const outputGain = track(ctx.createGain());
-      outputGain.gain.value = 0.98;
+      outputGain.gain.value = Number(processing.output_gain || 0.98);
 
       sourceNode.connect(highpass);
       highpass.connect(presence);
       presence.connect(air);
       air.connect(outputGain);
       output = outputGain;
-    } else if (normalized === "warm") {
+    } else if ((processing.kind || normalized) === "warm") {
       const lowshelf = track(ctx.createBiquadFilter());
       lowshelf.type = "lowshelf";
-      lowshelf.frequency.value = 220;
-      lowshelf.gain.value = 4.6;
+      lowshelf.frequency.value = Number(processing.lowshelf_hz || 220);
+      lowshelf.gain.value = Number(processing.lowshelf_gain_db || 4.6);
 
       const lowpass = track(ctx.createBiquadFilter());
       lowpass.type = "lowpass";
-      lowpass.frequency.value = 7600;
-      lowpass.Q.value = 0.62;
+      lowpass.frequency.value = Number(processing.lowpass_hz || 7600);
+      lowpass.Q.value = Number(processing.lowpass_q || 0.62);
 
       const highshelf = track(ctx.createBiquadFilter());
       highshelf.type = "highshelf";
-      highshelf.frequency.value = 4200;
-      highshelf.gain.value = -2.8;
+      highshelf.frequency.value = Number(processing.highshelf_hz || 4200);
+      highshelf.gain.value = Number(processing.highshelf_gain_db || -2.8);
 
       const compressor = track(ctx.createDynamicsCompressor());
-      compressor.threshold.value = -20;
-      compressor.knee.value = 18;
-      compressor.ratio.value = 2.1;
-      compressor.attack.value = 0.01;
-      compressor.release.value = 0.18;
+      compressor.threshold.value = Number(processing.compressor_threshold_db || -20);
+      compressor.knee.value = Number(processing.compressor_knee_db || 18);
+      compressor.ratio.value = Number(processing.compressor_ratio || 2.1);
+      compressor.attack.value = Number(processing.compressor_attack_s || 0.01);
+      compressor.release.value = Number(processing.compressor_release_s || 0.18);
 
       const outputGain = track(ctx.createGain());
-      outputGain.gain.value = 1.02;
+      outputGain.gain.value = Number(processing.output_gain || 1.02);
 
       sourceNode.connect(lowshelf);
       lowshelf.connect(lowpass);
@@ -347,29 +473,29 @@
       highshelf.connect(compressor);
       compressor.connect(outputGain);
       output = outputGain;
-    } else if (normalized === "radio") {
+    } else if ((processing.kind || normalized) === "radio") {
       const highpass = track(ctx.createBiquadFilter());
       highpass.type = "highpass";
-      highpass.frequency.value = 290;
-      highpass.Q.value = 0.9;
+      highpass.frequency.value = Number(processing.highpass_hz || 290);
+      highpass.Q.value = Number(processing.highpass_q || 0.9);
 
       const lowpass = track(ctx.createBiquadFilter());
       lowpass.type = "lowpass";
-      lowpass.frequency.value = 3350;
-      lowpass.Q.value = 0.92;
+      lowpass.frequency.value = Number(processing.lowpass_hz || 3350);
+      lowpass.Q.value = Number(processing.lowpass_q || 0.92);
 
       const mid = track(ctx.createBiquadFilter());
       mid.type = "peaking";
-      mid.frequency.value = 1450;
-      mid.Q.value = 1.1;
-      mid.gain.value = 3.4;
+      mid.frequency.value = Number(processing.mid_hz || 1450);
+      mid.Q.value = Number(processing.mid_q || 1.1);
+      mid.gain.value = Number(processing.mid_gain_db || 3.4);
 
       const drive = track(ctx.createWaveShaper());
-      drive.curve = makeSoftClipCurve(9);
+      drive.curve = makeSoftClipCurve(Number(processing.drive_amount || 9));
       drive.oversample = "2x";
 
       const outputGain = track(ctx.createGain());
-      outputGain.gain.value = 0.86;
+      outputGain.gain.value = Number(processing.output_gain || 0.86);
 
       sourceNode.connect(highpass);
       highpass.connect(lowpass);
@@ -377,32 +503,37 @@
       mid.connect(drive);
       drive.connect(outputGain);
       output = outputGain;
-    } else if (normalized === "dream") {
+    } else if ((processing.kind || normalized) === "dream") {
       const lowpass = track(ctx.createBiquadFilter());
       lowpass.type = "lowpass";
-      lowpass.frequency.value = 5200;
-      lowpass.Q.value = 0.5;
+      lowpass.frequency.value = Number(processing.lowpass_hz || 5200);
+      lowpass.Q.value = Number(processing.lowpass_q || 0.5);
 
       const dry = track(ctx.createGain());
-      dry.gain.value = 0.82;
+      dry.gain.value = Number(processing.dry_gain || 0.82);
 
       const wetSource = track(ctx.createGain());
-      wetSource.gain.value = 0.38;
+      wetSource.gain.value = Number(processing.wet_source_gain || 0.38);
 
       const delay = track(ctx.createDelay(0.5));
-      delay.delayTime.value = 0.18;
+      delay.delayTime.value = Number(processing.delay_s || 0.18);
 
       const feedback = track(ctx.createGain());
-      feedback.gain.value = 0.24;
+      feedback.gain.value = Number(processing.feedback_gain || 0.24);
 
       const convolver = track(ctx.createConvolver());
-      convolver.buffer = createDreamImpulseResponse(ctx, 1.5, 3.2);
+      convolver.buffer = createDreamImpulseResponse(
+        ctx,
+        Number(processing.impulse_seconds || 1.5),
+        Number(processing.impulse_decay || 3.2),
+        Number.isFinite(Number(options.seed)) ? Number(options.seed) : 1,
+      );
 
       const wet = track(ctx.createGain());
-      wet.gain.value = 0.28;
+      wet.gain.value = Number(processing.wet_gain || 0.28);
 
       const outputGain = track(ctx.createGain());
-      outputGain.gain.value = 0.96;
+      outputGain.gain.value = Number(processing.output_gain || 0.96);
 
       sourceNode.connect(lowpass);
       lowpass.connect(dry);
@@ -444,6 +575,7 @@
     const decodeContext = new AudioContextCtor();
     try {
       const buffer = await decodeContext.decodeAudioData((await blob.arrayBuffer()).slice(0));
+      const seed = memoryColorSeedForBuffer(buffer, normalized);
       const offlineCtx = new OfflineAudioContextCtor(
         Math.max(1, buffer.numberOfChannels),
         Math.max(1, buffer.length),
@@ -451,7 +583,7 @@
       );
       const source = offlineCtx.createBufferSource();
       source.buffer = buffer;
-      const memoryColorChain = buildMemoryColorChain(offlineCtx, source, normalized);
+      const memoryColorChain = buildMemoryColorChain(offlineCtx, source, normalized, { seed });
       memoryColorChain.output.connect(offlineCtx.destination);
       source.start(0);
       const rendered = await offlineCtx.startRendering();
@@ -473,6 +605,8 @@
     const ctx = new (global.AudioContext || global.webkitAudioContext)();
     await ensureWorkletModule(ctx);
     const buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    const memoryColorProfile = normalizeMemoryColorProfile(options.memoryColorProfile);
+    const memoryColorSeed = memoryColorProfile ? memoryColorSeedForBuffer(buffer, memoryColorProfile) : 0;
     const peak = getBufferPeak(buffer);
     const requestedStartSeconds = Math.max(0, Number(options.startMs || 0) / 1000);
     const requestedDurationSeconds = Math.max(0, Number(options.durationMs || 0) / 1000);
@@ -487,7 +621,8 @@
     const memoryColorChain = buildMemoryColorChain(
       ctx,
       src,
-      normalizeMemoryColorProfile(options.memoryColorProfile),
+      memoryColorProfile,
+      { seed: memoryColorSeed },
     );
 
     const lowpass = ctx.createBiquadFilter();
@@ -594,6 +729,7 @@
     ensureWorkletModule,
     mergeBuffers,
     normalizeMemoryColorProfile,
+    memoryColorSeedForBuffer,
     playUrlWithLightChain,
     processRecordingSamples,
     renderMemoryColorPreviewBlob,

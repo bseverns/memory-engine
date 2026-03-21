@@ -154,8 +154,10 @@ test.describe("browser behavior contracts", () => {
 
     const clearChoice = page.locator('.memory-choice[data-effect-profile="clear"]');
     const warmChoice = page.locator('.memory-choice[data-effect-profile="warm"]');
+    const allChoices = page.locator(".memory-choice");
 
     await expect(page.locator("#memoryColorPanel")).toBeVisible();
+    await expect(allChoices).toHaveCount(4);
     await expect(clearChoice).toBeVisible();
     await expect(warmChoice).toBeVisible();
     await expect(page.locator("#btnPreviewOriginal")).toHaveAttribute("aria-pressed", "true");

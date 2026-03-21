@@ -36,6 +36,7 @@ def memory_color_catalog():
                 for language, description in (item.get("descriptions") or {}).items()
                 if str(language or "").strip() and str(description or "").strip()
             },
+            "processing": item.get("processing") if isinstance(item.get("processing"), dict) else {},
         })
 
     default_candidate = str(payload.get("default") or MEMORY_COLOR_PROFILE_CLEAR).strip().lower()
@@ -68,10 +69,23 @@ def memory_color_catalog_payload() -> dict:
                 "family": spec["family"],
                 "labels": spec["labels"],
                 "descriptions": spec["descriptions"],
+                "processing": spec["processing"],
             }
             for spec in catalog["profiles"]
         ],
     }
+
+
+def memory_color_profile_codes() -> tuple[str, ...]:
+    return MEMORY_COLOR_PROFILE_ORDER
+
+
+def memory_color_allowed_values_text() -> str:
+    return ", ".join(memory_color_profile_codes())
+
+
+def memory_color_validation_error_message(field_name: str = "effect_profile") -> str:
+    return f"{field_name} must be one of: {memory_color_allowed_values_text()}."
 
 
 def normalize_memory_color_profile(value, *, default="") -> str:

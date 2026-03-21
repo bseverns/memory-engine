@@ -66,6 +66,8 @@ class ArtifactBehaviorTests(EngineTestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("effect_profile", response.json()["error"])
+        self.assertIn("clear", response.json()["error"])
+        self.assertIn("dream", response.json()["error"])
         put_bytes_mock.assert_not_called()
 
     @patch("engine.api_views.generate_essence_audio.delay")

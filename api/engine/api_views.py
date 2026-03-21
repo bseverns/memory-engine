@@ -30,7 +30,12 @@ from .media_access import (
     read_surface_token,
     surface_fossils_url,
 )
-from .memory_color import DEFAULT_MEMORY_COLOR_PROFILE, memory_color_metadata, normalize_memory_color_profile
+from .memory_color import (
+    DEFAULT_MEMORY_COLOR_PROFILE,
+    memory_color_metadata,
+    memory_color_validation_error_message,
+    normalize_memory_color_profile,
+)
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative
 from .operator_auth import operator_secret_configured, operator_session_active
 from .ops import (
@@ -182,7 +187,7 @@ def create_audio_artifact(request):
             default=DEFAULT_MEMORY_COLOR_PROFILE,
         )
     except ValueError:
-        return Response({"error": "effect_profile must be one of: clear, warm, radio, dream."}, status=400)
+        return Response({"error": memory_color_validation_error_message()}, status=400)
 
     upload = request.data.get("file")
     if not upload:
@@ -257,7 +262,7 @@ def create_ephemeral_audio(request):
             default=DEFAULT_MEMORY_COLOR_PROFILE,
         )
     except ValueError:
-        return Response({"error": "effect_profile must be one of: clear, warm, radio, dream."}, status=400)
+        return Response({"error": memory_color_validation_error_message()}, status=400)
 
     upload = request.data.get("file")
     if not upload:

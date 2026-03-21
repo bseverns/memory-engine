@@ -205,6 +205,17 @@
 
     const originalSelected = ctx.previewSourceMode !== "memory";
     const coloredSelected = ctx.previewSourceMode === "memory";
+    const timingSuffix = (
+      ctx.lastMemoryColorPreviewProfile === ctx.selectedEffectProfile
+      && ctx.lastMemoryColorPreviewRenderMs >= ctx.memoryColorPreviewTimingNoteThresholdMs
+    )
+      ? ctx.formatCopy(copy.memoryColorStatusTimingSuffix, {
+        duration: (ctx.lastMemoryColorPreviewRenderMs / 1000).toLocaleString(copy.locale, {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        }),
+      })
+      : "";
     ctx.btnPreviewOriginal.disabled = !interactive;
     ctx.btnPreviewColored.disabled = !interactive || (ctx.memoryColorPreviewRendering && coloredSelected);
     ctx.btnPreviewOriginal.classList.toggle("selected", originalSelected);
@@ -225,14 +236,14 @@
     if (coloredSelected && ctx.memoryColorPreviewAvailable(ctx.selectedEffectProfile)) {
       ctx.memoryColorStatus.textContent = ctx.formatCopy(copy.memoryColorStatusPreviewing, {
         name: profileCopy?.name || ctx.selectedEffectProfile,
-      });
+      }) + timingSuffix;
       return;
     }
 
     if (profileCopy) {
       ctx.memoryColorStatus.textContent = ctx.formatCopy(copy.memoryColorStatusSelected, {
         name: profileCopy.name,
-      });
+      }) + timingSuffix;
       return;
     }
 

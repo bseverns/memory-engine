@@ -43,6 +43,7 @@ const receiptPanel = document.getElementById("receiptPanel");
 const receipt = document.getElementById("receipt");
 const preview = document.getElementById("preview");
 const memoryColorPanel = document.getElementById("memoryColorPanel");
+const memoryChoiceContainer = memoryColorPanel?.querySelector(".memory-color-choices") || null;
 const memoryColorKicker = document.getElementById("memoryColorKicker");
 const memoryColorTitle = document.getElementById("memoryColorTitle");
 const memoryColorHint = document.getElementById("memoryColorHint");
@@ -82,11 +83,10 @@ const attractSteps = Array.from(document.querySelectorAll(".attract-step"));
 const stepEls = Array.from(document.querySelectorAll(".step"));
 const choices = Array.from(document.querySelectorAll(".choice"));
 const choiceCopyEls = new Map(choices.map((choice) => [choice.dataset.mode, {
-  title: choice.querySelector(".choice-title"),
-  copy: choice.querySelector(".choice-copy"),
+    title: choice.querySelector(".choice-title"),
+    copy: choice.querySelector(".choice-copy"),
 }]));
-const memoryChoiceContainer = memoryColorPanel?.querySelector(".memory-color-choices") || null;
-let memoryChoices = Array.from(document.querySelectorAll(".memory-choice"));
+let memoryChoices = [];
 
 let flowState = FLOW.IDLE;
 let primaryAction = null;
@@ -103,7 +103,10 @@ let previewSourceMode = "original";
 let memoryColorPreviewRendering = false;
 let memoryColorPreviewError = false;
 let memoryColorRenderToken = 0;
+let lastMemoryColorPreviewRenderMs = 0;
+let lastMemoryColorPreviewProfile = "";
 const memoryColorPreviewUrls = new Map();
+const MEMORY_COLOR_PREVIEW_TIMING_NOTE_MS = 350;
 
 let buffers = [];
 let recStartTs = 0;
@@ -162,9 +165,6 @@ const DEFAULT_MAX_RECORDING_SECONDS = Number(kioskConfig.kioskMaxRecordingSecond
 function readMemoryColorCatalog() {
   const fallbackProfiles = [
     { code: "clear", version: "v1", family: "participant_memory_color", labels: { en: "Clear" }, descriptions: {} },
-    { code: "warm", version: "v1", family: "participant_memory_color", labels: { en: "Warm" }, descriptions: {} },
-    { code: "radio", version: "v1", family: "participant_memory_color", labels: { en: "Radio" }, descriptions: {} },
-    { code: "dream", version: "v1", family: "participant_memory_color", labels: { en: "Dream" }, descriptions: {} },
   ];
   const rawCatalog = kioskConfig.memoryColorCatalog || {};
   const profiles = Array.isArray(rawCatalog.profiles)
@@ -189,15 +189,20 @@ function readMemoryColorCatalog() {
   };
 }
 
+function buildMemoryChoiceButton(profile) {
+  const choice = document.createElement("button");
+  choice.type = "button";
+  choice.className = "memory-choice";
+  choice.dataset.effectProfile = profile.code;
+  choice.textContent = profile.labels.en || profile.code;
+  return choice;
+}
+
 const memoryColorCatalog = readMemoryColorCatalog();
 const memoryColorProfileMap = new Map(memoryColorCatalog.profiles.map((profile) => [profile.code, profile]));
-const orderedMemoryChoices = memoryColorCatalog.profiles
-  .map((profile) => memoryChoices.find((choice) => String(choice.dataset.effectProfile || "").trim().toLowerCase() === profile.code))
-  .filter(Boolean);
-
-if (memoryChoiceContainer && orderedMemoryChoices.length) {
-  orderedMemoryChoices.forEach((choice) => memoryChoiceContainer.appendChild(choice));
-  memoryChoices = orderedMemoryChoices;
+if (memoryChoiceContainer) {
+  memoryChoices = memoryColorCatalog.profiles.map(buildMemoryChoiceButton);
+  memoryChoiceContainer.replaceChildren(...memoryChoices);
 }
 
 selectedEffectProfile = memoryColorCatalog.default;
@@ -320,6 +325,9 @@ function buildViewContext() {
     previewSourceMode,
     memoryColorPreviewRendering,
     memoryColorPreviewError,
+    lastMemoryColorPreviewRenderMs,
+    lastMemoryColorPreviewProfile,
+    memoryColorPreviewTimingNoteThresholdMs: MEMORY_COLOR_PREVIEW_TIMING_NOTE_MS,
     wavBlob,
     durationMs,
     recStartTs,
@@ -579,6 +587,7 @@ async function ensureMemoryColorPreview(profile) {
   }
 
   const renderToken = ++memoryColorRenderToken;
+  const renderStartedAt = performance.now();
   memoryColorPreviewRendering = true;
   memoryColorPreviewError = false;
   render();
@@ -591,6 +600,8 @@ async function ensureMemoryColorPreview(profile) {
     memoryColorPreviewUrls.set(normalized, coloredUrl);
     memoryColorPreviewRendering = false;
     memoryColorPreviewError = false;
+    lastMemoryColorPreviewRenderMs = Math.max(0, performance.now() - renderStartedAt);
+    lastMemoryColorPreviewProfile = normalized;
     if (previewSourceMode === "memory" && selectedEffectProfile === normalized) {
       applyPreviewSource();
     }
@@ -602,6 +613,8 @@ async function ensureMemoryColorPreview(profile) {
     }
     memoryColorPreviewRendering = false;
     memoryColorPreviewError = true;
+    lastMemoryColorPreviewRenderMs = 0;
+    lastMemoryColorPreviewProfile = "";
     if (previewSourceMode === "memory" && selectedEffectProfile === normalized) {
       previewSourceMode = "original";
       applyPreviewSource();
@@ -683,6 +696,8 @@ function clearTakeData({ clearReceipt = true } = {}) {
   previewSourceMode = "original";
   memoryColorPreviewRendering = false;
   memoryColorPreviewError = false;
+  lastMemoryColorPreviewRenderMs = 0;
+  lastMemoryColorPreviewProfile = "";
   memoryColorRenderToken += 1;
   choices.forEach((choice) => choice.classList.remove("selected"));
   memoryChoices.forEach((choice) => choice.classList.remove("selected"));
@@ -805,6 +820,8 @@ function stopRecording() {
   previewSourceMode = "original";
   memoryColorPreviewRendering = false;
   memoryColorPreviewError = false;
+  lastMemoryColorPreviewRenderMs = 0;
+  lastMemoryColorPreviewProfile = "";
   previewUrl = URL.createObjectURL(wavBlob);
   preview.src = previewUrl;
   preview.hidden = false;
@@ -1039,10 +1056,12 @@ btnPreviewColored.addEventListener("click", () => {
 choices.forEach((choice) => {
   choice.addEventListener("click", () => selectMode(choice.dataset.mode));
 });
-memoryChoices.forEach((choice) => {
-  choice.addEventListener("click", () => {
-    void selectEffectProfile(choice.dataset.effectProfile);
-  });
+memoryChoiceContainer?.addEventListener("click", (event) => {
+  const choice = event.target instanceof Element
+    ? event.target.closest(".memory-choice")
+    : null;
+  if (!choice) return;
+  void selectEffectProfile(choice.dataset.effectProfile);
 });
 
 preview.addEventListener("play", noteReviewActivity);
@@ -1136,6 +1155,8 @@ async function seedReviewTakeForBrowserTests(options = {}) {
   previewSourceMode = "original";
   memoryColorPreviewRendering = false;
   memoryColorPreviewError = false;
+  lastMemoryColorPreviewRenderMs = 0;
+  lastMemoryColorPreviewProfile = "";
   previewUrl = URL.createObjectURL(wavBlob);
   preview.src = previewUrl;
   preview.hidden = false;

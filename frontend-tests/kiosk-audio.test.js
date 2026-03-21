@@ -65,3 +65,22 @@ test("normalizeMemoryColorProfile accepts known profiles and falls back safely",
   assert.equal(audio.normalizeMemoryColorProfile("mystery", "clear"), "clear");
   assert.equal(audio.normalizeMemoryColorProfile("", "dream"), "dream");
 });
+
+test("memoryColorSeedForBuffer is stable for the same audio and profile", () => {
+  const audio = loadKioskAudio();
+  const fakeBuffer = {
+    numberOfChannels: 1,
+    length: 8,
+    sampleRate: 16000,
+    getChannelData() {
+      return new Float32Array([0, 0.1, -0.2, 0.3, -0.4, 0.2, 0.05, -0.01]);
+    },
+  };
+
+  const first = audio.memoryColorSeedForBuffer(fakeBuffer, "dream");
+  const second = audio.memoryColorSeedForBuffer(fakeBuffer, "dream");
+  const warm = audio.memoryColorSeedForBuffer(fakeBuffer, "warm");
+
+  assert.equal(first, second);
+  assert.notEqual(first, warm);
+});

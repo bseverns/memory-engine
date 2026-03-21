@@ -12,6 +12,18 @@
       "descriptions": {
         "en": "A cleaner, more present return with only a light lift.",
         "es_mx_ca": "Regresa más limpio y presente, con apenas un pequeño realce."
+      },
+      "processing": {
+        "engine": "chain_v1",
+        "kind": "clear",
+        "highpass_hz": 72,
+        "highpass_q": 0.66,
+        "presence_hz": 2100,
+        "presence_q": 0.8,
+        "presence_gain_db": 1.6,
+        "air_hz": 5600,
+        "air_gain_db": 1.4,
+        "output_gain": 0.98
       }
     },
     {
@@ -25,6 +37,22 @@
       "descriptions": {
         "en": "Softer highs and a little more body, like something kept close.",
         "es_mx_ca": "Agudos más suaves y un poco más de cuerpo, como algo guardado cerca."
+      },
+      "processing": {
+        "engine": "chain_v1",
+        "kind": "warm",
+        "lowshelf_hz": 220,
+        "lowshelf_gain_db": 4.6,
+        "lowpass_hz": 7600,
+        "lowpass_q": 0.62,
+        "highshelf_hz": 4200,
+        "highshelf_gain_db": -2.8,
+        "compressor_threshold_db": -20,
+        "compressor_knee_db": 18,
+        "compressor_ratio": 2.1,
+        "compressor_attack_s": 0.01,
+        "compressor_release_s": 0.18,
+        "output_gain": 1.02
       }
     },
     {
@@ -38,6 +66,19 @@
       "descriptions": {
         "en": "Narrow-band and slightly worn, like a signal found again.",
         "es_mx_ca": "Banda angosta y un poco gastada, como una señal encontrada otra vez."
+      },
+      "processing": {
+        "engine": "chain_v1",
+        "kind": "radio",
+        "highpass_hz": 290,
+        "highpass_q": 0.9,
+        "lowpass_hz": 3350,
+        "lowpass_q": 0.92,
+        "mid_hz": 1450,
+        "mid_q": 1.1,
+        "mid_gain_db": 3.4,
+        "drive_amount": 9,
+        "output_gain": 0.86
       }
     },
     {
@@ -51,6 +92,20 @@
       "descriptions": {
         "en": "Diffused and suspended, with a blurred edge around it.",
         "es_mx_ca": "Difuso y suspendido, con el borde un poco borroso."
+      },
+      "processing": {
+        "engine": "chain_v1",
+        "kind": "dream",
+        "lowpass_hz": 5200,
+        "lowpass_q": 0.5,
+        "dry_gain": 0.82,
+        "wet_source_gain": 0.38,
+        "delay_s": 0.18,
+        "feedback_gain": 0.24,
+        "impulse_seconds": 1.5,
+        "impulse_decay": 3.2,
+        "wet_gain": 0.28,
+        "output_gain": 0.96
       }
     }
   ]
