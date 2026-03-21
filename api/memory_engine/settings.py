@@ -2,6 +2,8 @@ import os
 import sys
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 from .config_validation import validate_runtime_settings
 from .installation_profiles import (
     DEFAULT_INSTALLATION_PROFILE,
@@ -41,6 +43,7 @@ def profile_default(name: str, fallback):
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
 DEBUG = env_bool("DJANGO_DEBUG", False)
 ALLOW_LOCAL_MEMORY_CACHE = env_bool("DJANGO_ALLOW_LOCAL_MEMORY_CACHE", False)
+BROWSER_TEST_MODE = env_bool("BROWSER_TEST_MODE", False)
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost,http://127.0.0.1").split(",") if o.strip()]
 USE_X_FORWARDED_HOST = env_bool("DJANGO_USE_X_FORWARDED_HOST", True)
@@ -111,13 +114,17 @@ if CACHE_URL:
             "LOCATION": CACHE_URL,
         },
     }
-else:
+elif DEBUG or ALLOW_LOCAL_MEMORY_CACHE:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
             "LOCATION": "memory-engine-kiosk-default",
         },
     }
+else:
+    raise ImproperlyConfigured(
+        "Shared cache is required outside debug mode. Set CACHE_URL/REDIS_URL or explicitly allow local-memory cache.",
+    )
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

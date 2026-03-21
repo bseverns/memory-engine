@@ -1176,6 +1176,12 @@ if (kioskConfig.browserTestMode) {
     async chooseOriginalPreview() {
       await chooseOriginalPreview();
     },
+    async selectMode(mode) {
+      await selectMode(mode);
+    },
+    async submitCurrentTake() {
+      await submitCurrentTake();
+    },
   };
 }
 

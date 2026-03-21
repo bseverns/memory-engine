@@ -5,6 +5,7 @@ const { expect } = require("@playwright/test");
 
 const SCREENSHOT_DIR = path.join(process.cwd(), "artifacts", "screenshots");
 const MEMORY_COLOR_CATALOG_PATH = path.join(process.cwd(), "api", "engine", "memory_color_profiles.json");
+const PLAYWRIGHT_OPS_SECRET = process.env.PLAYWRIGHT_OPS_SECRET || "test-ops-secret";
 
 function loadMemoryColorCatalog() {
   return JSON.parse(fsSync.readFileSync(MEMORY_COLOR_CATALOG_PATH, "utf8"));
@@ -86,7 +87,7 @@ async function signIntoOps(page) {
   await page.goto("/ops/");
   const loginHeading = page.getByRole("heading", { name: "Steward sign-in" });
   if (await loginHeading.isVisible().catch(() => false)) {
-    await page.getByLabel("Shared steward secret").fill("test-ops-secret");
+    await page.getByLabel("Shared steward secret").fill(PLAYWRIGHT_OPS_SECRET);
     await page.getByRole("button", { name: "Open dashboard" }).click();
   }
   await expect(page.getByRole("heading", { name: "Room Memory Status" })).toBeVisible();

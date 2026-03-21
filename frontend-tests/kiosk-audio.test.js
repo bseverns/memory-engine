@@ -11,7 +11,20 @@ function loadBrowserScript(context, relativePath) {
 }
 
 function loadMemoryColorRuntime() {
+  const memoryColorCatalog = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "../api/engine/memory_color_profiles.json"), "utf8"),
+  );
   const window = {};
+  window.document = {
+    getElementById(id) {
+      if (id !== "kiosk-config") {
+        return null;
+      }
+      return {
+        textContent: JSON.stringify({ memoryColorCatalog }),
+      };
+    },
+  };
   const context = {
     window,
     Blob,

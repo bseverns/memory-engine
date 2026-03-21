@@ -393,6 +393,7 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 - `docs/installation-checklist.md` — hardware, browser kiosk mode, audio, and auto-start install checklist
 - `docs/roadmap.md` — landed changes and the next likely improvements
 - `scripts/check.sh` — browser syntax, frontend smoke tests, Django behavior tests, and patch-hygiene validation
+- `scripts/release_smoke.sh` — disposable compose-backed ritual test for kiosk submit, room playback, and ops visibility on localhost `:18080`
 - `scripts/clean_local.sh` — clear regenerable local caches such as `api/.test-cache`, `__pycache__`, and Playwright output
 - `scripts/doctor.sh` — operator-focused env, compose, `/healthz`, `/readyz`, storage, and browser-constraint checks
 - `scripts/browser_kiosk.sh` — Chromium kiosk launcher for `/kiosk/`, `/room/`, or `/ops/`, with autoplay-safe flags for the listening surface
@@ -409,6 +410,16 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 - `api/engine/` — models, API endpoints, tasks
 - `api/engine/templates/engine/kiosk.html` — kiosk UI
 - `api/engine/static/engine/kiosk.js` — recording/playback + light decay
+
+For the closest thing in the repo to a full appliance release proof, run:
+
+```bash
+./scripts/release_smoke.sh
+```
+
+That boots a disposable compose project, waits for `/healthz` and `/readyz`,
+then runs a live browser flow that submits a memory-colored `ROOM` artifact and
+confirms room and ops alignment.
 
 ## Next obvious extensions
 - Node-as-AP mode scripts (captive portal) for true “room Wi‑Fi”

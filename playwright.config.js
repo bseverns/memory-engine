@@ -2,6 +2,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { defineConfig, devices } = require("@playwright/test");
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:8000";
+const disableWebServer = process.env.PLAYWRIGHT_DISABLE_WEBSERVER === "1";
 
 function findDownloadedChromiumExecutable() {
   const cacheRoot = path.join(os.homedir(), "Library", "Caches", "ms-playwright");
@@ -41,11 +43,11 @@ module.exports = defineConfig({
   reporter: [["list"]],
   outputDir: "test-results/playwright",
   use: {
-    baseURL: "http://127.0.0.1:8000",
+    baseURL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: {
+  webServer: disableWebServer ? undefined : {
     command: "/bin/sh -c 'PATH=\"$(pwd)/.venv/bin:$PATH\" python api/manage.py migrate --noinput --settings memory_engine.settings_browser && PATH=\"$(pwd)/.venv/bin:$PATH\" python api/manage.py runserver 127.0.0.1:8000 --noreload --settings memory_engine.settings_browser'",
     url: "http://127.0.0.1:8000/kiosk/",
     reuseExistingServer: true,

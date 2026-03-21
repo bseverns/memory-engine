@@ -33,11 +33,26 @@
 
   const config = readKioskConfig();
   const fossilVisualPollMs = Number(config.roomLoopConfig?.fossilVisuals?.refreshMs || 18000);
+  const playbackTestHook = config.browserTestMode ? {
+    calls: [],
+    reset() {
+      this.calls.length = 0;
+    },
+  } : null;
+  const playUrlWithLightChain = async (url, wear, options = {}) => {
+    if (playbackTestHook) {
+      playbackTestHook.calls.push({ url, wear, options });
+    }
+    return global.MemoryEngineKioskAudio.playUrlWithLightChain(url, wear, options);
+  };
+  if (playbackTestHook) {
+    global.MemoryEnginePlaybackTest = playbackTestHook;
+  }
   const roomLoopController = global.MemoryEngineRoomLoop.createController({
     startButton,
     stopButton,
     statusEl,
-    playUrlWithLightChain: global.MemoryEngineKioskAudio.playUrlWithLightChain,
+    playUrlWithLightChain,
   });
   let autostartRequested = false;
   let surfaceStateInterval = 0;

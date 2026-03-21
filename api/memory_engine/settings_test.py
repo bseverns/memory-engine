@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import tempfile
 
@@ -15,6 +16,9 @@ TEST_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("MPLCONFIGDIR", str(TEST_CACHE_DIR / "matplotlib"))
 Path(os.environ["MPLCONFIGDIR"]).mkdir(parents=True, exist_ok=True)  # noqa: F405
 Path(STATIC_ROOT).mkdir(parents=True, exist_ok=True)  # noqa: F405
+LOCAL_BLOB_STORAGE_ROOT = TEST_CACHE_DIR / "blob-store"
+shutil.rmtree(LOCAL_BLOB_STORAGE_ROOT, ignore_errors=True)
+LOCAL_BLOB_STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
 
 SECRET_KEY = "test-secret-key"
 DEBUG = False

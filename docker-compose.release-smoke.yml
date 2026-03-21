@@ -1,0 +1,19 @@
+services:
+  proxy:
+    environment:
+      APP_SITE_ADDRESS: ":80"
+      APP_TLS_DIRECTIVE: ""
+    ports:
+      - "127.0.0.1:18080:80"
+
+  minio:
+    ports:
+      - "127.0.0.1:19000:9000"
+      - "127.0.0.1:19001:9001"
+
+  api:
+    environment:
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DJANGO_CSRF_TRUSTED_ORIGINS: "http://localhost:18080,http://127.0.0.1:18080"
+      OPS_SHARED_SECRET: "${RELEASE_SMOKE_OPS_SECRET:-test-ops-secret}"
+      BROWSER_TEST_MODE: "1"

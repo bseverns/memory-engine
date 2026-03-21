@@ -4,6 +4,7 @@
   "scripts": {
     "test:frontend": "node --test frontend-tests/*.test.js",
     "test:browser": "playwright test",
+    "test:browser:release": "playwright test browser-tests/release-smoke.spec.js",
     "screenshots": "playwright test browser-tests/visual.spec.js --project=chromium"
   },
   "devDependencies": {
