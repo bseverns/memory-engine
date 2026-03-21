@@ -43,6 +43,8 @@ class Artifact(models.Model):
     raw_uri = models.CharField(max_length=512, blank=True, default="")  # s3 key
     raw_sha256 = models.CharField(max_length=128, blank=True, default="")
     duration_ms = models.IntegerField(default=0)
+    effect_profile = models.CharField(max_length=32, blank=True, default="")
+    effect_metadata = models.JSONField(default=dict, blank=True)
 
     wear = models.FloatField(default=0.0)  # 0..1
     play_count = models.IntegerField(default=0)

@@ -36,6 +36,7 @@
 
 .recording-page .meter-card,
 .recording-page .recording-strip,
+.recording-page .memory-color-panel,
 .recording-page .quiet-take-panel,
 .recording-page .review-timeout-panel{
   background:rgba(255,255,255,0.52);
@@ -51,6 +52,7 @@
 }
 
 .recording-page .mode-panel,
+.recording-page .memory-color-panel,
 .recording-page .receipt-panel{
   padding:0;
   margin:26px 0 0;
@@ -63,4 +65,10 @@
 
 .recording-page .choices{
   margin-top:0;
+}
+
+.recording-page .memory-color-panel{
+  display:flex;
+  flex-direction:column;
+  gap:0;
 }

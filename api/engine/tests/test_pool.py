@@ -22,6 +22,8 @@ class PoolBehaviorTests(EngineTestCase):
         artifact = self.make_active_artifact(
             raw_uri="raw/long.wav",
             duration_ms=300000,
+            effect_profile="warm",
+            effect_metadata={"profile": "warm", "family": "participant_memory_color", "version": "v1", "label": "Warm"},
             created_at=timezone.now() - timedelta(hours=10),
         )
 
@@ -32,6 +34,7 @@ class PoolBehaviorTests(EngineTestCase):
         self.assertEqual(payload["artifact_id"], artifact.id)
         self.assertTrue(payload["playback_windowed"])
         self.assertEqual(payload["playback_duration_ms"], 45000)
+        self.assertEqual(payload["effect_profile"], "warm")
         self.assertTrue(payload["audio_url"].startswith("/api/v1/media/raw/"))
         self.assertGreaterEqual(payload["playback_start_ms"], 0)
         self.assertLessEqual(payload["playback_start_ms"], artifact.duration_ms - payload["playback_duration_ms"])

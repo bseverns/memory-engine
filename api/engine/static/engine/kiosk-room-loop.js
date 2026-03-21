@@ -476,6 +476,7 @@
           toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, roomIntensity, roomTone.duckGain, loopKnownPoolSize)), 0.8);
           const playbackPromises = [(async () => {
             await playUrlWithLightChain(payload.audio_url, payload.wear, {
+              memoryColorProfile: payload.effect_profile,
               startMs: payload.playback_start_ms,
               durationMs: payload.playback_duration_ms,
               outputGainMultiplier: surfaceOutputGainMultiplier(),

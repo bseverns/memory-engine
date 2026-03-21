@@ -19,6 +19,16 @@
       reviewTimeoutHint: "Touch the screen, use the keyboard, or play the preview to keep this session open.",
       receiptKicker: "Receipt",
       receiptTitle: "What to keep",
+      memoryColorKicker: "Participant memory color",
+      memoryColorTitle: "Choose how this memory should lean when it returns.",
+      memoryColorHint: "Keep the archive dry. The color is stored separately and returns later in playback.",
+      previewOriginal: "Original",
+      previewColored: "Memory-colored",
+      memoryColorStatusOriginal: "Previewing the dry original.",
+      memoryColorStatusRendering: "Rendering the memory-colored preview...",
+      memoryColorStatusUnavailable: "The dry original is ready. Memory-colored preview could not be rendered here.",
+      memoryColorStatusSelected: "{name} selected. Switch to Memory-colored to hear it.",
+      memoryColorStatusPreviewing: "Previewing {name}.",
       countdownKicker: "Get ready",
       footerCopy: "Local-first node. Nothing is published. Revocation works only on this node's network.",
       selectionUnlocked: "Unlocked after recording",
@@ -174,6 +184,24 @@
       processingNoteTrimmed: "Take captured. Quiet edges were trimmed and the level was smoothed.",
       processingNoteSmoothed: "Take captured. The level was smoothed for playback.",
       processingNoteQuiet: "Take captured. The input stayed very quiet, so please keep or retake it before choosing a memory mode.",
+      memoryProfiles: {
+        clear: {
+          name: "Clear",
+          description: "A cleaner, more present return with only a light lift.",
+        },
+        warm: {
+          name: "Warm",
+          description: "Softer highs and a little more body, like something kept close.",
+        },
+        radio: {
+          name: "Radio",
+          description: "Narrow-band and slightly worn, like a signal found again.",
+        },
+        dream: {
+          name: "Dream",
+          description: "Diffused and suspended, with a blurred edge around it.",
+        },
+      },
       modes: {
         ROOM: {
           name: "Room Memory",
@@ -220,6 +248,16 @@
       reviewTimeoutHint: "Toca la pantalla, usa el teclado o reproduce la escucha previa para mantener abierta esta sesión.",
       receiptKicker: "Comprobante",
       receiptTitle: "Qué guardar",
+      memoryColorKicker: "Color de memoria",
+      memoryColorTitle: "Elige hacia dónde debe inclinarse esta memoria cuando regrese.",
+      memoryColorHint: "El archivo se guarda seco. El color se guarda aparte y vuelve después en la reproducción.",
+      previewOriginal: "Original",
+      previewColored: "Con color de memoria",
+      memoryColorStatusOriginal: "Escuchando el original seco.",
+      memoryColorStatusRendering: "Preparando la escucha con color de memoria...",
+      memoryColorStatusUnavailable: "El original seco está listo. Aquí no se pudo preparar la escucha con color de memoria.",
+      memoryColorStatusSelected: "{name} elegido. Cambia a \"Con color de memoria\" para escucharlo.",
+      memoryColorStatusPreviewing: "Escuchando {name}.",
       countdownKicker: "Prepárate",
       footerCopy: "Nodo local primero. Nada se publica. La revocación solo funciona dentro de la red de este nodo.",
       selectionUnlocked: "Se activa después de grabar",
@@ -375,6 +413,24 @@
       processingNoteTrimmed: "Toma capturada. Se recortaron los bordes silenciosos y se suavizó el nivel.",
       processingNoteSmoothed: "Toma capturada. Se suavizó el nivel para la reproducción.",
       processingNoteQuiet: "Toma capturada. La entrada se mantuvo muy baja, así que por favor consérvala o vuelve a grabarla antes de elegir un modo de memoria.",
+      memoryProfiles: {
+        clear: {
+          name: "Claro",
+          description: "Regresa más limpio y presente, con apenas un pequeño realce.",
+        },
+        warm: {
+          name: "Cálido",
+          description: "Agudos más suaves y un poco más de cuerpo, como algo guardado cerca.",
+        },
+        radio: {
+          name: "Radio",
+          description: "Banda angosta y un poco gastada, como una señal encontrada otra vez.",
+        },
+        dream: {
+          name: "Sueño",
+          description: "Difuso y suspendido, con el borde un poco borroso.",
+        },
+      },
       modes: {
         ROOM: {
           name: "Memoria de sala",

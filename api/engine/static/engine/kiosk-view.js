@@ -25,6 +25,10 @@
     if (ctx.reviewTimeoutHint) ctx.reviewTimeoutHint.textContent = copy.reviewTimeoutHint;
     if (ctx.receiptKicker) ctx.receiptKicker.textContent = copy.receiptKicker;
     if (ctx.receiptTitle) ctx.receiptTitle.textContent = copy.receiptTitle;
+    if (ctx.memoryColorKicker) ctx.memoryColorKicker.textContent = copy.memoryColorKicker;
+    if (ctx.memoryColorTitle) ctx.memoryColorTitle.textContent = copy.memoryColorTitle;
+    if (ctx.btnPreviewOriginal) ctx.btnPreviewOriginal.textContent = copy.previewOriginal;
+    if (ctx.btnPreviewColored) ctx.btnPreviewColored.textContent = copy.previewColored;
     if (ctx.countdownKicker) ctx.countdownKicker.textContent = copy.countdownKicker;
     if (ctx.footerCopy) ctx.footerCopy.textContent = copy.footerCopy;
     for (const [mode, els] of ctx.choiceCopyEls.entries()) {
@@ -32,6 +36,11 @@
       if (!modeStrings) continue;
       if (els.title) els.title.textContent = modeStrings.name;
       if (els.copy) els.copy.textContent = modeStrings.optionCopy;
+    }
+    for (const choice of ctx.memoryChoices) {
+      const profileStrings = copy.memoryProfiles[String(choice.dataset.effectProfile || "").trim().toLowerCase()];
+      if (!profileStrings) continue;
+      choice.textContent = profileStrings.name;
     }
   }
 
@@ -171,6 +180,63 @@
     const canSubmit = ctx.flowState === ctx.FLOW.REVIEW && !!ctx.wavBlob && !!ctx.selectedMode && !ctx.intakePaused();
     ctx.btnSubmit.disabled = !canSubmit;
     ctx.btnSubmit.textContent = ctx.selectedMode ? ctx.modeCopy(ctx.selectedMode).submitLabel : copy.submitSelection;
+  }
+
+  function updateMemoryColorPanel(ctx) {
+    if (!ctx.memoryColorPanel) return;
+    const copy = ctx.currentCopy();
+    const visible = [ctx.FLOW.REVIEW, ctx.FLOW.SUBMITTING].includes(ctx.flowState) && !!ctx.wavBlob;
+    ctx.memoryColorPanel.hidden = !visible;
+    if (!visible) {
+      return;
+    }
+
+    const profileCopy = ctx.memoryProfileCopy(ctx.selectedEffectProfile);
+    const interactive = ctx.flowState === ctx.FLOW.REVIEW && !ctx.quietTakeNeedsDecision;
+    ctx.memoryColorPanel.classList.toggle("locked", !interactive);
+    ctx.memoryColorHint.textContent = profileCopy?.description || copy.memoryColorHint;
+
+    ctx.memoryChoices.forEach((choice) => {
+      const profile = String(choice.dataset.effectProfile || "").trim().toLowerCase();
+      choice.disabled = !interactive;
+      choice.classList.toggle("selected", profile === ctx.selectedEffectProfile);
+      choice.setAttribute("aria-pressed", profile === ctx.selectedEffectProfile ? "true" : "false");
+    });
+
+    const originalSelected = ctx.previewSourceMode !== "memory";
+    const coloredSelected = ctx.previewSourceMode === "memory";
+    ctx.btnPreviewOriginal.disabled = !interactive;
+    ctx.btnPreviewColored.disabled = !interactive || (ctx.memoryColorPreviewRendering && coloredSelected);
+    ctx.btnPreviewOriginal.classList.toggle("selected", originalSelected);
+    ctx.btnPreviewColored.classList.toggle("selected", coloredSelected);
+    ctx.btnPreviewOriginal.setAttribute("aria-pressed", originalSelected ? "true" : "false");
+    ctx.btnPreviewColored.setAttribute("aria-pressed", coloredSelected ? "true" : "false");
+
+    if (ctx.memoryColorPreviewRendering && coloredSelected) {
+      ctx.memoryColorStatus.textContent = copy.memoryColorStatusRendering;
+      return;
+    }
+
+    if (ctx.memoryColorPreviewError) {
+      ctx.memoryColorStatus.textContent = copy.memoryColorStatusUnavailable;
+      return;
+    }
+
+    if (coloredSelected && ctx.memoryColorPreviewAvailable(ctx.selectedEffectProfile)) {
+      ctx.memoryColorStatus.textContent = ctx.formatCopy(copy.memoryColorStatusPreviewing, {
+        name: profileCopy?.name || ctx.selectedEffectProfile,
+      });
+      return;
+    }
+
+    if (profileCopy) {
+      ctx.memoryColorStatus.textContent = ctx.formatCopy(copy.memoryColorStatusSelected, {
+        name: profileCopy.name,
+      });
+      return;
+    }
+
+    ctx.memoryColorStatus.textContent = copy.memoryColorStatusOriginal;
   }
 
   function updateReceiptPanel(ctx) {
@@ -452,6 +518,7 @@
     ctx.countdownOverlay.hidden = ctx.flowState !== ctx.FLOW.COUNTDOWN;
     updateStepper(ctx);
     updateModePanel(ctx);
+    updateMemoryColorPanel(ctx);
     updateReceiptPanel(ctx);
     updateButtons(ctx);
     updateStage(ctx);
@@ -473,6 +540,7 @@
     updateBudgetNotice,
     updateButtons,
     updateModePanel,
+    updateMemoryColorPanel,
     updateOperatorNotice,
     updateQuietTakePanel,
     updateReceiptPanel,

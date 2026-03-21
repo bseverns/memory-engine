@@ -39,6 +39,35 @@ class ArtifactBehaviorTests(EngineTestCase):
         self.assertEqual(len(response.json()["revocation_token"]), 10)
         put_bytes_mock.assert_called_once()
 
+    @patch("engine.api_views.put_bytes")
+    def test_room_save_stores_memory_color_profile_separately_from_raw_audio(self, put_bytes_mock):
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=2.4), content_type="audio/wav")
+
+        response = self.client.post(
+            "/api/v1/artifacts/audio",
+            {"file": upload, "consent_mode": "ROOM", "effect_profile": "dream"},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        artifact = Artifact.objects.get()
+        self.assertEqual(artifact.effect_profile, "dream")
+        self.assertEqual(artifact.effect_metadata["profile"], "dream")
+        self.assertEqual(artifact.effect_metadata["family"], "participant_memory_color")
+        put_bytes_mock.assert_called_once()
+
+    @patch("engine.api_views.put_bytes")
+    def test_room_save_rejects_unknown_memory_color_profile(self, put_bytes_mock):
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=1.2), content_type="audio/wav")
+
+        response = self.client.post(
+            "/api/v1/artifacts/audio",
+            {"file": upload, "consent_mode": "ROOM", "effect_profile": "mystery"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("effect_profile", response.json()["error"])
+        put_bytes_mock.assert_not_called()
+
     @patch("engine.api_views.generate_essence_audio.delay")
     @patch("engine.api_views.generate_spectrogram.delay")
     @patch("engine.api_views.put_bytes")

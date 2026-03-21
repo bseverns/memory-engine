@@ -309,12 +309,15 @@ This is the normal path for `ROOM` and `FOSSIL`.
 3. Django generates a revocation token and stores only its hash in
    `ConsentManifest`.
 4. Django creates an `Artifact` row in `ACTIVE` state with a retention deadline.
-5. Django writes the WAV bytes to MinIO under `raw/<artifact_id>/audio.wav`.
-6. Django stores the resulting object key in `artifact.raw_uri`.
-7. If the consent mode permits derivatives, Django queues
+5. If the participant chose a memory color, Django stores that choice as
+   `artifact.effect_profile` plus structured `effect_metadata`; the WAV itself
+   stays dry.
+6. Django writes the WAV bytes to MinIO under `raw/<artifact_id>/audio.wav`.
+7. Django stores the resulting object key in `artifact.raw_uri`.
+8. If the consent mode permits derivatives, Django queues
    `generate_spectrogram.delay(artifact.id)` and
    `generate_essence_audio.delay(artifact.id)` as needed.
-8. Django returns the serialized artifact plus the plain revocation token.
+9. Django returns the serialized artifact plus the plain revocation token.
 
 Why this is structured this way:
 
@@ -330,7 +333,8 @@ flowchart TD
     upload --> validate["Django validates file + consent + WAV contract"]
     validate --> consent["Create ConsentManifest + hashed revoke token"]
     consent --> artifact["Create ACTIVE Artifact with retention deadline"]
-    artifact --> store["Write WAV to MinIO and save raw_uri"]
+    artifact --> effect["Store memory color metadata separately"]
+    effect --> store["Write WAV to MinIO and save raw_uri"]
     store --> branch{"Consent mode"}
     branch -->|ROOM| room["Return artifact + revocation token"]
     branch -->|FOSSIL| queue["Queue derivative generation"]

@@ -39,6 +39,10 @@ body.reduced-motion-mode .review-timeout-fill{
     grid-template-columns:1fr;
   }
 
+  .memory-color-choices{
+    grid-template-columns:1fr;
+  }
+
   .playback-note-grid{
     grid-template-columns:1fr;
   }

@@ -57,3 +57,11 @@ test("encodeWavMono16 returns a blob with wav header and payload size", async ()
   assert.equal(String.fromCharCode(...bytes.slice(0, 4)), "RIFF");
   assert.equal(String.fromCharCode(...bytes.slice(8, 12)), "WAVE");
 });
+
+test("normalizeMemoryColorProfile accepts known profiles and falls back safely", () => {
+  const audio = loadKioskAudio();
+
+  assert.equal(audio.normalizeMemoryColorProfile("Warm", "clear"), "warm");
+  assert.equal(audio.normalizeMemoryColorProfile("mystery", "clear"), "clear");
+  assert.equal(audio.normalizeMemoryColorProfile("", "dream"), "dream");
+});

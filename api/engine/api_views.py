@@ -30,6 +30,11 @@ from .media_access import (
     read_surface_token,
     surface_fossils_url,
 )
+from .memory_color import (
+    DEFAULT_MEMORY_COLOR_PROFILE,
+    memory_color_metadata,
+    normalize_memory_color_profile,
+)
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative
 from .operator_auth import operator_secret_configured, operator_session_active
 from .ops import (
@@ -176,6 +181,13 @@ def create_audio_artifact(request):
     consent_mode = (request.data.get("consent_mode") or "ROOM").upper()
     if consent_mode not in ("ROOM", "FOSSIL"):
         return Response({"error": "consent_mode must be ROOM or FOSSIL for this endpoint."}, status=400)
+    try:
+        effect_profile = normalize_memory_color_profile(
+            request.data.get("effect_profile"),
+            default=DEFAULT_MEMORY_COLOR_PROFILE,
+        )
+    except ValueError:
+        return Response({"error": "effect_profile must be one of: clear, warm, radio, dream."}, status=400)
 
     upload = request.data.get("file")
     if not upload:
@@ -200,6 +212,8 @@ def create_audio_artifact(request):
             consent=consent,
             status=Artifact.STATUS_ACTIVE,
             raw_sha256=hashlib.sha256(data).hexdigest(),
+            effect_profile=effect_profile,
+            effect_metadata=memory_color_metadata(effect_profile),
             expires_at=(
                 timezone.now() + timedelta(days=int(manifest["retention"]["derivative_ttl_days"]))
                 if consent_mode == "FOSSIL"
@@ -242,6 +256,14 @@ def create_ephemeral_audio(request):
     if state.intake_paused:
         return Response({"error": "intake is paused by the steward"}, status=423)
 
+    try:
+        effect_profile = normalize_memory_color_profile(
+            request.data.get("effect_profile"),
+            default=DEFAULT_MEMORY_COLOR_PROFILE,
+        )
+    except ValueError:
+        return Response({"error": "effect_profile must be one of: clear, warm, radio, dream."}, status=400)
+
     upload = request.data.get("file")
     if not upload:
         return Response({"error": "file required"}, status=400)
@@ -265,6 +287,8 @@ def create_ephemeral_audio(request):
             consent=consent,
             status=Artifact.STATUS_EPHEMERAL,
             raw_sha256=hashlib.sha256(data).hexdigest(),
+            effect_profile=effect_profile,
+            effect_metadata=memory_color_metadata(effect_profile),
             expires_at=timezone.now() + timedelta(minutes=5),
             duration_ms=validated_upload.duration_ms,
         )
@@ -436,6 +460,8 @@ def pool_next(request):
         "density": density,
         "mood": mood,
         "duration_ms": artifact.duration_ms,
+        "effect_profile": artifact.effect_profile,
+        "effect_metadata": artifact.effect_metadata,
         "playback_start_ms": playback_window["start_ms"],
         "playback_duration_ms": playback_window["duration_ms"],
         "playback_windowed": playback_window["windowed"],

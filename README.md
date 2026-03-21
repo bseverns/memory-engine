@@ -9,6 +9,7 @@ Local-first “room memory” appliance: record a short sound offering, choose c
 - Redis + Celery (+ Beat) for background jobs (derivative generation + expiry)
 - Separate client surfaces: `/kiosk/` for recording and `/room/` for dedicated playback
 - “Don’t save” = **play once immediately, then discard**
+- A participant can now choose a first-pass memory color (`Clear`, `Warm`, `Radio`, `Dream`) during review; the dry WAV stays unchanged in storage and the color choice is stored separately on the artifact for playback
 
 ## Quick start
 1) Install Docker + Docker Compose.
