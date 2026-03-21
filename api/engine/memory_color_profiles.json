@@ -1,0 +1,57 @@
+{
+  "default": "clear",
+  "profiles": [
+    {
+      "code": "clear",
+      "version": "v1",
+      "family": "participant_memory_color",
+      "labels": {
+        "en": "Clear",
+        "es_mx_ca": "Claro"
+      },
+      "descriptions": {
+        "en": "A cleaner, more present return with only a light lift.",
+        "es_mx_ca": "Regresa más limpio y presente, con apenas un pequeño realce."
+      }
+    },
+    {
+      "code": "warm",
+      "version": "v1",
+      "family": "participant_memory_color",
+      "labels": {
+        "en": "Warm",
+        "es_mx_ca": "Cálido"
+      },
+      "descriptions": {
+        "en": "Softer highs and a little more body, like something kept close.",
+        "es_mx_ca": "Agudos más suaves y un poco más de cuerpo, como algo guardado cerca."
+      }
+    },
+    {
+      "code": "radio",
+      "version": "v1",
+      "family": "participant_memory_color",
+      "labels": {
+        "en": "Radio",
+        "es_mx_ca": "Radio"
+      },
+      "descriptions": {
+        "en": "Narrow-band and slightly worn, like a signal found again.",
+        "es_mx_ca": "Banda angosta y un poco gastada, como una señal encontrada otra vez."
+      }
+    },
+    {
+      "code": "dream",
+      "version": "v1",
+      "family": "participant_memory_color",
+      "labels": {
+        "en": "Dream",
+        "es_mx_ca": "Sueño"
+      },
+      "descriptions": {
+        "en": "Diffused and suspended, with a blurred edge around it.",
+        "es_mx_ca": "Difuso y suspendido, con el borde un poco borroso."
+      }
+    }
+  ]
+}

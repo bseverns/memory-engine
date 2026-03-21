@@ -85,7 +85,8 @@ const choiceCopyEls = new Map(choices.map((choice) => [choice.dataset.mode, {
   title: choice.querySelector(".choice-title"),
   copy: choice.querySelector(".choice-copy"),
 }]));
-const memoryChoices = Array.from(document.querySelectorAll(".memory-choice"));
+const memoryChoiceContainer = memoryColorPanel?.querySelector(".memory-color-choices") || null;
+let memoryChoices = Array.from(document.querySelectorAll(".memory-choice"));
 
 let flowState = FLOW.IDLE;
 let primaryAction = null;
@@ -157,6 +158,50 @@ function readKioskConfig() {
 const kioskConfig = readKioskConfig();
 const DEFAULT_LANGUAGE_CODE = String(kioskConfig.kioskLanguageCode || "en");
 const DEFAULT_MAX_RECORDING_SECONDS = Number(kioskConfig.kioskMaxRecordingSeconds || 120);
+
+function readMemoryColorCatalog() {
+  const fallbackProfiles = [
+    { code: "clear", version: "v1", family: "participant_memory_color", labels: { en: "Clear" }, descriptions: {} },
+    { code: "warm", version: "v1", family: "participant_memory_color", labels: { en: "Warm" }, descriptions: {} },
+    { code: "radio", version: "v1", family: "participant_memory_color", labels: { en: "Radio" }, descriptions: {} },
+    { code: "dream", version: "v1", family: "participant_memory_color", labels: { en: "Dream" }, descriptions: {} },
+  ];
+  const rawCatalog = kioskConfig.memoryColorCatalog || {};
+  const profiles = Array.isArray(rawCatalog.profiles)
+    ? rawCatalog.profiles
+      .map((spec) => {
+        const code = String(spec?.code || "").trim().toLowerCase();
+        if (!code) return null;
+        return {
+          code,
+          version: String(spec?.version || "v1").trim() || "v1",
+          family: String(spec?.family || "participant_memory_color").trim() || "participant_memory_color",
+          labels: spec?.labels && typeof spec.labels === "object" ? spec.labels : {},
+          descriptions: spec?.descriptions && typeof spec.descriptions === "object" ? spec.descriptions : {},
+        };
+      })
+      .filter(Boolean)
+    : fallbackProfiles;
+  const defaultCode = String(rawCatalog.default || "clear").trim().toLowerCase();
+  return {
+    default: profiles.some((profile) => profile.code === defaultCode) ? defaultCode : "clear",
+    profiles,
+  };
+}
+
+const memoryColorCatalog = readMemoryColorCatalog();
+const memoryColorProfileMap = new Map(memoryColorCatalog.profiles.map((profile) => [profile.code, profile]));
+const orderedMemoryChoices = memoryColorCatalog.profiles
+  .map((profile) => memoryChoices.find((choice) => String(choice.dataset.effectProfile || "").trim().toLowerCase() === profile.code))
+  .filter(Boolean);
+
+if (memoryChoiceContainer && orderedMemoryChoices.length) {
+  orderedMemoryChoices.forEach((choice) => memoryChoiceContainer.appendChild(choice));
+  memoryChoices = orderedMemoryChoices;
+}
+
+selectedEffectProfile = memoryColorCatalog.default;
+
 let surfaceState = {
   intake_paused: false,
   playback_paused: false,
@@ -199,7 +244,20 @@ function modeCopy(mode) {
 
 function memoryProfileCopy(profile = selectedEffectProfile) {
   const normalized = normalizeMemoryColorProfile(profile, "clear");
-  return currentCopy().memoryProfiles[normalized] || currentCopy().memoryProfiles.clear;
+  const spec = memoryColorProfileMap.get(normalized) || memoryColorProfileMap.get(memoryColorCatalog.default);
+  if (!spec) {
+    return {
+      code: normalized || memoryColorCatalog.default,
+      name: normalized || "Clear",
+      description: currentCopy().memoryColorHint,
+    };
+  }
+  const languageCode = currentLanguageCode();
+  return {
+    code: spec.code,
+    name: spec.labels[languageCode] || spec.labels[DEFAULT_LANGUAGE_CODE] || spec.labels.en || spec.code,
+    description: spec.descriptions[languageCode] || spec.descriptions[DEFAULT_LANGUAGE_CODE] || spec.descriptions.en || currentCopy().memoryColorHint,
+  };
 }
 
 function localizedDateTime(value) {
@@ -258,6 +316,7 @@ function buildViewContext() {
     flowState,
     selectedMode,
     selectedEffectProfile,
+    memoryColorProfiles: memoryColorCatalog.profiles,
     previewSourceMode,
     memoryColorPreviewRendering,
     memoryColorPreviewError,
@@ -620,7 +679,7 @@ function clearTakeData({ clearReceipt = true } = {}) {
     hasReceipt = false;
   }
   selectedMode = null;
-  selectedEffectProfile = "clear";
+  selectedEffectProfile = memoryColorCatalog.default;
   previewSourceMode = "original";
   memoryColorPreviewRendering = false;
   memoryColorPreviewError = false;
@@ -742,7 +801,7 @@ function stopRecording() {
 
   durationMs = Math.round((processed.samples.length / sampleRate) * 1000);
   wavBlob = encodeWavMono16(processed.samples, sampleRate);
-  selectedEffectProfile = "clear";
+  selectedEffectProfile = memoryColorCatalog.default;
   previewSourceMode = "original";
   memoryColorPreviewRendering = false;
   memoryColorPreviewError = false;
@@ -1047,6 +1106,46 @@ function runAction(action) {
   });
 }
 
+function generateTestTakeBlob({ seconds = 1.4, sampleRate = 16000 } = {}) {
+  const frameCount = Math.max(1, Math.floor(sampleRate * seconds));
+  const samples = new Float32Array(frameCount);
+  for (let index = 0; index < frameCount; index += 1) {
+    const time = index / sampleRate;
+    samples[index] = (
+      (Math.sin(2 * Math.PI * 220 * time) * 0.18)
+      + (Math.sin(2 * Math.PI * 330 * time) * 0.07)
+    );
+  }
+  return {
+    sampleRate,
+    samples,
+    wav: encodeWavMono16(samples, sampleRate),
+  };
+}
+
+async function seedReviewTakeForBrowserTests(options = {}) {
+  clearTakeData();
+  await teardownMicrophone();
+  const seeded = generateTestTakeBlob({
+    seconds: Number(options.seconds || 1.4),
+    sampleRate: Number(options.sampleRate || 16000),
+  });
+  wavBlob = seeded.wav;
+  durationMs = Math.round((seeded.samples.length / seeded.sampleRate) * 1000);
+  selectedEffectProfile = normalizeMemoryColorProfile(options.effectProfile, memoryColorCatalog.default) || memoryColorCatalog.default;
+  previewSourceMode = "original";
+  memoryColorPreviewRendering = false;
+  memoryColorPreviewError = false;
+  previewUrl = URL.createObjectURL(wavBlob);
+  preview.src = previewUrl;
+  preview.hidden = false;
+  quietTakeNeedsDecision = false;
+  quietTakeAnalysis = null;
+  submitStatus.textContent = "";
+  setFlowState(FLOW.REVIEW);
+  void ensureMemoryColorPreview(selectedEffectProfile);
+}
+
 const roomLoopController = window.MemoryEngineRoomLoop.createController({
   startButton: btnLoop,
   stopButton: btnLoopStop,
@@ -1068,4 +1167,22 @@ void refreshSurfaceState();
 surfaceStateInterval = window.setInterval(() => {
   void refreshSurfaceState();
 }, SURFACE_STATE_POLL_MS);
+
+if (kioskConfig.browserTestMode) {
+  window.MemoryEngineKioskTest = {
+    async seedReviewTake(options = {}) {
+      await seedReviewTakeForBrowserTests(options);
+    },
+    async selectMemoryColor(profile) {
+      await selectEffectProfile(profile);
+    },
+    async chooseMemoryPreview() {
+      await chooseMemoryPreview();
+    },
+    async chooseOriginalPreview() {
+      await chooseOriginalPreview();
+    },
+  };
+}
+
 render();

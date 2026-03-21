@@ -32,6 +32,8 @@ from .media_access import (
 )
 from .memory_color import (
     DEFAULT_MEMORY_COLOR_PROFILE,
+    MEMORY_COLOR_PROFILE_ORDER,
+    memory_color_catalog_payload,
     memory_color_metadata,
     normalize_memory_color_profile,
 )
@@ -560,9 +562,16 @@ def node_status(request):
         "weathered": 0,
         "gathering": 0,
     }
+    memory_color_counts = {profile: 0 for profile in MEMORY_COLOR_PROFILE_ORDER}
     for artifact in playable_artifacts:
         lane_counts[artifact_lane(artifact, now)] += 1
         mood_counts[artifact_mood(artifact, now)] += 1
+        effect_profile = normalize_memory_color_profile(
+            artifact.effect_profile,
+            default=DEFAULT_MEMORY_COLOR_PROFILE,
+        ) or DEFAULT_MEMORY_COLOR_PROFILE
+        memory_color_counts.setdefault(effect_profile, 0)
+        memory_color_counts[effect_profile] += 1
 
     playable_count = len(playable_artifacts)
     storage = disk_status(settings.OPS_STORAGE_PATH)
@@ -610,6 +619,10 @@ def node_status(request):
         "active": active,
         "lanes": lane_counts,
         "moods": mood_counts,
+        "memory_colors": {
+            "counts": memory_color_counts,
+            "catalog": memory_color_catalog_payload(),
+        },
         "playable": playable_count,
         "storage": storage,
         "retention": retention,

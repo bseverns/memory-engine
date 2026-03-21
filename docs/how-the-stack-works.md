@@ -312,12 +312,15 @@ This is the normal path for `ROOM` and `FOSSIL`.
 5. If the participant chose a memory color, Django stores that choice as
    `artifact.effect_profile` plus structured `effect_metadata`; the WAV itself
    stays dry.
-6. Django writes the WAV bytes to MinIO under `raw/<artifact_id>/audio.wav`.
-7. Django stores the resulting object key in `artifact.raw_uri`.
-8. If the consent mode permits derivatives, Django queues
+6. The memory-color profile catalog is shared across Django and the kiosk UI,
+   so the same four profile codes, labels, and descriptions drive validation,
+   review copy, room playback metadata, and operator summaries.
+7. Django writes the WAV bytes to MinIO under `raw/<artifact_id>/audio.wav`.
+8. Django stores the resulting object key in `artifact.raw_uri`.
+9. If the consent mode permits derivatives, Django queues
    `generate_spectrogram.delay(artifact.id)` and
    `generate_essence_audio.delay(artifact.id)` as needed.
-9. Django returns the serialized artifact plus the plain revocation token.
+10. Django returns the serialized artifact plus the plain revocation token.
 
 Why this is structured this way:
 

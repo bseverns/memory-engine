@@ -10,5 +10,6 @@ from .settings_test import *  # noqa: F403,F401
 DEBUG = True
 ROOM_FOSSIL_VISUALS_ENABLED = True
 OPS_LOCAL_HEALTH_HARNESS = True
+BROWSER_TEST_MODE = True
 
 validate_runtime_settings(sys.modules[__name__])

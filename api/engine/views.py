@@ -3,6 +3,7 @@ from django.shortcuts import redirect
 from django.shortcuts import render
 
 from .media_access import PURPOSE_SURFACE_FOSSILS, build_surface_token, surface_fossils_url
+from .memory_color import memory_color_catalog_payload
 from .operator_auth import (
     authenticate_operator_secret,
     clear_failed_operator_logins,
@@ -69,6 +70,8 @@ def room_surface_config():
             if bool(settings.ROOM_FOSSIL_VISUALS_ENABLED) else ""
         ),
         "surfaceFossilFeedRefreshUrl": "/api/v1/surface/fossils-url",
+        "browserTestMode": bool(getattr(settings, "BROWSER_TEST_MODE", False)),
+        "memoryColorCatalog": memory_color_catalog_payload(),
         "operatorState": steward_state_payload(),
         "roomLoopConfig": ROOM_LOOP_CONFIG,
     }

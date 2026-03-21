@@ -365,6 +365,44 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertIsNotNone(retention["next_raw_expiry_at"])
         self.assertIsNotNone(retention["next_fossil_expiry_at"])
 
+    @patch("engine.api_views.health_component_status")
+    def test_node_status_reports_memory_color_summary(self, health_mock):
+        health_mock.return_value = (
+            True,
+            {
+                "database": {"ok": True},
+                "redis": {"ok": True},
+                "storage": {"ok": True},
+            },
+        )
+        self.login_operator()
+        consent = self.make_consent("ROOM")
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/warm.wav",
+            duration_ms=2400,
+            effect_profile="warm",
+            effect_metadata={"profile": "warm"},
+            created_at=timezone.now() - timedelta(hours=6),
+        )
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/dream.wav",
+            duration_ms=2400,
+            effect_profile="dream",
+            effect_metadata={"profile": "dream"},
+            created_at=timezone.now() - timedelta(hours=8),
+        )
+
+        response = self.client.get("/api/v1/node/status")
+
+        self.assertEqual(response.status_code, 200)
+        memory_colors = response.json()["memory_colors"]
+        self.assertEqual(memory_colors["counts"]["warm"], 1)
+        self.assertEqual(memory_colors["counts"]["dream"], 1)
+        self.assertIn("clear", memory_colors["counts"])
+        self.assertEqual(memory_colors["catalog"]["default"], "clear")
+
     def test_node_status_requires_operator_session(self):
         response = self.client.get("/api/v1/node/status")
 

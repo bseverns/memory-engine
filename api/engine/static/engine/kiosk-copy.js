@@ -184,24 +184,6 @@
       processingNoteTrimmed: "Take captured. Quiet edges were trimmed and the level was smoothed.",
       processingNoteSmoothed: "Take captured. The level was smoothed for playback.",
       processingNoteQuiet: "Take captured. The input stayed very quiet, so please keep or retake it before choosing a memory mode.",
-      memoryProfiles: {
-        clear: {
-          name: "Clear",
-          description: "A cleaner, more present return with only a light lift.",
-        },
-        warm: {
-          name: "Warm",
-          description: "Softer highs and a little more body, like something kept close.",
-        },
-        radio: {
-          name: "Radio",
-          description: "Narrow-band and slightly worn, like a signal found again.",
-        },
-        dream: {
-          name: "Dream",
-          description: "Diffused and suspended, with a blurred edge around it.",
-        },
-      },
       modes: {
         ROOM: {
           name: "Room Memory",
@@ -413,24 +395,6 @@
       processingNoteTrimmed: "Toma capturada. Se recortaron los bordes silenciosos y se suavizó el nivel.",
       processingNoteSmoothed: "Toma capturada. Se suavizó el nivel para la reproducción.",
       processingNoteQuiet: "Toma capturada. La entrada se mantuvo muy baja, así que por favor consérvala o vuelve a grabarla antes de elegir un modo de memoria.",
-      memoryProfiles: {
-        clear: {
-          name: "Claro",
-          description: "Regresa más limpio y presente, con apenas un pequeño realce.",
-        },
-        warm: {
-          name: "Cálido",
-          description: "Agudos más suaves y un poco más de cuerpo, como algo guardado cerca.",
-        },
-        radio: {
-          name: "Radio",
-          description: "Banda angosta y un poco gastada, como una señal encontrada otra vez.",
-        },
-        dream: {
-          name: "Sueño",
-          description: "Difuso y suspendido, con el borde un poco borroso.",
-        },
-      },
       modes: {
         ROOM: {
           name: "Memoria de sala",

@@ -36,6 +36,23 @@ function healthyNodeStatusPayload(overrides = {}) {
       weathered: 2,
       gathering: 2,
     },
+    memory_colors: {
+      counts: {
+        clear: 4,
+        warm: 3,
+        radio: 2,
+        dream: 3,
+      },
+      catalog: {
+        default: "clear",
+        profiles: [
+          { code: "clear", labels: { en: "Clear" } },
+          { code: "warm", labels: { en: "Warm" } },
+          { code: "radio", labels: { en: "Radio" } },
+          { code: "dream", labels: { en: "Dream" } },
+        ],
+      },
+    },
     storage: {
       path: "/",
       state: "ready",

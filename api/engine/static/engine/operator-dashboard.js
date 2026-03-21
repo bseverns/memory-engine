@@ -192,6 +192,26 @@
     ];
   }
 
+  function memoryColorCards(memoryColors) {
+    const profiles = Array.isArray(memoryColors?.catalog?.profiles) ? memoryColors.catalog.profiles : [];
+    const counts = memoryColors?.counts || {};
+    if (!profiles.length) {
+      return [{
+        tagName: "article",
+        className: "component-card degraded",
+        title: "Memory color data unavailable",
+        detail: "The node did not report participant color posture for the playable pool.",
+      }];
+    }
+
+    return profiles.map((profile) => ({
+      tagName: "article",
+      className: `component-card ${(counts[profile.code] || 0) > 0 ? "ready" : "degraded"}`,
+      title: profile.labels?.en || profile.code,
+      detail: `${counts[profile.code] || 0} playable artifact(s) currently lean ${profile.labels?.en || profile.code}.`,
+    }));
+  }
+
   function makeCard(doc, card) {
     const el = doc.createElement(card.tagName || "article");
     el.className = card.className || "";
@@ -258,6 +278,7 @@
       opsIngestIpRate: doc.getElementById("opsIngestIpRate"),
       opsRevokeRate: doc.getElementById("opsRevokeRate"),
       opsRevokeIpRate: doc.getElementById("opsRevokeIpRate"),
+      opsMemoryColorSummary: doc.getElementById("opsMemoryColorSummary"),
       opsRetentionSummary: doc.getElementById("opsRetentionSummary"),
       opsThrottleSummary: doc.getElementById("opsThrottleSummary"),
       opsWarnings: doc.getElementById("opsWarnings"),
@@ -328,6 +349,7 @@
     dom.opsRevokeRate.textContent = String(payload.throttles?.public_revoke?.rate || "-");
     dom.opsRevokeIpRate.textContent = String(payload.throttles?.public_revoke_ip?.rate || "-");
     replaceCardList(doc, dom.opsWarnings, warningCards(payload.warnings || []));
+    replaceCardList(doc, dom.opsMemoryColorSummary, memoryColorCards(payload.memory_colors));
     replaceCardList(doc, dom.opsRetentionSummary, retentionCards(payload.retention));
     replaceCardList(doc, dom.opsThrottleSummary, throttleCards(payload.throttles));
     replaceCardList(doc, dom.opsComponents, componentCards(payload.components || {}));
@@ -476,6 +498,7 @@
     renderControlPayload,
     renderError,
     renderPayload,
+    memoryColorCards,
     retentionCards,
     start,
     throttleCards,

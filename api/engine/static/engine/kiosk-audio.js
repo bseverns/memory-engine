@@ -25,7 +25,27 @@
     fadeOutSeconds: 0.35,
   };
 
-  const MEMORY_COLOR_PROFILE_ORDER = ["clear", "warm", "radio", "dream"];
+  function readMemoryColorCatalogFromDom() {
+    const configEl = global.document?.getElementById?.("kiosk-config");
+    if (!configEl || !configEl.textContent) {
+      return null;
+    }
+    try {
+      return JSON.parse(configEl.textContent).memoryColorCatalog || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  const MEMORY_COLOR_PROFILE_ORDER = (() => {
+    const catalog = readMemoryColorCatalogFromDom();
+    const ordered = Array.isArray(catalog?.profiles)
+      ? catalog.profiles
+        .map((profile) => String(profile?.code || "").trim().toLowerCase())
+        .filter(Boolean)
+      : [];
+    return ordered.length ? ordered : ["clear", "warm", "radio", "dream"];
+  })();
 
   async function ensureWorkletModule(audioContext) {
     if (!audioContext.audioWorklet) {

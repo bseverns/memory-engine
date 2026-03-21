@@ -144,6 +144,41 @@ test.describe("browser behavior contracts", () => {
     await kioskPage.close();
   });
 
+  test("memory color review panel previews original and selected color", async ({ page }) => {
+    await mockHealthyOpsStatus(page);
+    await page.goto("/kiosk/");
+
+    await page.evaluate(async () => {
+      await window.MemoryEngineKioskTest.seedReviewTake({ effectProfile: "clear", seconds: 1.6 });
+    });
+
+    const clearChoice = page.locator('.memory-choice[data-effect-profile="clear"]');
+    const warmChoice = page.locator('.memory-choice[data-effect-profile="warm"]');
+
+    await expect(page.locator("#memoryColorPanel")).toBeVisible();
+    await expect(clearChoice).toBeVisible();
+    await expect(warmChoice).toBeVisible();
+    await expect(page.locator("#btnPreviewOriginal")).toHaveAttribute("aria-pressed", "true");
+    const warmLabel = (await warmChoice.textContent() || "").trim();
+
+    await page.evaluate(async () => {
+      await window.MemoryEngineKioskTest.selectMemoryColor("warm");
+    });
+    await expect(page.locator("#memoryColorStatus")).toContainText(warmLabel);
+
+    await page.evaluate(async () => {
+      await window.MemoryEngineKioskTest.chooseMemoryPreview();
+    });
+    await expect(page.locator("#btnPreviewColored")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#memoryColorStatus")).toContainText(warmLabel);
+
+    await page.evaluate(async () => {
+      await window.MemoryEngineKioskTest.chooseOriginalPreview();
+    });
+    await expect(page.locator("#btnPreviewOriginal")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#memoryColorStatus")).toContainText(warmLabel);
+  });
+
   test("steward controls propagate to kiosk and room without reload-specific hacks", async ({ page }) => {
     await mockHealthyOpsStatus(page);
     await mockSpectrograms(page.context());

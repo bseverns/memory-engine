@@ -38,7 +38,7 @@
       if (els.copy) els.copy.textContent = modeStrings.optionCopy;
     }
     for (const choice of ctx.memoryChoices) {
-      const profileStrings = copy.memoryProfiles[String(choice.dataset.effectProfile || "").trim().toLowerCase()];
+      const profileStrings = ctx.memoryProfileCopy(String(choice.dataset.effectProfile || "").trim().toLowerCase());
       if (!profileStrings) continue;
       choice.textContent = profileStrings.name;
     }
