@@ -59,6 +59,7 @@ fi
 if compose_service_running "api"; then
   run_compose exec -T api curl -fsS http://localhost:8000/healthz > "${BUNDLE_DIR}/healthz.json" 2>&1 || true
   run_compose exec -T api curl -fsS http://localhost:8000/readyz > "${BUNDLE_DIR}/readyz.json" 2>&1 || true
+  run_compose exec -T api python manage.py artifact_summary > "${BUNDLE_DIR}/artifact-summary.json" 2>&1 || true
 fi
 
 for service_name in api worker beat proxy db redis minio; do
@@ -69,6 +70,7 @@ cat > "${BUNDLE_DIR}/manifest.txt" <<EOF
 created_at=${STAMP}
 log_tail_lines=${TAIL_LINES}
 includes_redacted_env=$( [ -f "${BUNDLE_DIR}/env.redacted" ] && printf 'yes' || printf 'no' )
+includes_artifact_summary=$( [ -f "${BUNDLE_DIR}/artifact-summary.json" ] && printf 'yes' || printf 'no' )
 EOF
 
 tar -C "${SUPPORT_ROOT}" -czf "${ARCHIVE_PATH}" "$(basename "${BUNDLE_DIR}")"

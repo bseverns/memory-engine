@@ -400,7 +400,8 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 - `scripts/backup.sh` — snapshot Postgres + MinIO data
 - `scripts/restore.sh` — restore Postgres + MinIO data from a backup folder
 - `scripts/export_bundle.sh` — package one backup snapshot into a portable handoff archive with checksums
-- `scripts/support_bundle.sh` — gather redacted env, `/healthz`, `/readyz`, status, and recent logs for remote support
+- `scripts/support_bundle.sh` — gather redacted env, `/healthz`, `/readyz`, status, recent logs, and an artifact summary for remote support
+- `/api/v1/operator/artifact-summary` — operator-only JSON download of current artifact posture, including lane, mood, retention, and memory-color counts
 - `scripts/status.sh` — compose, `/healthz`, and `/readyz` summary for operators
 - `api/` — Django project + Celery worker
 - `api/engine/` — models, API endpoints, tasks

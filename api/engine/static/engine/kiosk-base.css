@@ -376,6 +376,11 @@ body.recording-page.a11y-mode .timer{
   backdrop-filter:blur(6px);
 }
 
+.countdown-overlay[hidden]{
+  display:none !important;
+  pointer-events:none;
+}
+
 .countdown-card{
   min-width:min(100%, 340px);
   padding:24px;

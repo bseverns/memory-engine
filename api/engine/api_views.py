@@ -30,13 +30,7 @@ from .media_access import (
     read_surface_token,
     surface_fossils_url,
 )
-from .memory_color import (
-    DEFAULT_MEMORY_COLOR_PROFILE,
-    MEMORY_COLOR_PROFILE_ORDER,
-    memory_color_catalog_payload,
-    memory_color_metadata,
-    normalize_memory_color_profile,
-)
+from .memory_color import DEFAULT_MEMORY_COLOR_PROFILE, memory_color_metadata, normalize_memory_color_profile
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative
 from .operator_auth import operator_secret_configured, operator_session_active
 from .ops import (
@@ -45,19 +39,18 @@ from .ops import (
     disk_status,
     health_component_status,
     pool_warnings,
-    retention_summary,
 )
 from .pool import (
     artifact_age_hours,
     artifact_density,
     artifact_is_featured_return,
-    artifact_lane,
     artifact_mood,
     artifact_playback_key,
     artifact_playback_window,
     playable_artifact_queryset,
     select_pool_artifact,
 )
+from .reporting import artifact_summary_payload
 from .serializers import ArtifactSerializer, DerivativeSerializer
 from .storage import delete_key, put_bytes, stream_key
 from .steward import (
@@ -549,33 +542,14 @@ def node_status(request):
 
     now = timezone.now()
     ok, components = health_component_status()
-    active_qs = Artifact.objects.filter(status=Artifact.STATUS_ACTIVE, expires_at__gt=now)
-    active = active_qs.count()
-    expired = Artifact.objects.filter(status=Artifact.STATUS_EXPIRED).count()
-    revoked = Artifact.objects.filter(status=Artifact.STATUS_REVOKED).count()
-    playable_artifacts = list(playable_artifact_queryset(now).prefetch_related("derivative_set"))
-    lane_counts = {"fresh": 0, "mid": 0, "worn": 0}
-    mood_counts = {
-        "clear": 0,
-        "hushed": 0,
-        "suspended": 0,
-        "weathered": 0,
-        "gathering": 0,
-    }
-    memory_color_counts = {profile: 0 for profile in MEMORY_COLOR_PROFILE_ORDER}
-    for artifact in playable_artifacts:
-        lane_counts[artifact_lane(artifact, now)] += 1
-        mood_counts[artifact_mood(artifact, now)] += 1
-        effect_profile = normalize_memory_color_profile(
-            artifact.effect_profile,
-            default=DEFAULT_MEMORY_COLOR_PROFILE,
-        ) or DEFAULT_MEMORY_COLOR_PROFILE
-        memory_color_counts.setdefault(effect_profile, 0)
-        memory_color_counts[effect_profile] += 1
-
-    playable_count = len(playable_artifacts)
+    summary = artifact_summary_payload(now=now)
+    active = summary["active"]
+    expired = summary["expired"]
+    revoked = summary["revoked"]
+    playable_count = summary["playable"]
+    lane_counts = summary["lanes"]
+    mood_counts = summary["moods"]
     storage = disk_status(settings.OPS_STORAGE_PATH)
-    retention = retention_summary(now=now)
     throttles = public_throttle_snapshots()
     warnings = []
     operator_state = steward_state_payload()
@@ -619,13 +593,10 @@ def node_status(request):
         "active": active,
         "lanes": lane_counts,
         "moods": mood_counts,
-        "memory_colors": {
-            "counts": memory_color_counts,
-            "catalog": memory_color_catalog_payload(),
-        },
+        "memory_colors": summary["memory_colors"],
         "playable": playable_count,
         "storage": storage,
-        "retention": retention,
+        "retention": summary["retention"],
         "throttles": throttles,
         "warnings": warnings,
         "expired": expired,
@@ -677,6 +648,17 @@ def operator_controls(request):
         "changes": changes,
         "recent_actions": recent_steward_actions(),
     })
+
+
+@api_view(["GET"])
+def operator_artifact_summary(request):
+    if not operator_session_active(request):
+        return operator_api_denied()
+
+    payload = artifact_summary_payload()
+    response = Response(payload)
+    response["Content-Disposition"] = 'attachment; filename="artifact-summary.json"'
+    return response
 
 
 def media_proxy_raw(request, access_token: str):

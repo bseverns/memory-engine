@@ -91,8 +91,9 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` and `/readyz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.
 - `scripts/restore.sh` restores one of those snapshots into the current stack and now asks for explicit confirmation plus a fresh pre-restore snapshot by default.
-- `scripts/export_bundle.sh` packages one backup snapshot into a portable `.tgz` with a manifest and checksums.
-- `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, `/readyz`, compose status, doctor output, and recent logs into a single handoff archive.
+- `scripts/export_bundle.sh` packages one backup snapshot into a portable `.tgz` with a manifest, checksums, and an artifact summary when the API container is running.
+- `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, `/readyz`, compose status, doctor output, recent logs, and an artifact summary into a single handoff archive.
+- `/api/v1/operator/artifact-summary` gives stewards the same artifact posture snapshot as a direct JSON download from `/ops/`.
 - `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
 - Django also validates runtime config relationships at startup now, so bad threshold ordering or insecure origin posture fails fast before the stack enters service.
 - `INSTALLATION_PROFILE` can provide a named starting posture for room behavior and kiosk defaults. Explicit env vars still override profile defaults.
@@ -216,13 +217,13 @@ Restore cautions:
 Export bundle notes:
 
 - `scripts/export_bundle.sh --latest` packages the newest backup into `exports/`.
-- Each export includes the Postgres dump, MinIO archive, source manifest, a bundle manifest, and `CHECKSUMS.txt`.
+- Each export includes the Postgres dump, MinIO archive, source manifest, a bundle manifest, `CHECKSUMS.txt`, and `artifact-summary.json` when the API container is available.
 - Use export bundles for migration, archival handoff, or off-machine storage where a single file is easier to manage than a backup folder.
 
 Support bundle notes:
 
 - `scripts/support_bundle.sh` writes into `support-bundles/`.
-- It includes redacted environment values, compose status, doctor output, `/healthz`, `/readyz`, and recent logs for the main services.
+- It includes redacted environment values, compose status, doctor output, `/healthz`, `/readyz`, recent logs for the main services, and `artifact-summary.json` when the API container is available.
 - It is meant for remote troubleshooting without handing over shell access or the raw `.env`.
 
 ## MinIO setup notes

@@ -68,6 +68,11 @@ if [ -f "${BACKUP_DIR}/manifest.txt" ]; then
   cp "${BACKUP_DIR}/manifest.txt" "${BUNDLE_DIR}/source-manifest.txt"
 fi
 
+COMPOSE_BIN=$(detect_compose_bin)
+if compose_service_running "api"; then
+  run_compose exec -T api python manage.py artifact_summary > "${BUNDLE_DIR}/artifact-summary.json" 2>/dev/null || true
+fi
+
 GIT_HEAD=$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || printf '%s' "unknown")
 
 cat > "${BUNDLE_DIR}/bundle-manifest.txt" <<EOF
@@ -76,6 +81,7 @@ source_backup_dir=${BACKUP_DIR}
 source_git_head=${GIT_HEAD}
 postgres_dump=postgres.sql.gz
 minio_archive=minio-data.tgz
+artifact_summary=$( [ -f "${BUNDLE_DIR}/artifact-summary.json" ] && printf '%s' "artifact-summary.json" || printf '%s' "not-included" )
 EOF
 
 (
@@ -89,7 +95,6 @@ EOF
 
 tar -C "${EXPORT_ROOT}" -czf "${ARCHIVE_PATH}" "$(basename "${BUNDLE_DIR}")"
 
-COMPOSE_BIN=$(detect_compose_bin)
 log_operator_event "export_bundle.created" "export-script" "Created export bundle ${ARCHIVE_PATH}"
 
 info "Export bundle created: ${ARCHIVE_PATH}"

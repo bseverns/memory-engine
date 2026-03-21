@@ -1,7 +1,10 @@
 from datetime import timedelta
+import io
+import json
 from unittest.mock import patch
 
 from django.core.cache import cache
+from django.core.management import call_command
 from django.test import override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
@@ -402,6 +405,61 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertEqual(memory_colors["counts"]["dream"], 1)
         self.assertIn("clear", memory_colors["counts"])
         self.assertEqual(memory_colors["catalog"]["default"], "clear")
+
+    def test_artifact_summary_command_reports_memory_color_counts(self):
+        consent = self.make_consent("ROOM")
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/clear.wav",
+            duration_ms=2200,
+            effect_profile="clear",
+            effect_metadata={"profile": "clear"},
+            created_at=timezone.now() - timedelta(hours=2),
+        )
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/radio.wav",
+            duration_ms=2200,
+            effect_profile="radio",
+            effect_metadata={"profile": "radio"},
+            created_at=timezone.now() - timedelta(hours=7),
+        )
+        stdout = io.StringIO()
+
+        call_command("artifact_summary", stdout=stdout)
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["active"], 2)
+        self.assertEqual(payload["playable"], 2)
+        self.assertEqual(payload["memory_colors"]["counts"]["clear"], 1)
+        self.assertEqual(payload["memory_colors"]["counts"]["radio"], 1)
+        self.assertEqual(payload["memory_colors"]["catalog"]["default"], "clear")
+        self.assertIn("retention", payload)
+
+    def test_operator_artifact_summary_requires_operator_session(self):
+        response = self.client.get("/api/v1/operator/artifact-summary")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_operator_artifact_summary_downloads_json_payload(self):
+        self.login_operator()
+        consent = self.make_consent("ROOM")
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/warm.wav",
+            duration_ms=2500,
+            effect_profile="warm",
+            effect_metadata={"profile": "warm"},
+            created_at=timezone.now() - timedelta(hours=5),
+        )
+
+        response = self.client.get("/api/v1/operator/artifact-summary")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Disposition"], 'attachment; filename="artifact-summary.json"')
+        payload = response.json()
+        self.assertEqual(payload["memory_colors"]["counts"]["warm"], 1)
+        self.assertEqual(payload["playable"], 1)
 
     def test_node_status_requires_operator_session(self):
         response = self.client.get("/api/v1/node/status")

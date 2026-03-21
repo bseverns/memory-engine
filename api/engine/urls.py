@@ -13,6 +13,7 @@ urlpatterns = [
     path("surface/fossils-url", api_views.surface_fossils_feed_url),
     path("surface/fossils/<str:access_token>", api_views.surface_fossils),
     path("node/status", api_views.node_status),
+    path("operator/artifact-summary", api_views.operator_artifact_summary),
     path("operator/controls", api_views.operator_controls),
     path("media/raw/<str:access_token>", api_views.media_proxy_raw),
     path("media/spectrogram/<str:access_token>", api_views.media_proxy_spectrogram),
