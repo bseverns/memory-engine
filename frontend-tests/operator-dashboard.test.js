@@ -68,3 +68,33 @@ test("retentionCards summarize upcoming raw and fossil retention edges", () => {
   assert.equal(cards[0].title, "Raw audio expiring in 24h");
   assert.match(cards[0].detail, /2 recording/);
 });
+
+test("artifactSummaryCards summarize totals, lanes, and dominant moods", () => {
+  const cards = operatorDashboard.artifactSummaryCards({
+    active: 12,
+    playable: 9,
+    expired: 2,
+    revoked: 1,
+    lanes: {
+      fresh: 3,
+      mid: 4,
+      worn: 2,
+    },
+    moods: {
+      clear: 1,
+      hushed: 4,
+      suspended: 0,
+      weathered: 3,
+      gathering: 1,
+    },
+  });
+
+  assert.equal(cards.length, 3);
+  assert.equal(cards[0].title, "Archive totals");
+  assert.match(cards[0].detail, /12 active/);
+  assert.equal(cards[1].title, "Lane balance");
+  assert.match(cards[1].detail, /fresh 3/);
+  assert.equal(cards[2].title, "Dominant moods");
+  assert.match(cards[2].detail, /hushed 4/);
+  assert.match(cards[2].detail, /weathered 3/);
+});

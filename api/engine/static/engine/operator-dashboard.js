@@ -192,6 +192,51 @@
     ];
   }
 
+  function artifactSummaryCards(payload) {
+    if (!payload || typeof payload !== "object") {
+      return [{
+        tagName: "article",
+        className: "component-card degraded",
+        title: "Artifact summary unavailable",
+        detail: "The node did not return enough archive detail to summarize the current posture.",
+      }];
+    }
+
+    const lanes = payload.lanes || {};
+    const moods = payload.moods || {};
+    const active = Number(payload.active || 0);
+    const playable = Number(payload.playable || 0);
+    const expired = Number(payload.expired || 0);
+    const revoked = Number(payload.revoked || 0);
+    const moodSummary = Object.entries(moods)
+      .filter(([, count]) => Number(count || 0) > 0)
+      .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0))
+      .slice(0, 3)
+      .map(([mood, count]) => `${mood} ${count}`)
+      .join(" · ");
+
+    return [
+      {
+        tagName: "article",
+        className: "component-card ready",
+        title: "Archive totals",
+        detail: `${active} active · ${playable} playable · ${expired} expired · ${revoked} revoked`,
+      },
+      {
+        tagName: "article",
+        className: "component-card ready",
+        title: "Lane balance",
+        detail: `fresh ${lanes.fresh || 0} · mid ${lanes.mid || 0} · worn ${lanes.worn || 0}`,
+      },
+      {
+        tagName: "article",
+        className: "component-card ready",
+        title: "Dominant moods",
+        detail: moodSummary || "No playable moods are represented yet.",
+      },
+    ];
+  }
+
   function memoryColorCards(memoryColors) {
     const profiles = Array.isArray(memoryColors?.catalog?.profiles) ? memoryColors.catalog.profiles : [];
     const counts = memoryColors?.counts || {};
@@ -278,6 +323,7 @@
       opsIngestIpRate: doc.getElementById("opsIngestIpRate"),
       opsRevokeRate: doc.getElementById("opsRevokeRate"),
       opsRevokeIpRate: doc.getElementById("opsRevokeIpRate"),
+      opsArtifactSummary: doc.getElementById("opsArtifactSummary"),
       opsMemoryColorSummary: doc.getElementById("opsMemoryColorSummary"),
       opsRetentionSummary: doc.getElementById("opsRetentionSummary"),
       opsThrottleSummary: doc.getElementById("opsThrottleSummary"),
@@ -349,6 +395,7 @@
     dom.opsRevokeRate.textContent = String(payload.throttles?.public_revoke?.rate || "-");
     dom.opsRevokeIpRate.textContent = String(payload.throttles?.public_revoke_ip?.rate || "-");
     replaceCardList(doc, dom.opsWarnings, warningCards(payload.warnings || []));
+    replaceCardList(doc, dom.opsArtifactSummary, artifactSummaryCards(payload));
     replaceCardList(doc, dom.opsMemoryColorSummary, memoryColorCards(payload.memory_colors));
     replaceCardList(doc, dom.opsRetentionSummary, retentionCards(payload.retention));
     replaceCardList(doc, dom.opsThrottleSummary, throttleCards(payload.throttles));
@@ -498,6 +545,7 @@
     renderControlPayload,
     renderError,
     renderPayload,
+    artifactSummaryCards,
     memoryColorCards,
     retentionCards,
     start,
