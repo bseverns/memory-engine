@@ -38,22 +38,22 @@ For a real multi-machine install, the intended role split is:
 
 Recording kiosk idle:
 
-![Recording kiosk idle](artifacts/screenshots/recording-kiosk-idle.png)
+![Recording kiosk idle](docs/screenshots/recording-kiosk-idle.png)
 
 Listening surface:
 
-![Room playback surface](artifacts/screenshots/room-playback.png)
+![Room playback surface](docs/screenshots/room-playback.png)
 
 Operator dashboard:
 
-![Operator dashboard ready state](artifacts/screenshots/ops-ready.png)
+![Operator dashboard ready state](docs/screenshots/ops-ready.png)
 
 ## Supported Runtime
 
 The official supported runtime for this repo is:
 
 - Docker Compose for the full stack
-- the `api` container defined by [api/Dockerfile](/Users/bseverns/Documents/GitHub/memory-engine-kiosk/api/Dockerfile), which is pinned to Python `3.12`
+- the `api` container defined by `api/Dockerfile`, which is pinned to Python `3.12`
 
 That is the path the deployment scripts, compose stack, and production posture
 are designed around.
@@ -242,17 +242,18 @@ npm run screenshots
 
 That starts Django with the browser test settings, opens the recording kiosk,
 the dedicated playback surface, and the operator dashboard in headless
-Chromium, and writes example screenshots under `artifacts/screenshots/`.
+Chromium, and writes fresh generated screenshots under `artifacts/screenshots/`.
+The curated screenshots embedded in this README live in `docs/screenshots/`.
 The browser walkthrough now also signs into `/ops/`, applies live steward
 controls, and captures how `/kiosk/` and `/room/` react to those changes.
 
 More captured states:
 
-- Accessible recording mode: ![Accessible recording kiosk](artifacts/screenshots/recording-kiosk-accessible.png)
-- Spanish recording mode: ![Spanish recording kiosk](artifacts/screenshots/recording-kiosk-spanish.png)
-- Playback info lightbox: ![Playback info lightbox](artifacts/screenshots/room-playback-info.png)
-- Quieter listening mode: ![Room playback quieter mode](artifacts/screenshots/room-playback-quieter.png)
-- Live operator controls: ![Operator dashboard live controls](artifacts/screenshots/ops-controls-live.png)
+- Accessible recording mode: ![Accessible recording kiosk](docs/screenshots/recording-kiosk-accessible.png)
+- Spanish recording mode: ![Spanish recording kiosk](docs/screenshots/recording-kiosk-spanish.png)
+- Playback info lightbox: ![Playback info lightbox](docs/screenshots/room-playback-info.png)
+- Quieter listening mode: ![Room playback quieter mode](docs/screenshots/room-playback-quieter.png)
+- Live operator controls: ![Operator dashboard live controls](docs/screenshots/ops-controls-live.png)
 
 Longer operator notes live in `docs/maintenance.md`.
 That includes a MinIO section covering which credentials live where, what is set before first deploy, and how manual MinIO provisioning changes the `.env` values.

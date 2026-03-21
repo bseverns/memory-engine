@@ -101,6 +101,9 @@ def validate_runtime_settings(settings_obj) -> None:
     ensure_positive(errors, settings_obj, "OPS_WORKER_HEARTBEAT_MAX_AGE_SECONDS")
     ensure_positive(errors, settings_obj, "OPS_BEAT_HEARTBEAT_MAX_AGE_SECONDS")
     ensure_positive(errors, settings_obj, "OPS_THROTTLE_EVENT_WINDOW_SECONDS")
+    ensure_non_negative(errors, settings_obj, "OPS_QUEUE_DEPTH_WARNING")
+    ensure_non_negative(errors, settings_obj, "OPS_QUEUE_DEPTH_CRITICAL")
+    ensure_positive(errors, settings_obj, "OPS_TASK_FAILURE_WINDOW_SECONDS")
     ensure_positive(errors, settings_obj, "MEDIA_ACCESS_TOKEN_TTL_SECONDS")
     ensure_positive(errors, settings_obj, "SURFACE_ACCESS_TOKEN_TTL_SECONDS")
     ensure_positive(errors, settings_obj, "INGEST_MAX_UPLOAD_BYTES")
@@ -146,6 +149,11 @@ def validate_runtime_settings(settings_obj) -> None:
     disk_warning_percent = float(getattr(settings_obj, "OPS_DISK_WARNING_FREE_PERCENT", 0.0))
     if disk_critical_percent > disk_warning_percent:
         errors.append("OPS_DISK_CRITICAL_FREE_PERCENT must be less than or equal to OPS_DISK_WARNING_FREE_PERCENT.")
+
+    queue_warning = int(getattr(settings_obj, "OPS_QUEUE_DEPTH_WARNING", 0))
+    queue_critical = int(getattr(settings_obj, "OPS_QUEUE_DEPTH_CRITICAL", 0))
+    if queue_warning > queue_critical:
+        errors.append("OPS_QUEUE_DEPTH_WARNING must be less than or equal to OPS_QUEUE_DEPTH_CRITICAL.")
 
     overlap_min_delay = int(getattr(settings_obj, "ROOM_OVERLAP_MIN_DELAY_MS", 0))
     overlap_max_delay = int(getattr(settings_obj, "ROOM_OVERLAP_MAX_DELAY_MS", 0))

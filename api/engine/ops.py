@@ -12,6 +12,25 @@ from .storage import s3_client
 
 WORKER_HEARTBEAT_CACHE_KEY = "memory_engine_worker_heartbeat"
 BEAT_HEARTBEAT_CACHE_KEY = "memory_engine_beat_heartbeat"
+TASK_STATUS_CACHE_PREFIX = "memory_engine_task_status"
+TRACKED_TASKS = {
+    "generate_spectrogram": {"label": "spectrogram generation", "scheduled": False},
+    "generate_essence_audio": {"label": "essence generation", "scheduled": False},
+    "expire_raw": {"label": "raw expiry", "scheduled": True},
+    "prune_derivatives": {"label": "derivative pruning", "scheduled": True},
+}
+
+
+def parse_cached_datetime(raw_value):
+    if not raw_value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(raw_value))
+    except ValueError:
+        return None
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed
 
 
 def record_worker_heartbeat(*, at=None) -> None:
@@ -34,20 +53,11 @@ def record_beat_heartbeat(*, at=None) -> None:
 
 def heartbeat_component(name: str, cache_key: str, max_age_seconds: int, *, now=None) -> dict:
     now = now or timezone.now()
-    raw_value = cache.get(cache_key)
-    if not raw_value:
+    seen_at = parse_cached_datetime(cache.get(cache_key))
+    if not seen_at:
         return {
             "ok": False,
             "error": f"No recent heartbeat from {name}.",
-        }
-    try:
-        seen_at = datetime.fromisoformat(str(raw_value))
-        if timezone.is_naive(seen_at):
-            seen_at = timezone.make_aware(seen_at, timezone.get_current_timezone())
-    except ValueError:
-        return {
-            "ok": False,
-            "error": f"Heartbeat timestamp for {name} is unreadable.",
         }
     age_seconds = max(0.0, (now - seen_at).total_seconds())
     if age_seconds > max_age_seconds:
@@ -61,6 +71,149 @@ def heartbeat_component(name: str, cache_key: str, max_age_seconds: int, *, now=
         "ok": True,
         "last_seen_at": seen_at,
         "stale_seconds": round(age_seconds, 1),
+    }
+
+
+def task_status_cache_key(task_name: str) -> str:
+    return f"{TASK_STATUS_CACHE_PREFIX}:{task_name}"
+
+
+def task_status_snapshot(task_name: str) -> dict:
+    payload = dict(cache.get(task_status_cache_key(task_name)) or {})
+    last_success_at = parse_cached_datetime(payload.get("last_success_at"))
+    last_failure_at = parse_cached_datetime(payload.get("last_failure_at"))
+    return {
+        "task_name": task_name,
+        "last_success_at": last_success_at,
+        "last_failure_at": last_failure_at,
+        "last_error": str(payload.get("last_error") or "").strip(),
+        "consecutive_failures": int(payload.get("consecutive_failures") or 0),
+    }
+
+
+def record_task_success(task_name: str, *, at=None) -> None:
+    now = at or timezone.now()
+    snapshot = task_status_snapshot(task_name)
+    cache.set(
+        task_status_cache_key(task_name),
+        {
+            "last_success_at": now.isoformat(),
+            "last_failure_at": snapshot["last_failure_at"].isoformat() if snapshot["last_failure_at"] else "",
+            "last_error": snapshot["last_error"],
+            "consecutive_failures": 0,
+        },
+        timeout=max(86400, int(getattr(settings, "OPS_TASK_FAILURE_WINDOW_SECONDS", 1800)) * 8),
+    )
+
+
+def record_task_failure(task_name: str, error, *, at=None) -> None:
+    now = at or timezone.now()
+    snapshot = task_status_snapshot(task_name)
+    cache.set(
+        task_status_cache_key(task_name),
+        {
+            "last_success_at": snapshot["last_success_at"].isoformat() if snapshot["last_success_at"] else "",
+            "last_failure_at": now.isoformat(),
+            "last_error": str(error or "").strip()[:240],
+            "consecutive_failures": snapshot["consecutive_failures"] + 1,
+        },
+        timeout=max(86400, int(getattr(settings, "OPS_TASK_FAILURE_WINDOW_SECONDS", 1800)) * 8),
+    )
+
+
+def broker_redis_client():
+    return redis.Redis.from_url(settings.CELERY_BROKER_URL)
+
+
+def queue_depth_component() -> dict:
+    queue_name = str(getattr(settings, "CELERY_TASK_DEFAULT_QUEUE", "celery") or "celery").strip() or "celery"
+    client = broker_redis_client()
+    depth = int(client.llen(queue_name))
+    warning_depth = int(getattr(settings, "OPS_QUEUE_DEPTH_WARNING", 12))
+    critical_depth = int(getattr(settings, "OPS_QUEUE_DEPTH_CRITICAL", 40))
+    state = "ready"
+    ok = True
+    if depth >= critical_depth:
+        state = "critical"
+        ok = False
+    elif depth >= warning_depth:
+        state = "warning"
+    return {
+        "ok": ok,
+        "queue": queue_name,
+        "depth": depth,
+        "state": state,
+        "warning_depth": warning_depth,
+        "critical_depth": critical_depth,
+        "detail": f"{depth} queued task(s) on '{queue_name}'.",
+    }
+
+
+def task_pipeline_component(*, now=None) -> dict:
+    now = now or timezone.now()
+    failure_window_seconds = int(getattr(settings, "OPS_TASK_FAILURE_WINDOW_SECONDS", 1800))
+    snapshots = {
+        task_name: task_status_snapshot(task_name)
+        for task_name in TRACKED_TASKS
+    }
+    issues = []
+
+    for task_name, spec in TRACKED_TASKS.items():
+        snapshot = snapshots[task_name]
+        last_success_at = snapshot["last_success_at"]
+        last_failure_at = snapshot["last_failure_at"]
+        if not last_failure_at:
+            continue
+        failure_age_seconds = max(0.0, (now - last_failure_at).total_seconds())
+        if failure_age_seconds > failure_window_seconds:
+            continue
+        if last_success_at and last_success_at >= last_failure_at:
+            continue
+        issues.append({
+            "task_name": task_name,
+            "label": spec["label"],
+            "scheduled": bool(spec["scheduled"]),
+            "last_failure_at": last_failure_at,
+            "last_error": snapshot["last_error"],
+            "consecutive_failures": snapshot["consecutive_failures"],
+        })
+
+    if not issues:
+        return {
+            "ok": True,
+            "issues": [],
+            "detail": "No recent task failures are blocking background work.",
+            "tracked_tasks": {
+                task_name: {
+                    "label": spec["label"],
+                    "scheduled": bool(spec["scheduled"]),
+                    "last_success_at": snapshots[task_name]["last_success_at"],
+                    "last_failure_at": snapshots[task_name]["last_failure_at"],
+                    "consecutive_failures": snapshots[task_name]["consecutive_failures"],
+                }
+                for task_name, spec in TRACKED_TASKS.items()
+            },
+        }
+
+    scheduled_issue = any(issue["scheduled"] for issue in issues)
+    labels = ", ".join(issue["label"] for issue in issues[:3])
+    detail = f"Recent background task failures need attention ({labels})."
+    if len(issues) > 3:
+        detail = f"{detail[:-1]} and more."
+    return {
+        "ok": False if scheduled_issue or len(issues) >= 2 else True,
+        "issues": issues,
+        "detail": detail,
+        "tracked_tasks": {
+            task_name: {
+                "label": spec["label"],
+                "scheduled": bool(spec["scheduled"]),
+                "last_success_at": snapshots[task_name]["last_success_at"],
+                "last_failure_at": snapshots[task_name]["last_failure_at"],
+                "consecutive_failures": snapshots[task_name]["consecutive_failures"],
+            }
+            for task_name, spec in TRACKED_TASKS.items()
+        },
     }
 
 
@@ -78,6 +231,26 @@ def component_health_warnings(components: dict) -> list[dict]:
             "title": "Beat heartbeat is stale",
             "detail": "Scheduled expiry and pruning tasks may no longer be advancing on time.",
         })
+    queue_component = components.get("queue", {})
+    if queue_component.get("state") == "critical":
+        warnings.append({
+            "level": "critical",
+            "title": "Background queue is critically backed up",
+            "detail": queue_component.get("detail") or "The Redis-backed Celery queue is critically deep.",
+        })
+    elif queue_component.get("state") == "warning":
+        warnings.append({
+            "level": "warning",
+            "title": "Background queue is building up",
+            "detail": queue_component.get("detail") or "The Redis-backed Celery queue is growing.",
+        })
+    task_component = components.get("tasks", {})
+    for issue in task_component.get("issues", [])[:3]:
+        warnings.append({
+            "level": "critical" if issue.get("scheduled") else "warning",
+            "title": f"{issue.get('label', 'Background task').title()} failed recently",
+            "detail": issue.get("last_error") or "A recent background task failure has not yet been superseded by a later success.",
+        })
     return warnings
 
 
@@ -93,7 +266,7 @@ def api_health_component_status() -> tuple[bool, dict]:
         components["database"] = {"ok": False, "error": str(exc)}
 
     try:
-        redis.Redis.from_url(settings.CELERY_BROKER_URL).ping()
+        broker_redis_client().ping()
         components["redis"] = {"ok": True}
     except Exception as exc:
         components["redis"] = {"ok": False, "error": str(exc)}
@@ -120,6 +293,11 @@ def health_component_status() -> tuple[bool, dict]:
         BEAT_HEARTBEAT_CACHE_KEY,
         int(getattr(settings, "OPS_BEAT_HEARTBEAT_MAX_AGE_SECONDS", 180)),
     )
+    try:
+        components["queue"] = queue_depth_component()
+    except Exception as exc:
+        components["queue"] = {"ok": False, "state": "critical", "error": str(exc)}
+    components["tasks"] = task_pipeline_component()
 
     cluster_ok = all(component["ok"] for component in components.values())
     return cluster_ok, components

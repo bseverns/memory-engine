@@ -106,7 +106,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 ## Runtime contract
 
 The official supported runtime is the Docker Compose stack, with the API image
-from [api/Dockerfile](/Users/bseverns/Documents/GitHub/memory-engine-kiosk/api/Dockerfile) pinned to Python `3.12`.
+from `api/Dockerfile` pinned to Python `3.12`.
 
 What that means in practice:
 

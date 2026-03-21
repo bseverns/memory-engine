@@ -700,6 +700,8 @@ It includes the narrow `/healthz` dependencies plus:
 
 - Celery worker heartbeat freshness
 - Celery beat heartbeat freshness
+- current Redis-backed queue depth
+- recent background task failures for derivative and housekeeping work
 
 This is the right surface for operator checks that need to know whether
 background work is still advancing, without making the API container health
@@ -717,7 +719,7 @@ It combines:
 - lane distribution
 - mood distribution
 - disk headroom
-- warnings for low pool size, lane/mood imbalance, or stale worker/beat heartbeats
+- warnings for low pool size, lane/mood imbalance, stale worker/beat heartbeats, queue backlog, or recent background task failures
 
 ### `/ops/`
 

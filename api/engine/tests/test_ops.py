@@ -12,6 +12,8 @@ from ..ops import (
     WORKER_HEARTBEAT_CACHE_KEY,
     api_health_component_status,
     health_component_status,
+    record_task_failure,
+    record_task_success,
     record_beat_heartbeat,
     record_worker_heartbeat,
 )
@@ -348,6 +350,7 @@ class OperatorBehaviorTests(EngineTestCase):
     ):
         cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
         redis_from_url_mock.return_value.ping.return_value = True
+        redis_from_url_mock.return_value.llen.return_value = 0
         s3_client_mock.return_value.head_bucket.return_value = {}
 
         ok, components = health_component_status()
@@ -367,6 +370,7 @@ class OperatorBehaviorTests(EngineTestCase):
     ):
         cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
         redis_from_url_mock.return_value.ping.return_value = True
+        redis_from_url_mock.return_value.llen.return_value = 0
         s3_client_mock.return_value.head_bucket.return_value = {}
 
         ok, components = api_health_component_status()
@@ -385,6 +389,7 @@ class OperatorBehaviorTests(EngineTestCase):
     ):
         cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
         redis_from_url_mock.return_value.ping.return_value = True
+        redis_from_url_mock.return_value.llen.return_value = 0
         s3_client_mock.return_value.head_bucket.return_value = {}
         record_worker_heartbeat()
         record_beat_heartbeat()
@@ -394,6 +399,100 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertTrue(ok)
         self.assertTrue(components["worker"]["ok"])
         self.assertTrue(components["beat"]["ok"])
+        self.assertEqual(components["queue"]["depth"], 0)
+
+    @patch("engine.ops.s3_client")
+    @patch("engine.ops.redis.Redis.from_url")
+    @patch("engine.ops.connection.cursor")
+    @override_settings(OPS_QUEUE_DEPTH_WARNING=3, OPS_QUEUE_DEPTH_CRITICAL=5)
+    def test_health_component_status_reports_queue_backlog_warning(
+        self,
+        cursor_mock,
+        redis_from_url_mock,
+        s3_client_mock,
+    ):
+        cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
+        redis_from_url_mock.return_value.ping.return_value = True
+        redis_from_url_mock.return_value.llen.return_value = 4
+        s3_client_mock.return_value.head_bucket.return_value = {}
+        record_worker_heartbeat()
+        record_beat_heartbeat()
+
+        ok, components = health_component_status()
+
+        self.assertTrue(ok)
+        self.assertEqual(components["queue"]["state"], "warning")
+        self.assertEqual(components["queue"]["depth"], 4)
+
+    @patch("engine.ops.s3_client")
+    @patch("engine.ops.redis.Redis.from_url")
+    @patch("engine.ops.connection.cursor")
+    @override_settings(OPS_QUEUE_DEPTH_WARNING=3, OPS_QUEUE_DEPTH_CRITICAL=5)
+    def test_health_component_status_reports_queue_backlog_critical(
+        self,
+        cursor_mock,
+        redis_from_url_mock,
+        s3_client_mock,
+    ):
+        cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
+        redis_from_url_mock.return_value.ping.return_value = True
+        redis_from_url_mock.return_value.llen.return_value = 7
+        s3_client_mock.return_value.head_bucket.return_value = {}
+        record_worker_heartbeat()
+        record_beat_heartbeat()
+
+        ok, components = health_component_status()
+
+        self.assertFalse(ok)
+        self.assertEqual(components["queue"]["state"], "critical")
+        self.assertEqual(components["queue"]["depth"], 7)
+
+    @patch("engine.ops.s3_client")
+    @patch("engine.ops.redis.Redis.from_url")
+    @patch("engine.ops.connection.cursor")
+    def test_health_component_status_reports_recent_background_task_failure(
+        self,
+        cursor_mock,
+        redis_from_url_mock,
+        s3_client_mock,
+    ):
+        cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
+        redis_from_url_mock.return_value.ping.return_value = True
+        redis_from_url_mock.return_value.llen.return_value = 0
+        s3_client_mock.return_value.head_bucket.return_value = {}
+        record_worker_heartbeat()
+        record_beat_heartbeat()
+        record_task_failure("expire_raw", RuntimeError("cleanup failed"))
+
+        ok, components = health_component_status()
+
+        self.assertFalse(ok)
+        self.assertFalse(components["tasks"]["ok"])
+        self.assertEqual(components["tasks"]["issues"][0]["task_name"], "expire_raw")
+
+    @patch("engine.ops.s3_client")
+    @patch("engine.ops.redis.Redis.from_url")
+    @patch("engine.ops.connection.cursor")
+    def test_health_component_status_clears_task_issue_after_success(
+        self,
+        cursor_mock,
+        redis_from_url_mock,
+        s3_client_mock,
+    ):
+        cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
+        redis_from_url_mock.return_value.ping.return_value = True
+        redis_from_url_mock.return_value.llen.return_value = 0
+        s3_client_mock.return_value.head_bucket.return_value = {}
+        record_worker_heartbeat()
+        record_beat_heartbeat()
+        record_task_failure("generate_spectrogram", RuntimeError("spectrogram failed"))
+        record_task_success("generate_spectrogram")
+
+        ok, components = health_component_status()
+
+        self.assertTrue(ok)
+        self.assertTrue(components["tasks"]["ok"])
+        self.assertEqual(components["tasks"]["issues"], [])
 
     def test_heartbeat_tick_records_worker_liveness(self):
         heartbeat_tick()

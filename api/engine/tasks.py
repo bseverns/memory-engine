@@ -14,7 +14,12 @@ from django.conf import settings
 from django.db import transaction
 
 from .models import Artifact, Derivative
-from .ops import record_beat_heartbeat, record_worker_heartbeat
+from .ops import (
+    record_beat_heartbeat,
+    record_task_failure,
+    record_task_success,
+    record_worker_heartbeat,
+)
 from .storage import get_bytes, put_bytes, delete_key
 
 ESSENCE_SAMPLE_RATE = 12000
@@ -134,114 +139,140 @@ def _essence_from_samples(sample_rate: int, samples: np.ndarray) -> tuple[int, n
 @shared_task
 def generate_spectrogram(artifact_id: int) -> None:
     record_worker_heartbeat()
-    art = Artifact.objects.get(id=artifact_id)
-    if not art.raw_uri:
-        return
-    wav_bytes = get_bytes(art.raw_uri)
-    sr, x = _wav_to_mono_float32(wav_bytes)
-    f, t, Sxx = spectrogram(x, fs=sr, nperseg=1024, noverlap=768)
-    # Render
-    fig = plt.figure(figsize=(6, 3), dpi=150)
-    ax = plt.gca()
-    ax.pcolormesh(t, f, 10*np.log10(Sxx + 1e-12), shading="auto")
-    ax.set_yscale("log")
-    ax.set_ylim(50, min(20000, sr/2))
-    ax.set_xlabel("time (s)")
-    ax.set_ylabel("freq (Hz)")
-    ax.set_title(f"Artifact {art.id} spectrogram")
-    fig.tight_layout()
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png")
-    plt.close(fig)
-    png = buf.getvalue()
+    try:
+        art = Artifact.objects.get(id=artifact_id)
+        if not art.raw_uri:
+            record_task_success("generate_spectrogram")
+            return
+        wav_bytes = get_bytes(art.raw_uri)
+        sr, x = _wav_to_mono_float32(wav_bytes)
+        f, t, Sxx = spectrogram(x, fs=sr, nperseg=1024, noverlap=768)
+        # Render
+        fig = plt.figure(figsize=(6, 3), dpi=150)
+        ax = plt.gca()
+        ax.pcolormesh(t, f, 10*np.log10(Sxx + 1e-12), shading="auto")
+        ax.set_yscale("log")
+        ax.set_ylim(50, min(20000, sr/2))
+        ax.set_xlabel("time (s)")
+        ax.set_ylabel("freq (Hz)")
+        ax.set_title(f"Artifact {art.id} spectrogram")
+        fig.tight_layout()
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png")
+        plt.close(fig)
+        png = buf.getvalue()
 
-    key = f"derivatives/{art.id}/spectrogram.png"
-    put_bytes(key, png, "image/png")
+        key = f"derivatives/{art.id}/spectrogram.png"
+        put_bytes(key, png, "image/png")
 
-    expires_at = timezone.now() + timedelta(days=int(settings.DERIVATIVE_TTL_DAYS_FOSSIL))
-    Derivative.objects.update_or_create(
-        artifact=art,
-        kind=Derivative.KIND_SPECTROGRAM_PNG,
-        defaults={"uri": key, "expires_at": expires_at, "publishable": False},
-    )
+        expires_at = timezone.now() + timedelta(days=int(settings.DERIVATIVE_TTL_DAYS_FOSSIL))
+        Derivative.objects.update_or_create(
+            artifact=art,
+            kind=Derivative.KIND_SPECTROGRAM_PNG,
+            defaults={"uri": key, "expires_at": expires_at, "publishable": False},
+        )
+    except Exception as exc:
+        record_task_failure("generate_spectrogram", exc)
+        raise
+    else:
+        record_task_success("generate_spectrogram")
 
 
 @shared_task
 def generate_essence_audio(artifact_id: int) -> None:
     record_worker_heartbeat()
-    art = Artifact.objects.get(id=artifact_id)
-    if not art.raw_uri:
-        return
+    try:
+        art = Artifact.objects.get(id=artifact_id)
+        if not art.raw_uri:
+            record_task_success("generate_essence_audio")
+            return
 
-    wav_bytes = get_bytes(art.raw_uri)
-    sample_rate, samples = _wav_to_mono_float32(wav_bytes)
-    essence_rate, essence_samples = _essence_from_samples(sample_rate, samples)
-    essence_wav = _float32_to_wav_mono16(essence_rate, essence_samples)
+        wav_bytes = get_bytes(art.raw_uri)
+        sample_rate, samples = _wav_to_mono_float32(wav_bytes)
+        essence_rate, essence_samples = _essence_from_samples(sample_rate, samples)
+        essence_wav = _float32_to_wav_mono16(essence_rate, essence_samples)
 
-    key = f"derivatives/{art.id}/essence.wav"
-    put_bytes(key, essence_wav, "audio/wav")
+        key = f"derivatives/{art.id}/essence.wav"
+        put_bytes(key, essence_wav, "audio/wav")
 
-    expires_at = timezone.now() + timedelta(days=int(settings.DERIVATIVE_TTL_DAYS_FOSSIL))
-    Derivative.objects.update_or_create(
-        artifact=art,
-        kind=Derivative.KIND_ESSENCE_WAV,
-        defaults={"uri": key, "expires_at": expires_at, "publishable": False},
-    )
+        expires_at = timezone.now() + timedelta(days=int(settings.DERIVATIVE_TTL_DAYS_FOSSIL))
+        Derivative.objects.update_or_create(
+            artifact=art,
+            kind=Derivative.KIND_ESSENCE_WAV,
+            defaults={"uri": key, "expires_at": expires_at, "publishable": False},
+        )
+    except Exception as exc:
+        record_task_failure("generate_essence_audio", exc)
+        raise
+    else:
+        record_task_success("generate_essence_audio")
 
 @shared_task
 def expire_raw() -> None:
     record_worker_heartbeat()
-    now = timezone.now()
-    qs = Artifact.objects.filter(status=Artifact.STATUS_ACTIVE)
-    for art in qs.iterator():
-        retention = art.consent.json.get("retention", {}) if art.consent_id else {}
-        raw_ttl_hours = int(retention.get("raw_ttl_hours") or 0)
-        raw_expired = raw_ttl_hours <= 0 or (art.created_at + timedelta(hours=raw_ttl_hours)) < now
-        if raw_expired and art.raw_uri:
-            try:
-                delete_key(art.raw_uri)
-            except Exception:
-                pass
+    try:
+        now = timezone.now()
+        qs = Artifact.objects.filter(status=Artifact.STATUS_ACTIVE)
+        for art in qs.iterator():
+            retention = art.consent.json.get("retention", {}) if art.consent_id else {}
+            raw_ttl_hours = int(retention.get("raw_ttl_hours") or 0)
+            raw_expired = raw_ttl_hours <= 0 or (art.created_at + timedelta(hours=raw_ttl_hours)) < now
+            if raw_expired and art.raw_uri:
+                try:
+                    delete_key(art.raw_uri)
+                except Exception:
+                    pass
+                art.raw_uri = ""
+
+            essence_exists = Derivative.objects.filter(
+                artifact=art,
+                kind=Derivative.KIND_ESSENCE_WAV,
+                expires_at__gt=now,
+            ).exists()
+
+            if art.expires_at and art.expires_at < now:
+                art.status = Artifact.STATUS_EXPIRED
+                art.raw_uri = ""
+            elif not art.raw_uri and not essence_exists:
+                art.status = Artifact.STATUS_EXPIRED
+
+            art.save(update_fields=["status", "raw_uri"])
+
+        # Ephemeral safety: clean up any EPHEMERAL older than 10 minutes
+        cutoff = now - timedelta(minutes=10)
+        eph = Artifact.objects.filter(status=Artifact.STATUS_EPHEMERAL, created_at__lt=cutoff)
+        for art in eph.iterator():
+            if art.raw_uri:
+                try:
+                    delete_key(art.raw_uri)
+                except Exception:
+                    pass
+            art.status = Artifact.STATUS_REVOKED
             art.raw_uri = ""
-
-        essence_exists = Derivative.objects.filter(
-            artifact=art,
-            kind=Derivative.KIND_ESSENCE_WAV,
-            expires_at__gt=now,
-        ).exists()
-
-        if art.expires_at and art.expires_at < now:
-            art.status = Artifact.STATUS_EXPIRED
-            art.raw_uri = ""
-        elif not art.raw_uri and not essence_exists:
-            art.status = Artifact.STATUS_EXPIRED
-
-        art.save(update_fields=["status", "raw_uri"])
-
-    # Ephemeral safety: clean up any EPHEMERAL older than 10 minutes
-    cutoff = now - timedelta(minutes=10)
-    eph = Artifact.objects.filter(status=Artifact.STATUS_EPHEMERAL, created_at__lt=cutoff)
-    for art in eph.iterator():
-        if art.raw_uri:
-            try:
-                delete_key(art.raw_uri)
-            except Exception:
-                pass
-        art.status = Artifact.STATUS_REVOKED
-        art.raw_uri = ""
-        art.save(update_fields=["status", "raw_uri"])
+            art.save(update_fields=["status", "raw_uri"])
+    except Exception as exc:
+        record_task_failure("expire_raw", exc)
+        raise
+    else:
+        record_task_success("expire_raw")
 
 @shared_task
 def prune_derivatives() -> None:
     record_worker_heartbeat()
-    now = timezone.now()
-    qs = Derivative.objects.filter(expires_at__isnull=False, expires_at__lt=now)
-    for d in qs.iterator():
-        try:
-            delete_key(d.uri)
-        except Exception:
-            pass
-        d.delete()
+    try:
+        now = timezone.now()
+        qs = Derivative.objects.filter(expires_at__isnull=False, expires_at__lt=now)
+        for d in qs.iterator():
+            try:
+                delete_key(d.uri)
+            except Exception:
+                pass
+            d.delete()
+    except Exception as exc:
+        record_task_failure("prune_derivatives", exc)
+        raise
+    else:
+        record_task_success("prune_derivatives")
 
 
 @shared_task(name=HEARTBEAT_TASK_NAME)

@@ -81,8 +81,8 @@
     return entries.map(([name, value]) => ({
       tagName: "article",
       className: `component-card ${value.ok ? "ready" : "broken"}`,
-      title: name,
-      detail: value.ok ? "ok" : (value.error || "error"),
+      title: String(name || "").replace(/_/g, " "),
+      detail: value.ok ? (value.detail || "ok") : (value.error || value.detail || "error"),
     }));
   }
 

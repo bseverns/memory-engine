@@ -89,6 +89,17 @@ class RuntimeConfigValidationTests(EngineTestCase):
 
         self.assertIn("CACHE_URL", str(ctx.exception))
 
+    def test_runtime_config_validation_rejects_inverted_queue_thresholds(self):
+        config = default_runtime_config(
+            OPS_QUEUE_DEPTH_WARNING=50,
+            OPS_QUEUE_DEPTH_CRITICAL=20,
+        )
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("OPS_QUEUE_DEPTH_WARNING", str(ctx.exception))
+
     def test_installation_profile_defaults_return_expected_values(self):
         self.assertEqual(
             installation_profile_default("shared_lab", "KIOSK_DEFAULT_MAX_RECORDING_SECONDS", 120),

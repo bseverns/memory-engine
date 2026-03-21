@@ -31,6 +31,7 @@ CELERY_BROKER_URL = "memory://"
 CELERY_RESULT_BACKEND = "cache+memory://"
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TASK_DEFAULT_QUEUE = "celery"
 TEST_RUNNER = "memory_engine.test_runner.AppAwareDiscoverRunner"
 CACHES = {
     "default": {
