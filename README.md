@@ -260,9 +260,11 @@ More captured states:
 
 - Accessible recording mode: ![Accessible recording kiosk](docs/screenshots/recording-kiosk-accessible.png)
 - Spanish recording mode: ![Spanish recording kiosk](docs/screenshots/recording-kiosk-spanish.png)
+- Intake paused at the recorder: ![Recording kiosk intake paused](docs/screenshots/recording-kiosk-intake-paused.png)
 - Playback info lightbox: ![Playback info lightbox](docs/screenshots/room-playback-info.png)
 - Quieter listening mode: ![Room playback quieter mode](docs/screenshots/room-playback-quieter.png)
 - Live operator controls: ![Operator dashboard live controls](docs/screenshots/ops-controls-live.png)
+- Degraded operator state: ![Operator dashboard degraded state](docs/screenshots/ops-degraded.png)
 
 Longer operator notes live in `docs/maintenance.md`.
 That includes a MinIO section covering which credentials live where, what is set before first deploy, and how manual MinIO provisioning changes the `.env` values.
