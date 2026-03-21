@@ -32,7 +32,14 @@ from .media_access import (
 )
 from .models import AccessEvent, Artifact, ConsentManifest, Derivative
 from .operator_auth import operator_secret_configured, operator_session_active
-from .ops import component_health_warnings, disk_status, health_component_status, pool_warnings, retention_summary
+from .ops import (
+    api_health_component_status,
+    component_health_warnings,
+    disk_status,
+    health_component_status,
+    pool_warnings,
+    retention_summary,
+)
 from .pool import (
     artifact_age_hours,
     artifact_density,
@@ -483,6 +490,19 @@ def pool_heard(request, access_token: str):
 
 @api_view(["GET"])
 def healthz(request):
+    ok, components = api_health_component_status()
+    return Response(
+        {
+            "ok": ok,
+            "components": components,
+            "now": timezone.now(),
+        },
+        status=status.HTTP_200_OK if ok else status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
+@api_view(["GET"])
+def readyz(request):
     ok, components = health_component_status()
     return Response(
         {

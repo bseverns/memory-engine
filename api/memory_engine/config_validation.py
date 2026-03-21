@@ -13,6 +13,7 @@ def validate_runtime_settings(settings_obj) -> None:
     allowed_hosts = list(getattr(settings_obj, "ALLOWED_HOSTS", []) or [])
     csrf_trusted_origins = list(getattr(settings_obj, "CSRF_TRUSTED_ORIGINS", []) or [])
     minio_endpoint = str(getattr(settings_obj, "MINIO_ENDPOINT", "") or "").strip()
+    cache_url = str(getattr(settings_obj, "CACHE_URL", "") or "").strip()
 
     if not allowed_hosts:
         errors.append("ALLOWED_HOSTS must not be empty.")
@@ -45,6 +46,8 @@ def validate_runtime_settings(settings_obj) -> None:
 
     if not (minio_endpoint.startswith("http://") or minio_endpoint.startswith("https://")):
         errors.append("MINIO_ENDPOINT must start with http:// or https://.")
+    if cache_url and not (cache_url.startswith("redis://") or cache_url.startswith("rediss://")):
+        errors.append("CACHE_URL must start with redis:// or rediss:// when set.")
 
     room_tone_source_mode = str(getattr(settings_obj, "ROOM_TONE_SOURCE_MODE", "synthetic") or "").strip().lower()
     room_tone_source_url = str(getattr(settings_obj, "ROOM_TONE_SOURCE_URL", "") or "").strip()

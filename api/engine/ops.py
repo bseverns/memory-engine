@@ -81,7 +81,7 @@ def component_health_warnings(components: dict) -> list[dict]:
     return warnings
 
 
-def health_component_status() -> tuple[bool, dict]:
+def api_health_component_status() -> tuple[bool, dict]:
     components = {}
 
     try:
@@ -104,6 +104,12 @@ def health_component_status() -> tuple[bool, dict]:
     except Exception as exc:
         components["storage"] = {"ok": False, "error": str(exc)}
 
+    ok = all(component["ok"] for component in components.values())
+    return ok, components
+
+
+def health_component_status() -> tuple[bool, dict]:
+    ok, components = api_health_component_status()
     components["worker"] = heartbeat_component(
         "celery worker",
         WORKER_HEARTBEAT_CACHE_KEY,
@@ -115,8 +121,8 @@ def health_component_status() -> tuple[bool, dict]:
         int(getattr(settings, "OPS_BEAT_HEARTBEAT_MAX_AGE_SECONDS", 180)),
     )
 
-    ok = all(component["ok"] for component in components.values())
-    return ok, components
+    cluster_ok = all(component["ok"] for component in components.values())
+    return cluster_ok, components
 
 
 def disk_status(path: str) -> dict:

@@ -81,6 +81,14 @@ class RuntimeConfigValidationTests(EngineTestCase):
 
         self.assertIn("OPS_SESSION_BINDING_MODE", str(ctx.exception))
 
+    def test_runtime_config_validation_rejects_invalid_cache_url_scheme(self):
+        config = default_runtime_config(CACHE_URL="memcached://cache:11211")
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("CACHE_URL", str(ctx.exception))
+
     def test_installation_profile_defaults_return_expected_values(self):
         self.assertEqual(
             installation_profile_default("shared_lab", "KIOSK_DEFAULT_MAX_RECORDING_SECONDS", 120),

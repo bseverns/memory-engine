@@ -58,6 +58,7 @@ fi
 
 if compose_service_running "api"; then
   run_compose exec -T api curl -fsS http://localhost:8000/healthz > "${BUNDLE_DIR}/healthz.json" 2>&1 || true
+  run_compose exec -T api curl -fsS http://localhost:8000/readyz > "${BUNDLE_DIR}/readyz.json" 2>&1 || true
 fi
 
 for service_name in api worker beat proxy db redis minio; do

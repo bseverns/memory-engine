@@ -113,6 +113,14 @@ check_compose_services() {
     esac
   fi
 
+  ready_payload=$(sh -c "${compose_bin} exec -T api curl -fsS http://localhost:8000/readyz" 2>/dev/null || true)
+  if [ -z "${ready_payload}" ]; then
+    warn "api is running but /readyz did not return success; worker/beat or broader cluster readiness may be degraded"
+  else
+    info "OK: /readyz responded"
+    printf '%s\n' "${ready_payload}"
+  fi
+
   node_payload=$(sh -c "${compose_bin} exec -T api curl -fsS http://localhost:8000/api/v1/node/status" 2>/dev/null || true)
   if [ -z "${node_payload}" ]; then
     warn "Could not fetch /api/v1/node/status from inside the api container"

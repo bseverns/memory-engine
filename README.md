@@ -75,7 +75,8 @@ The compose stack is set up for a reverse proxy in front of Django:
 - Django runs behind it via `gunicorn`
 - static files are served through Django/WhiteNoise
 - MinIO is no longer exposed publicly by default
-- `/healthz` exposes dependency readiness for operators and container health checks
+- `/healthz` exposes narrow API/dependency health for container health checks
+- `/readyz` exposes broader cluster readiness, including worker/beat heartbeat state
 
 The fastest path on a fresh server is the deploy script:
 
@@ -126,9 +127,10 @@ posture, set `OPS_SESSION_BINDING_MODE=strict`. For a trusted single-site
 install where proxy/IP churn is more annoying than helpful, `none` is also
 available.
 
-`/healthz` and `/ops/` now also track Celery worker and beat heartbeats, so a
-node can show degraded if Redis is reachable but scheduled maintenance or
-derivative work is no longer advancing.
+`/healthz` stays intentionally narrow: database, Redis reachability, and MinIO.
+`/readyz` and `/ops/` carry the broader cluster view, including Celery worker
+and beat heartbeats, so a node can show degraded if Redis is reachable but
+scheduled maintenance or derivative work is no longer advancing.
 
 If the app sits behind a reverse proxy and you want throttling / operator
 allowlisting to trust `X-Forwarded-For`, also set:
@@ -139,6 +141,9 @@ DJANGO_TRUST_X_FORWARDED_FOR=1
 
 Leave that off unless your proxy strips inbound forwarded headers and rewrites
 them itself.
+
+For shared cache-backed operator and throttle state, Django uses `CACHE_URL`
+when set and otherwise falls back to `REDIS_URL`.
 
 For a server that is already bootstrapped and just needs the usual
 `pull -> test -> backup -> deploy -> status` cycle, use:
@@ -377,7 +382,7 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 - `docs/roadmap.md` — landed changes and the next likely improvements
 - `scripts/check.sh` — browser syntax, frontend smoke tests, Django behavior tests, and patch-hygiene validation
 - `scripts/clean_local.sh` — clear regenerable local caches such as `api/.test-cache`, `__pycache__`, and Playwright output
-- `scripts/doctor.sh` — operator-focused env, compose, storage, and browser-constraint checks
+- `scripts/doctor.sh` — operator-focused env, compose, `/healthz`, `/readyz`, storage, and browser-constraint checks
 - `scripts/browser_kiosk.sh` — Chromium kiosk launcher for `/kiosk/`, `/room/`, or `/ops/`, with autoplay-safe flags for the listening surface
 - `scripts/deploy.sh` — server-side deploy helper for IP-now / domain-later rollout
 - `scripts/update.sh` — server-side pull, verify, backup, deploy, and status helper for existing installs
@@ -385,8 +390,8 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 - `scripts/backup.sh` — snapshot Postgres + MinIO data
 - `scripts/restore.sh` — restore Postgres + MinIO data from a backup folder
 - `scripts/export_bundle.sh` — package one backup snapshot into a portable handoff archive with checksums
-- `scripts/support_bundle.sh` — gather redacted env, health, status, and recent logs for remote support
-- `scripts/status.sh` — compose and backend readiness summary for operators
+- `scripts/support_bundle.sh` — gather redacted env, `/healthz`, `/readyz`, status, and recent logs for remote support
+- `scripts/status.sh` — compose, `/healthz`, and `/readyz` summary for operators
 - `api/` — Django project + Celery worker
 - `api/engine/` — models, API endpoints, tasks
 - `api/engine/templates/engine/kiosk.html` — kiosk UI

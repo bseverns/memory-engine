@@ -45,13 +45,14 @@ services:
    Caddy is the public entrypoint on ports `80/443`. It terminates TLS and
    forwards HTTP traffic to Django.
 2. `api`
-   The Django app serves `/kiosk/`, `/ops/`, `/healthz`, and the JSON API under
+   The Django app serves `/kiosk/`, `/ops/`, `/healthz`, `/readyz`, and the JSON API under
    `/api/v1/`.
 3. `db`
    Postgres stores node metadata, consent manifests, artifacts, derivatives,
    and access events.
 4. `redis`
-   Celery broker/result backend.
+   Celery broker/result backend and the shared Django cache for throttle state,
+   operator lockouts, worker/beat heartbeats, and playback-ack dedupe.
 5. `worker`
    Celery worker for spectrogram generation and cleanup tasks.
 6. `beat`
@@ -107,7 +108,8 @@ The root URL table lives in `api/memory_engine/urls.py`.
 - `/kiosk/` renders the recording station
 - `/room/` renders the dedicated playback surface
 - `/ops/` renders the operator dashboard and sign-in surface
-- `/healthz` reports dependency readiness
+- `/healthz` reports narrow API/dependency health
+- `/readyz` reports broader cluster readiness
 - `/api/v1/...` exposes the kiosk and ops API surface
 
 In the intended field setup:
@@ -130,7 +132,6 @@ The app API routes in `api/engine/urls.py` break down into five groups:
   `/api/v1/surface/state`
   `/api/v1/surface/fossils/<token>`
   `/api/v1/node/status`
-  `/api/v1/healthz`
   `/api/v1/operator/controls`
 - blob and derivative access
   `/api/v1/media/raw/<token>`
@@ -681,7 +682,7 @@ The operator logic lives in `api/engine/ops.py` and the JSON endpoints in
 
 ### `/healthz`
 
-This is the narrow dependency readiness endpoint.
+This is the narrow API/dependency health endpoint.
 
 It checks:
 
@@ -690,6 +691,19 @@ It checks:
 - MinIO bucket reachability
 
 This is used by both operators and the API container health check.
+
+### `/readyz`
+
+This is the broader cluster readiness endpoint.
+
+It includes the narrow `/healthz` dependencies plus:
+
+- Celery worker heartbeat freshness
+- Celery beat heartbeat freshness
+
+This is the right surface for operator checks that need to know whether
+background work is still advancing, without making the API container health
+probe depend on worker/beat state.
 
 ### `/api/v1/node/status`
 

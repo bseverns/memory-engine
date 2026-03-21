@@ -49,6 +49,7 @@ def default_runtime_config(**overrides):
         "ALLOWED_HOSTS": ["localhost"],
         "CSRF_TRUSTED_ORIGINS": ["http://localhost"],
         "MINIO_ENDPOINT": "http://minio:9000",
+        "CACHE_URL": "redis://redis:6379/0",
         "TRUST_X_FORWARDED_FOR": False,
         "SECURE_SSL_REDIRECT": False,
         "SESSION_COOKIE_SECURE": False,

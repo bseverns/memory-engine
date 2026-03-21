@@ -24,7 +24,7 @@ Examples:
 
 Behavior:
   - prints docker compose service status
-  - prints /healthz from inside the api container when available
+  - prints /healthz and /readyz from inside the api container when available
   - optionally tails logs for one service
 EOF
 }
@@ -59,12 +59,19 @@ info "Compose services"
 sh -c "${COMPOSE_BIN} ps"
 
 printf '\n'
-info "API readiness"
+info "API health"
 if sh -c "${COMPOSE_BIN} ps --services --filter status=running" | grep -qx "api"; then
   if sh -c "${COMPOSE_BIN} exec -T api curl -fsS http://localhost:8000/healthz"; then
     :
   else
     info "The api container is running, but /healthz did not return success."
+  fi
+  printf '\n'
+  info "Cluster readiness"
+  if sh -c "${COMPOSE_BIN} exec -T api curl -fsS http://localhost:8000/readyz"; then
+    :
+  else
+    info "The api container is running, but /readyz did not return success."
   fi
 else
   info "The api container is not currently running."

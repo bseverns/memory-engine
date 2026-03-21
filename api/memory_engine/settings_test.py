@@ -32,6 +32,12 @@ CELERY_RESULT_BACKEND = "cache+memory://"
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 TEST_RUNNER = "memory_engine.test_runner.AppAwareDiscoverRunner"
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "memory-engine-kiosk-tests",
+    },
+}
 
 MINIO_ENDPOINT = "http://test-minio.invalid"
 MINIO_BUCKET = "test-memory"

@@ -86,20 +86,21 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/check.sh` is the quick sanity pass for browser JavaScript syntax, frontend smoke tests, Python, the Django behavior suite, shell syntax, and `git diff --check`.
 - `scripts/clean_local.sh` removes regenerable local caches such as `api/.test-cache`, `__pycache__`, and Playwright output. Pass `--include-screenshots` if you also want to clear generated screenshots.
 - `.github/workflows/check.yml` runs that same `scripts/check.sh` gate in GitHub Actions using a repo-local `.venv`, so CI stays aligned with the local check path.
-- `scripts/doctor.sh` checks `.env`, compose state, MinIO reachability through `/healthz`, and browser/TLS constraints that affect recording.
+- `scripts/doctor.sh` checks `.env`, compose state, narrow API health through `/healthz`, broader cluster readiness through `/readyz`, and browser/TLS constraints that affect recording.
 - `scripts/browser_kiosk.sh` launches Chromium into `/kiosk/`, `/room/`, or `/ops/` with a repeatable kiosk-safe flag set. The `/room/` role adds autoplay-hardening flags automatically.
-- `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` from inside the API container.
+- `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` and `/readyz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.
 - `scripts/restore.sh` restores one of those snapshots into the current stack and now asks for explicit confirmation plus a fresh pre-restore snapshot by default.
 - `scripts/export_bundle.sh` packages one backup snapshot into a portable `.tgz` with a manifest and checksums.
-- `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, compose status, doctor output, and recent logs into a single handoff archive.
+- `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, `/readyz`, compose status, doctor output, and recent logs into a single handoff archive.
 - `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
 - Django also validates runtime config relationships at startup now, so bad threshold ordering or insecure origin posture fails fast before the stack enters service.
 - `INSTALLATION_PROFILE` can provide a named starting posture for room behavior and kiosk defaults. Explicit env vars still override profile defaults.
 - Public write paths are also guarded by server-side WAV validation and two-layer DRF throttling: a kiosk-friendly client limit plus a broader IP abuse ceiling. If you tune those limits, update `INGEST_MAX_UPLOAD_BYTES`, `INGEST_MAX_DURATION_SECONDS`, `PUBLIC_INGEST_RATE`, `PUBLIC_INGEST_IP_RATE`, `PUBLIC_REVOKE_RATE`, and `PUBLIC_REVOKE_IP_RATE` together.
 - `/ops/` now shows those configured budgets plus recent throttle hits, and `/kiosk/` shows a soft warning when the current station is nearing its remaining ingest budget.
 - Leave `DJANGO_TRUST_X_FORWARDED_FOR=0` unless your reverse proxy strips and rewrites forwarded headers correctly. If you turn it on, throttling and steward network allowlists will trust that header.
-- `/healthz` and `/ops/` now also expect fresh Celery worker and beat heartbeats. If Redis is up but those heartbeats go stale, the node should show degraded rather than falsely green.
+- Django now defaults its shared cache to `CACHE_URL` and otherwise falls back to `REDIS_URL` when present, so cache-backed lockouts, throttle snapshots, heartbeat timestamps, and playback-ack dedupe live in shared Redis instead of per-process local memory.
+- `/readyz` and `/ops/` now expect fresh Celery worker and beat heartbeats. `/healthz` stays narrow so the API container health check does not depend on broader worker/beat state.
 - Operator sessions now default to `OPS_SESSION_BINDING_MODE=user_agent`, which is less brittle than pinning to the steward IP. Use `strict` if you explicitly want IP+browser binding, or `none` for a very trusted single-site install.
 
 ## Runtime contract
@@ -157,10 +158,11 @@ If you need to skip one phase intentionally:
 
 ## Health and readiness
 
-There are three practical health surfaces:
+There are four practical health surfaces:
 
 - `docker compose ps` tells you whether the containers are running and whether Docker thinks health checks are passing.
-- `/healthz` is the backend readiness view and is the source used by the API container health check.
+- `/healthz` is the narrow API/dependency view and is the source used by the API container health check.
+- `/readyz` is the broader cluster readiness view, including worker/beat heartbeat state.
 - `/ops/` is the human-facing dashboard for steward use during install or troubleshooting.
 - `/ops/` is now the authenticated steward surface. It exposes maintenance mode, pause-intake, pause-playback, and quieter-mode controls once the steward secret is accepted.
 - `/ops/` can also be narrowed to trusted IPs or CIDR ranges with `OPS_ALLOWED_NETWORKS`.
@@ -219,7 +221,7 @@ Export bundle notes:
 Support bundle notes:
 
 - `scripts/support_bundle.sh` writes into `support-bundles/`.
-- It includes redacted environment values, compose status, doctor output, `/healthz`, and recent logs for the main services.
+- It includes redacted environment values, compose status, doctor output, `/healthz`, `/readyz`, and recent logs for the main services.
 - It is meant for remote troubleshooting without handing over shell access or the raw `.env`.
 
 ## MinIO setup notes
@@ -278,7 +280,7 @@ External S3-compatible migration notes:
 - Pre-create the destination bucket and grant the app identity read, write, list, and delete permissions there.
 - Copy object data from the existing MinIO bucket before changing `.env`.
 - Update `MINIO_ENDPOINT`, `MINIO_BUCKET`, `MINIO_ACCESS_KEY`, and `MINIO_SECRET_KEY`.
-- Run `./scripts/check.sh`, then redeploy and confirm `/healthz` plus a real playback request from `/room/`.
+- Run `./scripts/check.sh`, then redeploy and confirm `/healthz`, `/readyz`, plus a real playback request from `/room/`.
 - Keep the old MinIO data untouched until `/ops/` reports healthy storage and the room has successfully played migrated audio.
 
 Versioning and object-locking notes:
@@ -293,6 +295,7 @@ Practical verification after deploy:
 docker compose logs --tail 100 minio
 docker compose logs --tail 100 minio_init
 docker compose exec -T api curl -fsS http://localhost:8000/healthz
+docker compose exec -T api curl -fsS http://localhost:8000/readyz
 ```
 
 If you want to inspect the MinIO console directly on the server, use `http://127.0.0.1:9001` locally on that machine or tunnel it over SSH.
@@ -318,6 +321,15 @@ Check service order and dependency state:
 - `minio` reachability
 - MinIO bucket and credentials in `.env`
 - `api` logs for migration or environment errors
+
+### `/readyz` fails but `/healthz` passes
+
+The API is up, but broader cluster work is degraded. Check:
+
+- `worker` and `beat` service state
+- shared Redis cache / broker reachability from all processes
+- stale worker/beat warnings in `/ops/`
+- worker logs for failed derivative or expiry tasks
 
 ### Playback pool feels empty or repetitive
 

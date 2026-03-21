@@ -10,6 +10,7 @@ from .base import EngineTestCase, make_test_wav_bytes
 from ..ops import (
     BEAT_HEARTBEAT_CACHE_KEY,
     WORKER_HEARTBEAT_CACHE_KEY,
+    api_health_component_status,
     health_component_status,
     record_beat_heartbeat,
     record_worker_heartbeat,
@@ -26,7 +27,7 @@ class OperatorBehaviorTests(EngineTestCase):
         cache.delete(BEAT_HEARTBEAT_CACHE_KEY)
         cache.clear()
 
-    @patch("engine.api_views.health_component_status")
+    @patch("engine.api_views.api_health_component_status")
     def test_healthz_returns_503_when_dependency_check_fails(self, health_mock):
         health_mock.return_value = (
             False,
@@ -38,6 +39,40 @@ class OperatorBehaviorTests(EngineTestCase):
         )
 
         response = self.client.get("/healthz")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.json()["ok"])
+
+    @patch("engine.api_views.api_health_component_status")
+    def test_healthz_ignores_worker_and_beat_cluster_staleness(self, health_mock):
+        health_mock.return_value = (
+            True,
+            {
+                "database": {"ok": True},
+                "redis": {"ok": True},
+                "storage": {"ok": True},
+            },
+        )
+
+        response = self.client.get("/healthz")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+
+    @patch("engine.api_views.health_component_status")
+    def test_readyz_returns_503_when_cluster_worker_state_is_stale(self, health_mock):
+        health_mock.return_value = (
+            False,
+            {
+                "database": {"ok": True},
+                "redis": {"ok": True},
+                "storage": {"ok": True},
+                "worker": {"ok": False, "error": "stale"},
+                "beat": {"ok": True},
+            },
+        )
+
+        response = self.client.get("/readyz")
 
         self.assertEqual(response.status_code, 503)
         self.assertFalse(response.json()["ok"])
@@ -61,6 +96,18 @@ class OperatorBehaviorTests(EngineTestCase):
 
         self.assertEqual(response.status_code, 429)
         self.assertContains(response, "Too many failed sign-in attempts", status_code=429)
+
+    @override_settings(OPS_LOGIN_MAX_ATTEMPTS=1, OPS_LOGIN_LOCKOUT_SECONDS=60)
+    def test_operator_login_lockout_applies_to_fresh_client_from_same_ip(self):
+        first_client = self.client_class()
+        second_client = self.client_class()
+
+        first = first_client.post("/ops/", {"secret": "wrong-secret"}, REMOTE_ADDR="127.0.0.1")
+        second = second_client.post("/ops/", {"secret": "test-ops-secret"}, REMOTE_ADDR="127.0.0.1")
+
+        self.assertEqual(first.status_code, 429)
+        self.assertEqual(second.status_code, 429)
+        self.assertContains(second, "Too many failed sign-in attempts", status_code=429)
 
     def test_operator_session_invalidates_when_client_binding_changes(self):
         self.client.post("/ops/", {"secret": "test-ops-secret"}, REMOTE_ADDR="127.0.0.1", HTTP_USER_AGENT="browser-a")
@@ -308,6 +355,24 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertFalse(ok)
         self.assertFalse(components["worker"]["ok"])
         self.assertFalse(components["beat"]["ok"])
+
+    @patch("engine.ops.s3_client")
+    @patch("engine.ops.redis.Redis.from_url")
+    @patch("engine.ops.connection.cursor")
+    def test_api_health_component_status_ignores_worker_and_beat_heartbeats(
+        self,
+        cursor_mock,
+        redis_from_url_mock,
+        s3_client_mock,
+    ):
+        cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
+        redis_from_url_mock.return_value.ping.return_value = True
+        s3_client_mock.return_value.head_bucket.return_value = {}
+
+        ok, components = api_health_component_status()
+
+        self.assertTrue(ok)
+        self.assertEqual(set(components.keys()), {"database", "redis", "storage"})
 
     @patch("engine.ops.s3_client")
     @patch("engine.ops.redis.Redis.from_url")

@@ -102,6 +102,22 @@ DATABASES = {
     }
 }
 
+CACHE_URL = os.getenv("CACHE_URL", os.getenv("REDIS_URL", "")).strip()
+if CACHE_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": CACHE_URL,
+        },
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "memory-engine-kiosk-default",
+        },
+    }
+
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
