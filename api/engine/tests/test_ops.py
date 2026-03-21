@@ -104,12 +104,43 @@ class OperatorBehaviorTests(EngineTestCase):
         first_client = self.client_class()
         second_client = self.client_class()
 
-        first = first_client.post("/ops/", {"secret": "wrong-secret"}, REMOTE_ADDR="127.0.0.1")
-        second = second_client.post("/ops/", {"secret": "test-ops-secret"}, REMOTE_ADDR="127.0.0.1")
+        first = first_client.post(
+            "/ops/",
+            {"secret": "wrong-secret"},
+            REMOTE_ADDR="127.0.0.1",
+            HTTP_USER_AGENT="browser-a",
+        )
+        second = second_client.post(
+            "/ops/",
+            {"secret": "test-ops-secret"},
+            REMOTE_ADDR="127.0.0.1",
+            HTTP_USER_AGENT="browser-a",
+        )
 
         self.assertEqual(first.status_code, 429)
         self.assertEqual(second.status_code, 429)
         self.assertContains(second, "Too many failed sign-in attempts", status_code=429)
+
+    @override_settings(OPS_LOGIN_MAX_ATTEMPTS=1, OPS_LOGIN_LOCKOUT_SECONDS=60)
+    def test_operator_login_lockout_does_not_spill_across_different_user_agents(self):
+        first_client = self.client_class()
+        second_client = self.client_class()
+
+        first = first_client.post(
+            "/ops/",
+            {"secret": "wrong-secret"},
+            REMOTE_ADDR="127.0.0.1",
+            HTTP_USER_AGENT="browser-a",
+        )
+        second = second_client.post(
+            "/ops/",
+            {"secret": "test-ops-secret"},
+            REMOTE_ADDR="127.0.0.1",
+            HTTP_USER_AGENT="browser-b",
+        )
+
+        self.assertEqual(first.status_code, 429)
+        self.assertEqual(second.status_code, 302)
 
     def test_operator_session_invalidates_when_client_binding_changes(self):
         self.client.post("/ops/", {"secret": "test-ops-secret"}, REMOTE_ADDR="127.0.0.1", HTTP_USER_AGENT="browser-a")

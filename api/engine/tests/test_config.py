@@ -89,6 +89,14 @@ class RuntimeConfigValidationTests(EngineTestCase):
 
         self.assertIn("CACHE_URL", str(ctx.exception))
 
+    def test_runtime_config_validation_requires_shared_cache_outside_debug(self):
+        config = default_runtime_config(CACHE_URL="", ALLOW_LOCAL_MEMORY_CACHE=False)
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("Shared cache is required", str(ctx.exception))
+
     def test_runtime_config_validation_rejects_inverted_queue_thresholds(self):
         config = default_runtime_config(
             OPS_QUEUE_DEPTH_WARNING=50,
@@ -99,6 +107,14 @@ class RuntimeConfigValidationTests(EngineTestCase):
             validate_runtime_settings(config)
 
         self.assertIn("OPS_QUEUE_DEPTH_WARNING", str(ctx.exception))
+
+    def test_runtime_config_validation_rejects_unknown_operator_lockout_scope(self):
+        config = default_runtime_config(OPS_LOGIN_LOCKOUT_SCOPE="mystery")
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("OPS_LOGIN_LOCKOUT_SCOPE", str(ctx.exception))
 
     def test_installation_profile_defaults_return_expected_values(self):
         self.assertEqual(

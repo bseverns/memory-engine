@@ -99,9 +99,10 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - Public write paths are also guarded by server-side WAV validation and two-layer DRF throttling: a kiosk-friendly client limit plus a broader IP abuse ceiling. If you tune those limits, update `INGEST_MAX_UPLOAD_BYTES`, `INGEST_MAX_DURATION_SECONDS`, `PUBLIC_INGEST_RATE`, `PUBLIC_INGEST_IP_RATE`, `PUBLIC_REVOKE_RATE`, and `PUBLIC_REVOKE_IP_RATE` together.
 - `/ops/` now shows those configured budgets plus recent throttle hits, and `/kiosk/` shows a soft warning when the current station is nearing its remaining ingest budget.
 - Leave `DJANGO_TRUST_X_FORWARDED_FOR=0` unless your reverse proxy strips and rewrites forwarded headers correctly. If you turn it on, throttling and steward network allowlists will trust that header.
-- Django now defaults its shared cache to `CACHE_URL` and otherwise falls back to `REDIS_URL` when present, so cache-backed lockouts, throttle snapshots, heartbeat timestamps, and playback-ack dedupe live in shared Redis instead of per-process local memory.
+- Django now defaults its shared cache to `CACHE_URL` and otherwise falls back to `REDIS_URL` when present, so cache-backed lockouts, throttle snapshots, heartbeat timestamps, and playback-ack dedupe live in shared Redis instead of per-process local memory. Outside debug mode, startup now fails fast if neither is present unless you explicitly set `DJANGO_ALLOW_LOCAL_MEMORY_CACHE=1` for an isolated local harness.
 - `/readyz` and `/ops/` now expect fresh Celery worker and beat heartbeats. `/healthz` stays narrow so the API container health check does not depend on broader worker/beat state.
 - Operator sessions now default to `OPS_SESSION_BINDING_MODE=user_agent`, which is less brittle than pinning to the steward IP. Use `strict` if you explicitly want IP+browser binding, or `none` for a very trusted single-site install.
+- Failed operator sign-ins now default to `OPS_LOGIN_LOCKOUT_SCOPE=ip_user_agent`, so a bad secret attempt is less likely to lock out unrelated stewards behind the same NAT. Use `ip` only if you explicitly want network-wide lockout behavior.
 
 ## Runtime contract
 

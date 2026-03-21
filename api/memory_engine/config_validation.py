@@ -14,6 +14,7 @@ def validate_runtime_settings(settings_obj) -> None:
     csrf_trusted_origins = list(getattr(settings_obj, "CSRF_TRUSTED_ORIGINS", []) or [])
     minio_endpoint = str(getattr(settings_obj, "MINIO_ENDPOINT", "") or "").strip()
     cache_url = str(getattr(settings_obj, "CACHE_URL", "") or "").strip()
+    allow_local_memory_cache = bool(getattr(settings_obj, "ALLOW_LOCAL_MEMORY_CACHE", False))
 
     if not allowed_hosts:
         errors.append("ALLOWED_HOSTS must not be empty.")
@@ -48,12 +49,17 @@ def validate_runtime_settings(settings_obj) -> None:
         errors.append("MINIO_ENDPOINT must start with http:// or https://.")
     if cache_url and not (cache_url.startswith("redis://") or cache_url.startswith("rediss://")):
         errors.append("CACHE_URL must start with redis:// or rediss:// when set.")
+    if not bool(getattr(settings_obj, "DEBUG", False)) and not cache_url and not allow_local_memory_cache:
+        errors.append(
+            "Shared cache is required outside debug mode. Set CACHE_URL/REDIS_URL or explicitly allow local-memory cache.",
+        )
 
     room_tone_source_mode = str(getattr(settings_obj, "ROOM_TONE_SOURCE_MODE", "synthetic") or "").strip().lower()
     room_tone_source_url = str(getattr(settings_obj, "ROOM_TONE_SOURCE_URL", "") or "").strip()
     kiosk_default_language_code = str(getattr(settings_obj, "KIOSK_DEFAULT_LANGUAGE_CODE", "en") or "").strip().lower()
     installation_profile = str(getattr(settings_obj, "INSTALLATION_PROFILE", "custom") or "").strip().lower()
     ops_session_binding_mode = str(getattr(settings_obj, "OPS_SESSION_BINDING_MODE", "user_agent") or "").strip().lower()
+    ops_login_lockout_scope = str(getattr(settings_obj, "OPS_LOGIN_LOCKOUT_SCOPE", "ip_user_agent") or "").strip().lower()
     if room_tone_source_mode not in {"synthetic", "site_ambience"}:
         errors.append("ROOM_TONE_SOURCE_MODE must be 'synthetic' or 'site_ambience'.")
     if room_tone_source_mode == "site_ambience":
@@ -124,6 +130,8 @@ def validate_runtime_settings(settings_obj) -> None:
         errors.append(f"INSTALLATION_PROFILE must be one of: {joined_profiles}.")
     if ops_session_binding_mode not in {"strict", "user_agent", "none"}:
         errors.append("OPS_SESSION_BINDING_MODE must be 'strict', 'user_agent', or 'none'.")
+    if ops_login_lockout_scope not in {"ip", "ip_user_agent"}:
+        errors.append("OPS_LOGIN_LOCKOUT_SCOPE must be 'ip' or 'ip_user_agent'.")
     for network in list(getattr(settings_obj, "OPS_ALLOWED_NETWORKS", []) or []):
         try:
             ipaddress.ip_network(str(network), strict=False)

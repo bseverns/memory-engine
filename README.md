@@ -143,7 +143,14 @@ Leave that off unless your proxy strips inbound forwarded headers and rewrites
 them itself.
 
 For shared cache-backed operator and throttle state, Django uses `CACHE_URL`
-when set and otherwise falls back to `REDIS_URL`.
+when set and otherwise falls back to `REDIS_URL`. Outside debug mode, the app
+now fails fast if neither is present unless you explicitly opt into
+`DJANGO_ALLOW_LOCAL_MEMORY_CACHE=1` for an isolated local harness.
+
+Operator lockout now defaults to `OPS_LOGIN_LOCKOUT_SCOPE=ip_user_agent`, so a
+mistyped secret from one steward browser is less likely to lock out every
+operator behind the same NAT. Use `ip` only if you explicitly want the coarser
+shared-network lockout posture.
 
 For a server that is already bootstrapped and just needs the usual
 `pull -> test -> backup -> deploy -> status` cycle, use:

@@ -40,6 +40,13 @@ def operator_session_binding_mode() -> str:
     return "user_agent"
 
 
+def operator_login_lockout_scope() -> str:
+    scope = str(getattr(settings, "OPS_LOGIN_LOCKOUT_SCOPE", "ip_user_agent") or "").strip().lower()
+    if scope in {"ip", "ip_user_agent"}:
+        return scope
+    return "ip_user_agent"
+
+
 def operator_request_allowed(request) -> bool:
     allowed_networks = operator_allowed_networks()
     if not allowed_networks:
@@ -89,8 +96,17 @@ def authenticate_operator_secret(secret: str) -> bool:
     return operator_secret_configured() and hmac.compare_digest(configured, str(secret or ""))
 
 
+def login_attempt_identity(request) -> str:
+    remote_ip = request_operator_ip(request) or "unknown"
+    if operator_login_lockout_scope() == "ip":
+        payload = remote_ip
+    else:
+        payload = f"{remote_ip}|{request_operator_user_agent(request) or 'unknown'}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def login_attempt_cache_key(request) -> str:
-    return f"{OPS_LOGIN_CACHE_PREFIX}:{request_operator_ip(request) or 'unknown'}"
+    return f"{OPS_LOGIN_CACHE_PREFIX}:{operator_login_lockout_scope()}:{login_attempt_identity(request)}"
 
 
 def operator_login_locked_out(request) -> bool:

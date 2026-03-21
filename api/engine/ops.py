@@ -1,5 +1,6 @@
 import shutil
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 import redis
 from django.conf import settings
@@ -19,6 +20,15 @@ TRACKED_TASKS = {
     "expire_raw": {"label": "raw expiry", "scheduled": True},
     "prune_derivatives": {"label": "derivative pruning", "scheduled": True},
 }
+
+
+def local_health_harness_enabled() -> bool:
+    return bool(getattr(settings, "OPS_LOCAL_HEALTH_HARNESS", False))
+
+
+def broker_uses_external_redis() -> bool:
+    broker_url = str(getattr(settings, "CELERY_BROKER_URL", "") or "").strip().lower()
+    return broker_url.startswith("redis://") or broker_url.startswith("rediss://")
 
 
 def parse_cached_datetime(raw_value):
@@ -127,6 +137,16 @@ def broker_redis_client():
 
 def queue_depth_component() -> dict:
     queue_name = str(getattr(settings, "CELERY_TASK_DEFAULT_QUEUE", "celery") or "celery").strip() or "celery"
+    if local_health_harness_enabled() and not broker_uses_external_redis():
+        return {
+            "ok": True,
+            "queue": queue_name,
+            "depth": 0,
+            "state": "ready",
+            "warning_depth": int(getattr(settings, "OPS_QUEUE_DEPTH_WARNING", 12)),
+            "critical_depth": int(getattr(settings, "OPS_QUEUE_DEPTH_CRITICAL", 40)),
+            "detail": "Local browser harness is using an eager in-process task queue.",
+        }
     client = broker_redis_client()
     depth = int(client.llen(queue_name))
     warning_depth = int(getattr(settings, "OPS_QUEUE_DEPTH_WARNING", 12))
@@ -265,17 +285,31 @@ def api_health_component_status() -> tuple[bool, dict]:
     except Exception as exc:
         components["database"] = {"ok": False, "error": str(exc)}
 
-    try:
-        broker_redis_client().ping()
-        components["redis"] = {"ok": True}
-    except Exception as exc:
-        components["redis"] = {"ok": False, "error": str(exc)}
+    if local_health_harness_enabled() and not broker_uses_external_redis():
+        components["redis"] = {
+            "ok": True,
+            "detail": "Local browser harness is using in-process cache/task services.",
+        }
+    else:
+        try:
+            broker_redis_client().ping()
+            components["redis"] = {"ok": True}
+        except Exception as exc:
+            components["redis"] = {"ok": False, "error": str(exc)}
 
-    try:
-        s3_client().head_bucket(Bucket=settings.MINIO_BUCKET)
-        components["storage"] = {"ok": True}
-    except Exception as exc:
-        components["storage"] = {"ok": False, "error": str(exc)}
+    minio_endpoint = str(getattr(settings, "MINIO_ENDPOINT", "") or "").strip()
+    parsed_endpoint = urlparse(minio_endpoint) if minio_endpoint else None
+    if local_health_harness_enabled() and parsed_endpoint and parsed_endpoint.hostname and parsed_endpoint.hostname.endswith(".invalid"):
+        components["storage"] = {
+            "ok": True,
+            "detail": "Local browser harness skips the external object-storage probe.",
+        }
+    else:
+        try:
+            s3_client().head_bucket(Bucket=settings.MINIO_BUCKET)
+            components["storage"] = {"ok": True}
+        except Exception as exc:
+            components["storage"] = {"ok": False, "error": str(exc)}
 
     ok = all(component["ok"] for component in components.values())
     return ok, components
@@ -283,16 +317,26 @@ def api_health_component_status() -> tuple[bool, dict]:
 
 def health_component_status() -> tuple[bool, dict]:
     ok, components = api_health_component_status()
-    components["worker"] = heartbeat_component(
-        "celery worker",
-        WORKER_HEARTBEAT_CACHE_KEY,
-        int(getattr(settings, "OPS_WORKER_HEARTBEAT_MAX_AGE_SECONDS", 180)),
-    )
-    components["beat"] = heartbeat_component(
-        "celery beat",
-        BEAT_HEARTBEAT_CACHE_KEY,
-        int(getattr(settings, "OPS_BEAT_HEARTBEAT_MAX_AGE_SECONDS", 180)),
-    )
+    if local_health_harness_enabled():
+        components["worker"] = {
+            "ok": True,
+            "detail": "Local browser harness does not run a separate worker process.",
+        }
+        components["beat"] = {
+            "ok": True,
+            "detail": "Local browser harness does not run a separate beat process.",
+        }
+    else:
+        components["worker"] = heartbeat_component(
+            "celery worker",
+            WORKER_HEARTBEAT_CACHE_KEY,
+            int(getattr(settings, "OPS_WORKER_HEARTBEAT_MAX_AGE_SECONDS", 180)),
+        )
+        components["beat"] = heartbeat_component(
+            "celery beat",
+            BEAT_HEARTBEAT_CACHE_KEY,
+            int(getattr(settings, "OPS_BEAT_HEARTBEAT_MAX_AGE_SECONDS", 180)),
+        )
     try:
         components["queue"] = queue_depth_component()
     except Exception as exc:

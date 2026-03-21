@@ -143,6 +143,7 @@ async function applyStewardControls(page, {
   kioskMaxRecordingSeconds = 120,
 } = {}) {
   await signIntoOps(page);
+  await expect(page.locator("#opsControlStatus")).not.toContainText("Controls are loading.");
   await setCheckboxState(page.locator("#opsIntakePaused"), intakePaused);
   await setCheckboxState(page.locator("#opsPlaybackPaused"), playbackPaused);
   await setCheckboxState(page.locator("#opsQuieterMode"), quieterMode);

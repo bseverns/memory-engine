@@ -3,6 +3,7 @@ const {
   applyStewardControls,
   mockHealthyOpsStatus,
   mockSpectrograms,
+  signIntoOps,
 } = require("./helpers");
 
 function minimalWavBuffer({ seconds = 0.5, sampleRate = 8000 } = {}) {
@@ -78,6 +79,18 @@ async function mockPlaybackLoop(page) {
 }
 
 test.describe("browser behavior contracts", () => {
+  test("operator dashboard renders the real node status payload", async ({ page }) => {
+    await signIntoOps(page);
+
+    await expect(page.locator("#opsStateLabel")).not.toHaveText("Checking...");
+    await expect(page.locator("#opsComponents")).toContainText("database");
+    await expect(page.locator("#opsComponents")).toContainText("redis");
+    await expect(page.locator("#opsComponents")).toContainText("storage");
+    await expect(page.locator("#opsComponents")).toContainText("worker");
+    await expect(page.locator("#opsComponents")).not.toContainText("Unable to reach /api/v1/node/status");
+    await expect(page.locator("#opsIngestRate")).toContainText("180/hour");
+  });
+
   test("playback info lightbox opens and closes cleanly", async ({ page }) => {
     await mockHealthyOpsStatus(page);
     await mockSpectrograms(page.context());

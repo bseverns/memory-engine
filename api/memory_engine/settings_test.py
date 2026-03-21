@@ -2,6 +2,8 @@ import os
 import sys
 import tempfile
 
+os.environ.setdefault("DJANGO_ALLOW_LOCAL_MEMORY_CACHE", "1")
+
 from .config_validation import validate_runtime_settings
 from .settings import *  # noqa: F403,F401
 
