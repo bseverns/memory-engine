@@ -1,8 +1,8 @@
-# Memory Engine — Confessional Kiosk (v0 skeleton)
+# Memory Engine — Confessional Kiosk
 
 Local-first “room memory” appliance: record a short sound offering, choose consent, receive a revoke code, and let the room replay contributions with **very light decay per access**. Nodes are offline/local-first by design.
 
-## What you get in this skeleton
+## What you get
 - Django + DRF API (Artifacts, Pool playback, Revocation, Node status)
 - Postgres for metadata
 - MinIO for blob storage (raw audio + spectrogram / essence fossils)
