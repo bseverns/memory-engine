@@ -16,6 +16,7 @@ from ..media_access import (
     build_media_token,
     build_surface_token,
 )
+from ..memory_color import memory_color_profile_codes
 from ..models import AccessEvent, Artifact, ConsentManifest, Derivative, StewardAction
 from ..throttling import public_ingest_budget_snapshot
 
@@ -66,8 +67,8 @@ class ArtifactBehaviorTests(EngineTestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("effect_profile", response.json()["error"])
-        self.assertIn("clear", response.json()["error"])
-        self.assertIn("dream", response.json()["error"])
+        for code in memory_color_profile_codes():
+            self.assertIn(code, response.json()["error"])
         put_bytes_mock.assert_not_called()
 
     @patch("engine.api_views.generate_essence_audio.delay")

@@ -2,10 +2,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-MEMORY_COLOR_PROFILE_CLEAR = "clear"
-MEMORY_COLOR_PROFILE_WARM = "warm"
-MEMORY_COLOR_PROFILE_RADIO = "radio"
-MEMORY_COLOR_PROFILE_DREAM = "dream"
+DEFAULT_MEMORY_COLOR_PROFILE_CODE = "clear"
 
 MEMORY_COLOR_CATALOG_PATH = Path(__file__).with_name("memory_color_profiles.json")
 
@@ -39,9 +36,9 @@ def memory_color_catalog():
             "processing": item.get("processing") if isinstance(item.get("processing"), dict) else {},
         })
 
-    default_candidate = str(payload.get("default") or MEMORY_COLOR_PROFILE_CLEAR).strip().lower()
+    default_candidate = str(payload.get("default") or DEFAULT_MEMORY_COLOR_PROFILE_CODE).strip().lower()
     profile_codes = {spec["code"] for spec in profiles}
-    default = default_candidate if default_candidate in profile_codes else MEMORY_COLOR_PROFILE_CLEAR
+    default = default_candidate if default_candidate in profile_codes else DEFAULT_MEMORY_COLOR_PROFILE_CODE
 
     return {
         "default": default,

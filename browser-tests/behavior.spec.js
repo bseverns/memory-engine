@@ -152,33 +152,37 @@ test.describe("browser behavior contracts", () => {
       await window.MemoryEngineKioskTest.seedReviewTake({ effectProfile: "clear", seconds: 1.6 });
     });
 
-    const clearChoice = page.locator('.memory-choice[data-effect-profile="clear"]');
-    const warmChoice = page.locator('.memory-choice[data-effect-profile="warm"]');
     const allChoices = page.locator(".memory-choice");
+    const catalog = await page.evaluate(() => window.MemoryEngineMemoryColorCatalog.getMemoryColorCatalog());
+    const catalogProfiles = Array.isArray(catalog?.profiles) ? catalog.profiles : [];
+    const defaultChoice = page.locator(`.memory-choice[data-effect-profile="${catalog.default}"]`);
 
     await expect(page.locator("#memoryColorPanel")).toBeVisible();
-    await expect(allChoices).toHaveCount(4);
-    await expect(clearChoice).toBeVisible();
-    await expect(warmChoice).toBeVisible();
+    await expect(allChoices).toHaveCount(catalogProfiles.length);
+    await expect(defaultChoice).toBeVisible();
     await expect(page.locator("#btnPreviewOriginal")).toHaveAttribute("aria-pressed", "true");
-    const warmLabel = (await warmChoice.textContent() || "").trim();
 
-    await page.evaluate(async () => {
-      await window.MemoryEngineKioskTest.selectMemoryColor("warm");
-    });
-    await expect(page.locator("#memoryColorStatus")).toContainText(warmLabel);
+    for (const profile of catalogProfiles) {
+      const profileChoice = page.locator(`.memory-choice[data-effect-profile="${profile.code}"]`);
+      const profileLabel = (await profileChoice.textContent() || "").trim();
 
-    await page.evaluate(async () => {
-      await window.MemoryEngineKioskTest.chooseMemoryPreview();
-    });
-    await expect(page.locator("#btnPreviewColored")).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("#memoryColorStatus")).toContainText(warmLabel);
+      await page.evaluate(async ({ code }) => {
+        await window.MemoryEngineKioskTest.selectMemoryColor(code);
+      }, { code: profile.code });
+      await expect(page.locator("#memoryColorStatus")).toContainText(profileLabel);
 
-    await page.evaluate(async () => {
-      await window.MemoryEngineKioskTest.chooseOriginalPreview();
-    });
-    await expect(page.locator("#btnPreviewOriginal")).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("#memoryColorStatus")).toContainText(warmLabel);
+      await page.evaluate(async () => {
+        await window.MemoryEngineKioskTest.chooseMemoryPreview();
+      });
+      await expect(page.locator("#btnPreviewColored")).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator("#memoryColorStatus")).toContainText(profileLabel);
+
+      await page.evaluate(async () => {
+        await window.MemoryEngineKioskTest.chooseOriginalPreview();
+      });
+      await expect(page.locator("#btnPreviewOriginal")).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator("#memoryColorStatus")).toContainText(profileLabel);
+    }
   });
 
   test("steward controls propagate to kiosk and room without reload-specific hacks", async ({ page }) => {

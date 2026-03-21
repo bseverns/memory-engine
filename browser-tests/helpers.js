@@ -1,8 +1,14 @@
+const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { expect } = require("@playwright/test");
 
 const SCREENSHOT_DIR = path.join(process.cwd(), "artifacts", "screenshots");
+const MEMORY_COLOR_CATALOG_PATH = path.join(process.cwd(), "api", "engine", "memory_color_profiles.json");
+
+function loadMemoryColorCatalog() {
+  return JSON.parse(fsSync.readFileSync(MEMORY_COLOR_CATALOG_PATH, "utf8"));
+}
 
 async function ensureScreenshotDir() {
   await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
@@ -17,6 +23,10 @@ async function saveScreenshot(page, name) {
 }
 
 function healthyNodeStatusPayload(overrides = {}) {
+  const memoryColorCatalog = loadMemoryColorCatalog();
+  const memoryColorCounts = Object.fromEntries(
+    (memoryColorCatalog.profiles || []).map((profile, index) => [profile.code, Math.max(1, 4 - index)]),
+  );
   return {
     ok: true,
     components: {
@@ -37,21 +47,8 @@ function healthyNodeStatusPayload(overrides = {}) {
       gathering: 2,
     },
     memory_colors: {
-      counts: {
-        clear: 4,
-        warm: 3,
-        radio: 2,
-        dream: 3,
-      },
-      catalog: {
-        default: "clear",
-        profiles: [
-          { code: "clear", labels: { en: "Clear" } },
-          { code: "warm", labels: { en: "Warm" } },
-          { code: "radio", labels: { en: "Radio" } },
-          { code: "dream", labels: { en: "Dream" } },
-        ],
-      },
+      counts: memoryColorCounts,
+      catalog: memoryColorCatalog,
     },
     storage: {
       path: "/",

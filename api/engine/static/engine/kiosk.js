@@ -128,6 +128,7 @@ const PUBLIC_CLIENT_STORAGE_KEY = "memory-engine-public-client-id-v1";
 
 const kioskCopyApi = window.MemoryEngineKioskCopy;
 const kioskView = window.MemoryEngineKioskView;
+const memoryColorCatalogApi = window.MemoryEngineMemoryColorCatalog;
 
 const PRE_ROLL_TONE = {
   gain: 0.04,
@@ -140,7 +141,6 @@ const PRE_ROLL_TONE = {
 const {
   encodeWavMono16,
   mergeBuffers,
-  normalizeMemoryColorProfile,
   playUrlWithLightChain,
   processRecordingSamples,
   renderMemoryColorPreviewBlob,
@@ -162,33 +162,6 @@ const kioskConfig = readKioskConfig();
 const DEFAULT_LANGUAGE_CODE = String(kioskConfig.kioskLanguageCode || "en");
 const DEFAULT_MAX_RECORDING_SECONDS = Number(kioskConfig.kioskMaxRecordingSeconds || 120);
 
-function readMemoryColorCatalog() {
-  const fallbackProfiles = [
-    { code: "clear", version: "v1", family: "participant_memory_color", labels: { en: "Clear" }, descriptions: {} },
-  ];
-  const rawCatalog = kioskConfig.memoryColorCatalog || {};
-  const profiles = Array.isArray(rawCatalog.profiles)
-    ? rawCatalog.profiles
-      .map((spec) => {
-        const code = String(spec?.code || "").trim().toLowerCase();
-        if (!code) return null;
-        return {
-          code,
-          version: String(spec?.version || "v1").trim() || "v1",
-          family: String(spec?.family || "participant_memory_color").trim() || "participant_memory_color",
-          labels: spec?.labels && typeof spec.labels === "object" ? spec.labels : {},
-          descriptions: spec?.descriptions && typeof spec.descriptions === "object" ? spec.descriptions : {},
-        };
-      })
-      .filter(Boolean)
-    : fallbackProfiles;
-  const defaultCode = String(rawCatalog.default || "clear").trim().toLowerCase();
-  return {
-    default: profiles.some((profile) => profile.code === defaultCode) ? defaultCode : "clear",
-    profiles,
-  };
-}
-
 function buildMemoryChoiceButton(profile) {
   const choice = document.createElement("button");
   choice.type = "button";
@@ -198,14 +171,14 @@ function buildMemoryChoiceButton(profile) {
   return choice;
 }
 
-const memoryColorCatalog = readMemoryColorCatalog();
+const memoryColorCatalog = memoryColorCatalogApi.getMemoryColorCatalog();
 const memoryColorProfileMap = new Map(memoryColorCatalog.profiles.map((profile) => [profile.code, profile]));
 if (memoryChoiceContainer) {
   memoryChoices = memoryColorCatalog.profiles.map(buildMemoryChoiceButton);
   memoryChoiceContainer.replaceChildren(...memoryChoices);
 }
 
-selectedEffectProfile = memoryColorCatalog.default;
+selectedEffectProfile = memoryColorCatalogApi.getDefaultMemoryColorCode();
 
 let surfaceState = {
   intake_paused: false,
@@ -248,7 +221,7 @@ function modeCopy(mode) {
 }
 
 function memoryProfileCopy(profile = selectedEffectProfile) {
-  const normalized = normalizeMemoryColorProfile(profile, "clear");
+  const normalized = memoryColorCatalogApi.normalizeMemoryColorCode(profile, memoryColorCatalog.default);
   const spec = memoryColorProfileMap.get(normalized) || memoryColorProfileMap.get(memoryColorCatalog.default);
   if (!spec) {
     return {
@@ -407,7 +380,7 @@ function buildViewContext() {
     intakePaused,
     maintenanceMode,
     memoryColorPreviewAvailable(profile) {
-      return memoryColorPreviewUrls.has(normalizeMemoryColorProfile(profile, "clear"));
+      return memoryColorPreviewUrls.has(memoryColorCatalogApi.normalizeMemoryColorCode(profile, memoryColorCatalog.default));
     },
     formatDuration,
     actions: {
@@ -580,7 +553,7 @@ function applyPreviewSource() {
 }
 
 async function ensureMemoryColorPreview(profile) {
-  const normalized = normalizeMemoryColorProfile(profile, "clear");
+  const normalized = memoryColorCatalogApi.normalizeMemoryColorCode(profile, memoryColorCatalog.default);
   if (!wavBlob) return "";
   if (memoryColorPreviewUrls.has(normalized)) {
     return memoryColorPreviewUrls.get(normalized) || "";
@@ -649,7 +622,7 @@ async function chooseMemoryPreview() {
 async function selectEffectProfile(profile) {
   if (![FLOW.REVIEW, FLOW.SUBMITTING, FLOW.COMPLETE].includes(flowState)) return;
   if (flowState === FLOW.SUBMITTING || quietTakeNeedsDecision) return;
-  const normalized = normalizeMemoryColorProfile(profile, "");
+  const normalized = memoryColorCatalogApi.normalizeMemoryColorCode(profile, "");
   if (!normalized) return;
   selectedEffectProfile = normalized;
   memoryColorPreviewError = false;
@@ -1151,7 +1124,7 @@ async function seedReviewTakeForBrowserTests(options = {}) {
   });
   wavBlob = seeded.wav;
   durationMs = Math.round((seeded.samples.length / seeded.sampleRate) * 1000);
-  selectedEffectProfile = normalizeMemoryColorProfile(options.effectProfile, memoryColorCatalog.default) || memoryColorCatalog.default;
+  selectedEffectProfile = memoryColorCatalogApi.normalizeMemoryColorCode(options.effectProfile, memoryColorCatalog.default) || memoryColorCatalog.default;
   previewSourceMode = "original";
   memoryColorPreviewRendering = false;
   memoryColorPreviewError = false;

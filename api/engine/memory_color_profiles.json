@@ -15,7 +15,7 @@
       },
       "processing": {
         "engine": "chain_v1",
-        "kind": "clear",
+        "topology": "presence_lift",
         "highpass_hz": 72,
         "highpass_q": 0.66,
         "presence_hz": 2100,
@@ -40,7 +40,7 @@
       },
       "processing": {
         "engine": "chain_v1",
-        "kind": "warm",
+        "topology": "warm_body",
         "lowshelf_hz": 220,
         "lowshelf_gain_db": 4.6,
         "lowpass_hz": 7600,
@@ -69,7 +69,7 @@
       },
       "processing": {
         "engine": "chain_v1",
-        "kind": "radio",
+        "topology": "radio_narrowband",
         "highpass_hz": 290,
         "highpass_q": 0.9,
         "lowpass_hz": 3350,
@@ -95,7 +95,7 @@
       },
       "processing": {
         "engine": "chain_v1",
-        "kind": "dream",
+        "topology": "dream_diffuse",
         "lowpass_hz": 5200,
         "lowpass_q": 0.5,
         "dry_gain": 0.82,

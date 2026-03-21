@@ -10,7 +10,7 @@ Local-first “room memory” appliance: record a short sound offering, choose c
 - Separate client surfaces: `/kiosk/` for recording and `/room/` for dedicated playback
 - “Don’t save” = **play once immediately, then discard**
 - A participant can now choose a first-pass memory color (`Clear`, `Warm`, `Radio`, `Dream`) during review; the dry WAV stays unchanged in storage and the color choice is stored separately on the artifact for playback
-- Those memory-color profiles now come from one shared catalog used by Django, the kiosk review UI, and `/ops/`, so the profile list and first-pass tuning stay aligned across storage, playback, and operator visibility. `Dream` is seeded from the source audio so preview and later playback stay materially aligned.
+- Those memory-color profiles now come from one shared catalog used by Django, the kiosk review UI, and `/ops/`, so the profile list and first-pass tuning stay aligned across storage, playback, and operator visibility. Audio behavior stays bounded through a small topology dispatch layer rather than arbitrary DSP graphs, so a new profile can often be added by editing the catalog if it reuses an existing topology. `Dream` is seeded from the source audio so preview and later playback stay materially aligned.
 
 ## Quick start
 1) Install Docker + Docker Compose.

@@ -1,6 +1,7 @@
 (function initMemoryEngineKioskAudio(global) {
   const WORKLET_MODULE_URL = "/static/engine/kiosk-audio-worklets.js";
   const workletLoads = new WeakMap();
+  const memoryColorCatalogApi = global.MemoryEngineMemoryColorCatalog;
 
   const RECORDING_PROCESSING = {
     trimThreshold: 0.014,
@@ -24,114 +25,15 @@
     fadeInSeconds: 0.12,
     fadeOutSeconds: 0.35,
   };
+  const MEMORY_COLOR_CATALOG = memoryColorCatalogApi.getMemoryColorCatalog();
+  const MEMORY_COLOR_PROFILE_ORDER = MEMORY_COLOR_CATALOG.profiles.map((profile) => profile.code);
 
-  function readMemoryColorCatalogFromDom() {
-    const configEl = global.document?.getElementById?.("kiosk-config");
-    if (!configEl || !configEl.textContent) {
-      return null;
-    }
-    try {
-      return JSON.parse(configEl.textContent).memoryColorCatalog || null;
-    } catch (error) {
-      return null;
-    }
+  function normalizeMemoryColorProfile(profile, fallbackCode = memoryColorCatalogApi.getDefaultMemoryColorCode()) {
+    return memoryColorCatalogApi.normalizeMemoryColorCode(profile, fallbackCode);
   }
 
-  const MEMORY_COLOR_CATALOG = (() => {
-    const catalog = readMemoryColorCatalogFromDom();
-    if (catalog && Array.isArray(catalog.profiles) && catalog.profiles.length) {
-      return catalog;
-    }
-    return {
-      default: "clear",
-      profiles: [
-        {
-          code: "clear",
-          processing: {
-            engine: "chain_v1",
-            kind: "clear",
-            highpass_hz: 72,
-            highpass_q: 0.66,
-            presence_hz: 2100,
-            presence_q: 0.8,
-            presence_gain_db: 1.6,
-            air_hz: 5600,
-            air_gain_db: 1.4,
-            output_gain: 0.98,
-          },
-        },
-        {
-          code: "warm",
-          processing: {
-            engine: "chain_v1",
-            kind: "warm",
-            lowshelf_hz: 220,
-            lowshelf_gain_db: 4.6,
-            lowpass_hz: 7600,
-            lowpass_q: 0.62,
-            highshelf_hz: 4200,
-            highshelf_gain_db: -2.8,
-            compressor_threshold_db: -20,
-            compressor_knee_db: 18,
-            compressor_ratio: 2.1,
-            compressor_attack_s: 0.01,
-            compressor_release_s: 0.18,
-            output_gain: 1.02,
-          },
-        },
-        {
-          code: "radio",
-          processing: {
-            engine: "chain_v1",
-            kind: "radio",
-            highpass_hz: 290,
-            highpass_q: 0.9,
-            lowpass_hz: 3350,
-            lowpass_q: 0.92,
-            mid_hz: 1450,
-            mid_q: 1.1,
-            mid_gain_db: 3.4,
-            drive_amount: 9,
-            output_gain: 0.86,
-          },
-        },
-        {
-          code: "dream",
-          processing: {
-            engine: "chain_v1",
-            kind: "dream",
-            lowpass_hz: 5200,
-            lowpass_q: 0.5,
-            dry_gain: 0.82,
-            wet_source_gain: 0.38,
-            delay_s: 0.18,
-            feedback_gain: 0.24,
-            impulse_seconds: 1.5,
-            impulse_decay: 3.2,
-            wet_gain: 0.28,
-            output_gain: 0.96,
-          },
-        },
-      ],
-    };
-  })();
-
-  const MEMORY_COLOR_PROFILE_MAP = new Map(
-    MEMORY_COLOR_CATALOG.profiles.map((profile) => [String(profile?.code || "").trim().toLowerCase(), profile]),
-  );
-
-  const MEMORY_COLOR_PROFILE_ORDER = (() => {
-    const ordered = Array.isArray(MEMORY_COLOR_CATALOG?.profiles)
-      ? MEMORY_COLOR_CATALOG.profiles
-        .map((profile) => String(profile?.code || "").trim().toLowerCase())
-        .filter(Boolean)
-      : [];
-    return ordered.length ? ordered : ["clear"];
-  })();
-
   function memoryColorProfileSpec(profile) {
-    const normalized = normalizeMemoryColorProfile(profile, MEMORY_COLOR_CATALOG.default || "clear");
-    return MEMORY_COLOR_PROFILE_MAP.get(normalized) || null;
+    return memoryColorCatalogApi.getMemoryColorByCode(profile);
   }
 
   async function ensureWorkletModule(audioContext) {
@@ -328,14 +230,6 @@
     return response.arrayBuffer();
   }
 
-  function normalizeMemoryColorProfile(profile, fallback = "") {
-    const normalized = String(profile || "").trim().toLowerCase();
-    if (MEMORY_COLOR_PROFILE_ORDER.includes(normalized)) {
-      return normalized;
-    }
-    return String(fallback || "").trim().toLowerCase();
-  }
-
   function makeSoftClipCurve(amount = 18) {
     const samples = 4096;
     const curve = new Float32Array(samples);
@@ -397,6 +291,157 @@
     return impulse;
   }
 
+  function buildPresenceLiftTopology(ctx, sourceNode, processing, track) {
+    const highpass = track(ctx.createBiquadFilter());
+    highpass.type = "highpass";
+    highpass.frequency.value = Number(processing.highpass_hz || 72);
+    highpass.Q.value = Number(processing.highpass_q || 0.66);
+
+    const presence = track(ctx.createBiquadFilter());
+    presence.type = "peaking";
+    presence.frequency.value = Number(processing.presence_hz || 2100);
+    presence.Q.value = Number(processing.presence_q || 0.8);
+    presence.gain.value = Number(processing.presence_gain_db || 1.6);
+
+    const air = track(ctx.createBiquadFilter());
+    air.type = "highshelf";
+    air.frequency.value = Number(processing.air_hz || 5600);
+    air.gain.value = Number(processing.air_gain_db || 1.4);
+
+    const outputGain = track(ctx.createGain());
+    outputGain.gain.value = Number(processing.output_gain || 0.98);
+
+    sourceNode.connect(highpass);
+    highpass.connect(presence);
+    presence.connect(air);
+    air.connect(outputGain);
+    return outputGain;
+  }
+
+  function buildWarmBodyTopology(ctx, sourceNode, processing, track) {
+    const lowshelf = track(ctx.createBiquadFilter());
+    lowshelf.type = "lowshelf";
+    lowshelf.frequency.value = Number(processing.lowshelf_hz || 220);
+    lowshelf.gain.value = Number(processing.lowshelf_gain_db || 4.6);
+
+    const lowpass = track(ctx.createBiquadFilter());
+    lowpass.type = "lowpass";
+    lowpass.frequency.value = Number(processing.lowpass_hz || 7600);
+    lowpass.Q.value = Number(processing.lowpass_q || 0.62);
+
+    const highshelf = track(ctx.createBiquadFilter());
+    highshelf.type = "highshelf";
+    highshelf.frequency.value = Number(processing.highshelf_hz || 4200);
+    highshelf.gain.value = Number(processing.highshelf_gain_db || -2.8);
+
+    const compressor = track(ctx.createDynamicsCompressor());
+    compressor.threshold.value = Number(processing.compressor_threshold_db || -20);
+    compressor.knee.value = Number(processing.compressor_knee_db || 18);
+    compressor.ratio.value = Number(processing.compressor_ratio || 2.1);
+    compressor.attack.value = Number(processing.compressor_attack_s || 0.01);
+    compressor.release.value = Number(processing.compressor_release_s || 0.18);
+
+    const outputGain = track(ctx.createGain());
+    outputGain.gain.value = Number(processing.output_gain || 1.02);
+
+    sourceNode.connect(lowshelf);
+    lowshelf.connect(lowpass);
+    lowpass.connect(highshelf);
+    highshelf.connect(compressor);
+    compressor.connect(outputGain);
+    return outputGain;
+  }
+
+  function buildRadioNarrowbandTopology(ctx, sourceNode, processing, track) {
+    const highpass = track(ctx.createBiquadFilter());
+    highpass.type = "highpass";
+    highpass.frequency.value = Number(processing.highpass_hz || 290);
+    highpass.Q.value = Number(processing.highpass_q || 0.9);
+
+    const lowpass = track(ctx.createBiquadFilter());
+    lowpass.type = "lowpass";
+    lowpass.frequency.value = Number(processing.lowpass_hz || 3350);
+    lowpass.Q.value = Number(processing.lowpass_q || 0.92);
+
+    const mid = track(ctx.createBiquadFilter());
+    mid.type = "peaking";
+    mid.frequency.value = Number(processing.mid_hz || 1450);
+    mid.Q.value = Number(processing.mid_q || 1.1);
+    mid.gain.value = Number(processing.mid_gain_db || 3.4);
+
+    const drive = track(ctx.createWaveShaper());
+    drive.curve = makeSoftClipCurve(Number(processing.drive_amount || 9));
+    drive.oversample = "2x";
+
+    const outputGain = track(ctx.createGain());
+    outputGain.gain.value = Number(processing.output_gain || 0.86);
+
+    sourceNode.connect(highpass);
+    highpass.connect(lowpass);
+    lowpass.connect(mid);
+    mid.connect(drive);
+    drive.connect(outputGain);
+    return outputGain;
+  }
+
+  function buildDreamDiffuseTopology(ctx, sourceNode, processing, track, options = {}) {
+    const lowpass = track(ctx.createBiquadFilter());
+    lowpass.type = "lowpass";
+    lowpass.frequency.value = Number(processing.lowpass_hz || 5200);
+    lowpass.Q.value = Number(processing.lowpass_q || 0.5);
+
+    const dry = track(ctx.createGain());
+    dry.gain.value = Number(processing.dry_gain || 0.82);
+
+    const wetSource = track(ctx.createGain());
+    wetSource.gain.value = Number(processing.wet_source_gain || 0.38);
+
+    const delay = track(ctx.createDelay(0.5));
+    delay.delayTime.value = Number(processing.delay_s || 0.18);
+
+    const feedback = track(ctx.createGain());
+    feedback.gain.value = Number(processing.feedback_gain || 0.24);
+
+    const convolver = track(ctx.createConvolver());
+    convolver.buffer = createDreamImpulseResponse(
+      ctx,
+      Number(processing.impulse_seconds || 1.5),
+      Number(processing.impulse_decay || 3.2),
+      Number.isFinite(Number(options.seed)) ? Number(options.seed) : 1,
+    );
+
+    const wet = track(ctx.createGain());
+    wet.gain.value = Number(processing.wet_gain || 0.28);
+
+    const outputGain = track(ctx.createGain());
+    outputGain.gain.value = Number(processing.output_gain || 0.96);
+
+    sourceNode.connect(lowpass);
+    lowpass.connect(dry);
+    lowpass.connect(wetSource);
+    wetSource.connect(delay);
+    delay.connect(feedback);
+    feedback.connect(delay);
+    delay.connect(convolver);
+    convolver.connect(wet);
+    dry.connect(outputGain);
+    wet.connect(outputGain);
+    return outputGain;
+  }
+
+  const MEMORY_COLOR_TOPOLOGY_BUILDERS = {
+    presence_lift: buildPresenceLiftTopology,
+    warm_body: buildWarmBodyTopology,
+    radio_narrowband: buildRadioNarrowbandTopology,
+    dream_diffuse: buildDreamDiffuseTopology,
+  };
+
+  function resolveMemoryColorTopology(profile, processing) {
+    const normalized = normalizeMemoryColorProfile(profile);
+    const candidate = String(processing?.topology || processing?.kind || normalized || "").trim().toLowerCase();
+    return MEMORY_COLOR_TOPOLOGY_BUILDERS[candidate] ? candidate : "";
+  }
+
   function buildMemoryColorChain(ctx, sourceNode, profile, options = {}) {
     const normalized = normalizeMemoryColorProfile(profile);
     const spec = memoryColorProfileSpec(normalized);
@@ -414,139 +459,11 @@
       return node;
     };
 
-    let output = sourceNode;
-
-    if ((processing.kind || normalized) === "clear") {
-      const highpass = track(ctx.createBiquadFilter());
-      highpass.type = "highpass";
-      highpass.frequency.value = Number(processing.highpass_hz || 72);
-      highpass.Q.value = Number(processing.highpass_q || 0.66);
-
-      const presence = track(ctx.createBiquadFilter());
-      presence.type = "peaking";
-      presence.frequency.value = Number(processing.presence_hz || 2100);
-      presence.Q.value = Number(processing.presence_q || 0.8);
-      presence.gain.value = Number(processing.presence_gain_db || 1.6);
-
-      const air = track(ctx.createBiquadFilter());
-      air.type = "highshelf";
-      air.frequency.value = Number(processing.air_hz || 5600);
-      air.gain.value = Number(processing.air_gain_db || 1.4);
-
-      const outputGain = track(ctx.createGain());
-      outputGain.gain.value = Number(processing.output_gain || 0.98);
-
-      sourceNode.connect(highpass);
-      highpass.connect(presence);
-      presence.connect(air);
-      air.connect(outputGain);
-      output = outputGain;
-    } else if ((processing.kind || normalized) === "warm") {
-      const lowshelf = track(ctx.createBiquadFilter());
-      lowshelf.type = "lowshelf";
-      lowshelf.frequency.value = Number(processing.lowshelf_hz || 220);
-      lowshelf.gain.value = Number(processing.lowshelf_gain_db || 4.6);
-
-      const lowpass = track(ctx.createBiquadFilter());
-      lowpass.type = "lowpass";
-      lowpass.frequency.value = Number(processing.lowpass_hz || 7600);
-      lowpass.Q.value = Number(processing.lowpass_q || 0.62);
-
-      const highshelf = track(ctx.createBiquadFilter());
-      highshelf.type = "highshelf";
-      highshelf.frequency.value = Number(processing.highshelf_hz || 4200);
-      highshelf.gain.value = Number(processing.highshelf_gain_db || -2.8);
-
-      const compressor = track(ctx.createDynamicsCompressor());
-      compressor.threshold.value = Number(processing.compressor_threshold_db || -20);
-      compressor.knee.value = Number(processing.compressor_knee_db || 18);
-      compressor.ratio.value = Number(processing.compressor_ratio || 2.1);
-      compressor.attack.value = Number(processing.compressor_attack_s || 0.01);
-      compressor.release.value = Number(processing.compressor_release_s || 0.18);
-
-      const outputGain = track(ctx.createGain());
-      outputGain.gain.value = Number(processing.output_gain || 1.02);
-
-      sourceNode.connect(lowshelf);
-      lowshelf.connect(lowpass);
-      lowpass.connect(highshelf);
-      highshelf.connect(compressor);
-      compressor.connect(outputGain);
-      output = outputGain;
-    } else if ((processing.kind || normalized) === "radio") {
-      const highpass = track(ctx.createBiquadFilter());
-      highpass.type = "highpass";
-      highpass.frequency.value = Number(processing.highpass_hz || 290);
-      highpass.Q.value = Number(processing.highpass_q || 0.9);
-
-      const lowpass = track(ctx.createBiquadFilter());
-      lowpass.type = "lowpass";
-      lowpass.frequency.value = Number(processing.lowpass_hz || 3350);
-      lowpass.Q.value = Number(processing.lowpass_q || 0.92);
-
-      const mid = track(ctx.createBiquadFilter());
-      mid.type = "peaking";
-      mid.frequency.value = Number(processing.mid_hz || 1450);
-      mid.Q.value = Number(processing.mid_q || 1.1);
-      mid.gain.value = Number(processing.mid_gain_db || 3.4);
-
-      const drive = track(ctx.createWaveShaper());
-      drive.curve = makeSoftClipCurve(Number(processing.drive_amount || 9));
-      drive.oversample = "2x";
-
-      const outputGain = track(ctx.createGain());
-      outputGain.gain.value = Number(processing.output_gain || 0.86);
-
-      sourceNode.connect(highpass);
-      highpass.connect(lowpass);
-      lowpass.connect(mid);
-      mid.connect(drive);
-      drive.connect(outputGain);
-      output = outputGain;
-    } else if ((processing.kind || normalized) === "dream") {
-      const lowpass = track(ctx.createBiquadFilter());
-      lowpass.type = "lowpass";
-      lowpass.frequency.value = Number(processing.lowpass_hz || 5200);
-      lowpass.Q.value = Number(processing.lowpass_q || 0.5);
-
-      const dry = track(ctx.createGain());
-      dry.gain.value = Number(processing.dry_gain || 0.82);
-
-      const wetSource = track(ctx.createGain());
-      wetSource.gain.value = Number(processing.wet_source_gain || 0.38);
-
-      const delay = track(ctx.createDelay(0.5));
-      delay.delayTime.value = Number(processing.delay_s || 0.18);
-
-      const feedback = track(ctx.createGain());
-      feedback.gain.value = Number(processing.feedback_gain || 0.24);
-
-      const convolver = track(ctx.createConvolver());
-      convolver.buffer = createDreamImpulseResponse(
-        ctx,
-        Number(processing.impulse_seconds || 1.5),
-        Number(processing.impulse_decay || 3.2),
-        Number.isFinite(Number(options.seed)) ? Number(options.seed) : 1,
-      );
-
-      const wet = track(ctx.createGain());
-      wet.gain.value = Number(processing.wet_gain || 0.28);
-
-      const outputGain = track(ctx.createGain());
-      outputGain.gain.value = Number(processing.output_gain || 0.96);
-
-      sourceNode.connect(lowpass);
-      lowpass.connect(dry);
-      lowpass.connect(wetSource);
-      wetSource.connect(delay);
-      delay.connect(feedback);
-      feedback.connect(delay);
-      delay.connect(convolver);
-      convolver.connect(wet);
-      dry.connect(outputGain);
-      wet.connect(outputGain);
-      output = outputGain;
-    }
+    const topology = resolveMemoryColorTopology(normalized, processing);
+    const buildTopology = MEMORY_COLOR_TOPOLOGY_BUILDERS[topology];
+    const output = buildTopology
+      ? buildTopology(ctx, sourceNode, processing, track, options)
+      : sourceNode;
 
     return {
       output,

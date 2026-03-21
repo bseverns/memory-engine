@@ -318,9 +318,10 @@ This is the normal path for `ROOM` and `FOSSIL`.
 7. The `Dream` profile uses a seeded render path based on the decoded source
    audio, so a participant preview and later room playback stay materially
    aligned without baking a separate derivative.
-8. The profile catalog also carries the first-pass DSP tuning values for each
-   memory color, so the labels and the main playback-shaping parameters now
-   travel together even though the browser still owns the actual effect code.
+8. The profile catalog also carries the first-pass DSP tuning values and a
+   bounded processing topology for each memory color, so labels and playback
+   shaping travel together while the browser still dispatches through a small
+   authored set of effect builders instead of an arbitrary node graph.
 9. Django writes the WAV bytes to MinIO under `raw/<artifact_id>/audio.wav`.
 10. Django stores the resulting object key in `artifact.raw_uri`.
 11. If the consent mode permits derivatives, Django queues
