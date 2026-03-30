@@ -22,6 +22,7 @@ assigned the right URL and role.
 - Label the microphone and playback cables so a steward can reconnect them after transport or cleaning.
 - If the kiosk is touch-first, verify the enclosure does not force precise taps on small browser chrome.
 - If the kiosk relies on keyboard shortcuts for setup or fallback, keep a small keyboard available on site.
+- If you are using the Leonardo hands-free path, upload and wire it before install day and keep a fallback keyboard nearby. See [HANDS_FREE_CONTROLS.md](./HANDS_FREE_CONTROLS.md).
 
 ## Network And URL
 
@@ -44,6 +45,7 @@ assigned the right URL and role.
 - Verify that reloading `/room/` returns to the dedicated playback surface.
 - Verify that the recording browser has persistent permission to use the chosen microphone on `/kiosk/`.
 - On the playback machine, grant or launch with autoplay permission for the site if the browser supports it. In Chromium kiosk installs, a launch flag such as `--autoplay-policy=no-user-gesture-required` is often the practical fix.
+- If you are using a Leonardo button, verify the kiosk window keeps focus after boot. HID input only helps if Chromium is still the active kiosk surface.
 
 ## Audio Device Selection
 
@@ -74,6 +76,7 @@ assigned the right URL and role.
 - Confirm there are no critical storage warnings.
 - Confirm there are no unexpected pool warnings before public use.
 - Test one full participant flow: arm, record, review, choose a mode, receive a receipt if applicable.
+- If you are using the Leonardo path, test one short press and one long press at `/kiosk/` during the acceptance pass.
 - Test one playback-only cycle: confirm `/room/` starts or can be resumed with one tap after boot.
 - Test one restart cycle: reboot or restart both browser clients and confirm the recorder returns to `/kiosk/` while the listening surface returns to `/room/`.
 

@@ -32,6 +32,7 @@
     playFollowPayload,
     playLayeredPayload,
     randomDelayBetween,
+    repairBenchProfile,
     threadFollowDecision,
     toneLevelForName,
   } = global.MemoryEngineRoomLoopPlayback;
@@ -371,6 +372,10 @@
       return String(value || "").trim().toLowerCase();
     }
 
+    function normalizedTopicTag(value) {
+      return String(value || "").trim().toLowerCase();
+    }
+
     function unresolvedLifecycleStatus(value) {
       return ["", "open", "unresolved", "pending"].includes(normalizedLifecycleStatus(value));
     }
@@ -393,14 +398,14 @@
     function repeatedRecentTopic(entries) {
       const counts = new Map();
       entries.forEach((entry) => {
-        const topic = String(entry.topic || "").trim().toLowerCase();
+        const topic = normalizedTopicTag(entry.topic);
         if (!topic) {
           return;
         }
         counts.set(topic, (counts.get(topic) || 0) + 1);
       });
       for (const entry of entries) {
-        const topic = String(entry.topic || "").trim().toLowerCase();
+        const topic = normalizedTopicTag(entry.topic);
         if (topic && (counts.get(topic) || 0) >= 2) {
           return topic;
         }
@@ -411,22 +416,25 @@
     function preferredQuestionThread() {
       // Question tries to sustain an unresolved line of inquiry for a short
       // span, but only from what the room has actually been playing recently.
-      const recentEntries = loopHistory.slice(-4).reverse();
+      const recentEntries = loopHistory.slice(-5).reverse();
       const unresolvedEntries = recentEntries.filter((entry) => unresolvedLifecycleStatus(entry.lifecycleStatus));
       const repeatedTopic = repeatedRecentTopic(unresolvedEntries);
       if (repeatedTopic) {
-        const source = unresolvedEntries.find((entry) => String(entry.topic || "").trim().toLowerCase() === repeatedTopic) || {};
+        const source = unresolvedEntries.find((entry) => normalizedTopicTag(entry.topic) === repeatedTopic) || {};
         return {
           preferredTopic: repeatedTopic,
           preferredLifecycleStatus: normalizedLifecycleStatus(source.lifecycleStatus) || "open",
+          threadLength: unresolvedEntries.filter((entry) => normalizedTopicTag(entry.topic) === repeatedTopic).length,
         };
       }
 
-      const topicalUnresolved = unresolvedEntries.find((entry) => Boolean(String(entry.topic || "").trim()));
+      const topicalUnresolved = unresolvedEntries.find((entry) => Boolean(normalizedTopicTag(entry.topic)));
       if (topicalUnresolved) {
+        const topic = normalizedTopicTag(topicalUnresolved.topic);
         return {
-          preferredTopic: String(topicalUnresolved.topic || "").trim().toLowerCase(),
+          preferredTopic: topic,
           preferredLifecycleStatus: normalizedLifecycleStatus(topicalUnresolved.lifecycleStatus) || "open",
+          threadLength: unresolvedEntries.filter((entry) => normalizedTopicTag(entry.topic) === topic).length,
         };
       }
 
@@ -434,36 +442,41 @@
         return {
           preferredTopic: "",
           preferredLifecycleStatus: normalizedLifecycleStatus(unresolvedEntries[0].lifecycleStatus) || "open",
+          threadLength: unresolvedEntries.length,
         };
       }
 
-      return { preferredTopic: "", preferredLifecycleStatus: "" };
+      return { preferredTopic: "", preferredLifecycleStatus: "", threadLength: 0 };
     }
 
     function preferredRepairThread() {
       // Repair treats the recent loop like a bench notebook: if there is still
       // an actionable topic in flight, prefer keeping that practical thread alive.
-      const recentEntries = loopHistory.slice(-4).reverse();
+      const recentEntries = loopHistory.slice(-5).reverse();
       const actionableEntry = recentEntries.find((entry) => {
-        const topic = String(entry.topic || "").trim();
+        const topic = normalizedTopicTag(entry.topic);
         return topic && !resolvedLifecycleStatus(entry.lifecycleStatus);
       });
       if (actionableEntry) {
+        const topic = normalizedTopicTag(actionableEntry.topic);
         return {
-          preferredTopic: String(actionableEntry.topic || "").trim().toLowerCase(),
+          preferredTopic: topic,
           preferredLifecycleStatus: normalizedLifecycleStatus(actionableEntry.lifecycleStatus),
+          threadLength: recentEntries.filter((entry) => normalizedTopicTag(entry.topic) === topic && !resolvedLifecycleStatus(entry.lifecycleStatus)).length,
         };
       }
 
-      const topicalEntry = recentEntries.find((entry) => Boolean(String(entry.topic || "").trim()));
+      const topicalEntry = recentEntries.find((entry) => Boolean(normalizedTopicTag(entry.topic)));
       if (topicalEntry) {
+        const topic = normalizedTopicTag(topicalEntry.topic);
         return {
-          preferredTopic: String(topicalEntry.topic || "").trim().toLowerCase(),
+          preferredTopic: topic,
           preferredLifecycleStatus: "",
+          threadLength: recentEntries.filter((entry) => normalizedTopicTag(entry.topic) === topic).length,
         };
       }
 
-      return { preferredTopic: "", preferredLifecycleStatus: "" };
+      return { preferredTopic: "", preferredLifecycleStatus: "", threadLength: 0 };
     }
 
     function preferredThreadHint() {
@@ -474,7 +487,7 @@
       if (deploymentCode === "repair") {
         return preferredRepairThread();
       }
-      return { preferredTopic: "", preferredLifecycleStatus: "" };
+      return { preferredTopic: "", preferredLifecycleStatus: "", threadLength: 0 };
     }
 
     function threadModeLabel(mode) {
@@ -598,27 +611,55 @@
             payload,
             cue,
             poolSize: loopKnownPoolSize,
+            threadLength: threadHint.threadLength,
+            maxLayers: Number(config.roomOverlapMaxLayers || 0),
           });
-          let layerPayload = null;
-          let followPayload = null;
+          const layerPayloads = [];
+          const followPayloads = [];
+          const overlapMaxLayers = Number(config.roomOverlapMaxLayers || 0);
           if (threadDecision.mode === "question_chorus" && Number(config.roomOverlapMaxLayers || 0) > 1) {
             // Question chorus is a special case: use the extra layer slot for a
             // same-thread return instead of the normal generic overlap chance.
-            layerPayload = await fetchThreadFollowPayload({
-              config,
-              persistentLoopWindow,
-              cue,
-              primaryArtifactId: payload.artifact_id,
-              recentDensities,
-              recentTopics,
-              preferredTopic: threadDecision.preferredTopic,
-              preferredLifecycleStatus: threadDecision.preferredLifecycleStatus,
-              currentMoodBias: currentMoodBias(),
-              segmentPrefix: "question-chorus",
-            });
-            if (layerPayload) {
-              rememberLoopPayload(layerPayload, scene, movement);
-              persistentLoopWindow = rememberPersistentArtifactId(config, PERSISTENT_LOOP_WINDOW_KEY, persistentLoopWindow, layerPayload.artifact_id);
+            // Once a question topic has proven persistent, let a later echo
+            // extend the chorus so the room feels actively haunted, not merely layered.
+            const requestedCompanions = Math.max(1, Number(threadDecision.companionCount || 1));
+            const layeredCompanions = Math.min(requestedCompanions, Math.max(0, overlapMaxLayers - 1));
+            const companionIds = [];
+            for (let index = 0; index < requestedCompanions; index += 1) {
+              const companionPayload = await fetchThreadFollowPayload({
+                config,
+                persistentLoopWindow,
+                cue,
+                primaryArtifactId: payload.artifact_id,
+                extraExcludedIds: companionIds,
+                recentDensities,
+                recentTopics,
+                preferredTopic: threadDecision.preferredTopic,
+                preferredLifecycleStatus: threadDecision.preferredLifecycleStatus,
+                currentMoodBias: currentMoodBias(),
+                segmentPrefix: `question-chorus-${index + 1}`,
+              });
+              if (!companionPayload) {
+                break;
+              }
+              rememberLoopPayload(companionPayload, scene, movement);
+              persistentLoopWindow = rememberPersistentArtifactId(
+                config,
+                PERSISTENT_LOOP_WINDOW_KEY,
+                persistentLoopWindow,
+                companionPayload.artifact_id,
+              );
+              companionIds.push(companionPayload.artifact_id);
+              if (index < layeredCompanions) {
+                layerPayloads.push(companionPayload);
+              } else {
+                followPayloads.push({
+                  payload: companionPayload,
+                  delayMs: randomDelayBetween(140, 260),
+                  outputGainMultiplier: surfaceOutputGainMultiplier() * 0.84,
+                  gapScale: 0.82,
+                });
+              }
             }
           } else if (threadDecision.mode !== "repair_bench" && Number(config.roomOverlapMaxLayers || 0) > 1 && overlapAllowedForCue({
             cue,
@@ -627,7 +668,7 @@
             loopConfig,
             quieterModeEnabled,
           })) {
-            layerPayload = await fetchLayerPayload({
+            const layerPayload = await fetchLayerPayload({
               config,
               persistentLoopWindow,
               cue,
@@ -641,18 +682,26 @@
             if (layerPayload) {
               rememberLoopPayload(layerPayload, scene, movement);
               persistentLoopWindow = rememberPersistentArtifactId(config, PERSISTENT_LOOP_WINDOW_KEY, persistentLoopWindow, layerPayload.artifact_id);
+              layerPayloads.push(layerPayload);
             }
           }
           if (threadDecision.mode === "repair_bench") {
             // Repair follow-ons should read as a short practical sequence, not a
             // thicker wall of sound, so they happen after the main cue instead
             // of competing with the generic overlap path.
-            followPayload = await fetchThreadFollowPayload({
+            const benchProfile = repairBenchProfile({
+              threadLength: threadHint.threadLength,
+              cueDensity: cue.density,
+            });
+            const followPayload = await fetchThreadFollowPayload({
               config,
               persistentLoopWindow,
-              cue,
+              cue: {
+                ...cue,
+                density: benchProfile.requestDensity,
+              },
               primaryArtifactId: payload.artifact_id,
-              extraExcludedIds: layerPayload ? [layerPayload.artifact_id] : [],
+              extraExcludedIds: layerPayloads.map((item) => item.artifact_id),
               recentDensities,
               recentTopics,
               preferredTopic: threadDecision.preferredTopic,
@@ -663,12 +712,18 @@
             if (followPayload) {
               rememberLoopPayload(followPayload, scene, movement);
               persistentLoopWindow = rememberPersistentArtifactId(config, PERSISTENT_LOOP_WINDOW_KEY, persistentLoopWindow, followPayload.artifact_id);
+              followPayloads.push({
+                payload: followPayload,
+                delayMs: randomDelayBetween(benchProfile.followDelayMinMs, benchProfile.followDelayMaxMs),
+                outputGainMultiplier: surfaceOutputGainMultiplier() * 0.92,
+                gapScale: benchProfile.gapScale,
+              });
             }
           }
           setStatus(
             scarcityLabel
-              ? `Playing ${laneLabel}${featuredLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name}${layerPayload ? " / layered return" : ""}${threadModeLabel(threadDecision.mode)} (${scarcityLabel} pool, wear ${payload.wear.toFixed(3)})`
-              : `Playing ${laneLabel}${featuredLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name}${layerPayload ? " / layered return" : ""}${threadModeLabel(threadDecision.mode)} (wear ${payload.wear.toFixed(3)})`,
+              ? `Playing ${laneLabel}${featuredLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name}${layerPayloads.length ? " / layered return" : ""}${threadModeLabel(threadDecision.mode)} (${scarcityLabel} pool, wear ${payload.wear.toFixed(3)})`
+              : `Playing ${laneLabel}${featuredLabel} in ${roomPostureLabel(profiles)} / ${movement.name} / ${scene.name}${layerPayloads.length ? " / layered return" : ""}${threadModeLabel(threadDecision.mode)} (wear ${payload.wear.toFixed(3)})`,
           );
           toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, roomIntensity, roomTone.duckGain, loopKnownPoolSize)), 0.8);
           const playbackPromises = [(async () => {
@@ -680,32 +735,34 @@
             });
             await acknowledgeAudiblePlayback(payload.playback_ack_url);
           })()];
-          if (layerPayload) {
-            playbackPromises.push(playLayeredPayload({
-              payload: layerPayload,
-              delayMs: randomDelayBetween(config.roomOverlapMinDelayMs, config.roomOverlapMaxDelayMs),
-              loopRunning: () => loopRunning,
-              playbackPausedBySteward,
-              playUrlWithLightChain,
-              outputGainMultiplier: surfaceOutputGainMultiplier() * Number(config.roomOverlapGainMultiplier || 0.68),
-            }));
+          if (layerPayloads.length) {
+            layerPayloads.forEach((layerPayload) => {
+              playbackPromises.push(playLayeredPayload({
+                payload: layerPayload,
+                delayMs: randomDelayBetween(config.roomOverlapMinDelayMs, config.roomOverlapMaxDelayMs),
+                loopRunning: () => loopRunning,
+                playbackPausedBySteward,
+                playUrlWithLightChain,
+                outputGainMultiplier: surfaceOutputGainMultiplier() * Number(config.roomOverlapGainMultiplier || 0.68),
+              }));
+            });
           }
           await Promise.allSettled(playbackPromises);
-          if (followPayload) {
+          for (const followPayload of followPayloads) {
             await playFollowPayload({
-              payload: followPayload,
-              delayMs: randomDelayBetween(220, 440),
+              payload: followPayload.payload,
+              delayMs: followPayload.delayMs,
               loopRunning: () => loopRunning,
               playbackPausedBySteward,
               playUrlWithLightChain,
-              outputGainMultiplier: surfaceOutputGainMultiplier() * 0.92,
+              outputGainMultiplier: followPayload.outputGainMultiplier,
             });
           }
           advanceLoopMovement();
           if (loopRunning) {
             const gapMultiplier = applySurfaceGapMultiplier(adaptiveGapMultiplier(config, loopConfig, roomIntensity, loopKnownPoolSize, movement, false));
             toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, roomIntensity, roomTone.idleGain, loopKnownPoolSize)), 1.4);
-            const followGapScale = followPayload ? 0.72 : 1.0;
+            const followGapScale = followPayloads.reduce((scale, item) => Math.min(scale, Number(item.gapScale || 1.0)), 1.0);
             await sleep(Math.round((cue.gapMs || 900) * gapMultiplier * followGapScale));
           }
         } catch (err) {

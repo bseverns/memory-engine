@@ -1050,6 +1050,8 @@ document.addEventListener("keydown", (event) => {
   noteReviewActivity();
   if (shouldIgnoreShortcut(event.target)) return;
 
+  // Keep kiosk shortcuts stable. They now serve both ordinary keyboard fallback
+  // and the Leonardo HID button path documented in docs/HANDS_FREE_CONTROLS.md.
   if (event.code === "Escape") {
     event.preventDefault();
     if (flowState === FLOW.COUNTDOWN) {

@@ -44,12 +44,36 @@ test("threadFollowDecision enables a rare question chorus when an unresolved thr
     },
     cue: { density: "medium" },
     poolSize: 5,
+    threadLength: 2,
+    maxLayers: 2,
     randomValue: 0.1,
   });
 
   assert.equal(decision.mode, "question_chorus");
   assert.equal(decision.preferredTopic, "entry_gate");
   assert.equal(decision.preferredLifecycleStatus, "open");
+  assert.equal(decision.companionCount, 1);
+});
+
+test("threadFollowDecision can request a second question chorus companion for a sustained thread", () => {
+  const playback = loadRoomLoopPlayback();
+
+  const decision = playback.threadFollowDecision({
+    payload: {
+      thread_signal: "question_chorus",
+      topic_tag: "entry_gate",
+      lifecycle_status: "open",
+      density: "medium",
+    },
+    cue: { density: "medium" },
+    poolSize: 5,
+    threadLength: 3,
+    maxLayers: 2,
+    randomValue: 0.1,
+  });
+
+  assert.equal(decision.mode, "question_chorus");
+  assert.equal(decision.companionCount, 2);
 });
 
 test("threadFollowDecision suppresses question chorus for dense material", () => {
@@ -88,4 +112,20 @@ test("threadFollowDecision enables repair bench returns more readily for practic
   assert.equal(decision.mode, "repair_bench");
   assert.equal(decision.preferredTopic, "projector");
   assert.equal(decision.preferredLifecycleStatus, "needs_part");
+  assert.equal(decision.companionCount, 0);
+});
+
+test("repairBenchProfile lightens density and tightens the gap for longer repair threads", () => {
+  const playback = loadRoomLoopPlayback();
+
+  const profile = playback.repairBenchProfile({
+    threadLength: 3,
+    cueDensity: "medium",
+  });
+
+  assert.equal(profile.requestDensity, "light");
+  assert.equal(profile.followDensity, "light");
+  assert.equal(profile.followDelayMinMs, 120);
+  assert.equal(profile.followDelayMaxMs, 240);
+  assert.equal(profile.gapScale, 0.48);
 });

@@ -45,6 +45,12 @@ Walk through the install-day hardware and kiosk checklist:
 open docs/installation-checklist.md
 ```
 
+Review the current hands-free trigger path for `/kiosk/`:
+
+```bash
+open docs/HANDS_FREE_CONTROLS.md
+```
+
 See service state and backend readiness:
 
 ```bash
@@ -100,6 +106,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, `/readyz`, compose status, doctor output, recent logs, and an artifact summary into a single handoff archive.
 - `/api/v1/operator/artifact-summary` gives stewards the same artifact posture snapshot as a direct JSON download from `/ops/`.
 - `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
+- `docs/HANDS_FREE_CONTROLS.md` documents the current Leonardo-based kiosk button path that reuses the browser shortcut contract instead of adding a new host control layer.
 - Django also validates runtime config relationships at startup now, so bad threshold ordering or insecure origin posture fails fast before the stack enters service.
 - `INSTALLATION_PROFILE` can provide a named starting posture for room behavior and kiosk defaults. Explicit env vars still override profile defaults.
 - `ENGINE_DEPLOYMENT` declares the active deployment kind (`memory` default; also `question`, `prompt`, `repair`, `witness`, `oracle`) so `/ops/`, participant framing, artifact metadata, and playback weighting can branch safely without changing routes.

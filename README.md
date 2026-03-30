@@ -381,12 +381,14 @@ Caddy will then be able to obtain a public certificate automatically, assuming p
   - `Space` or `Enter` advances the primary action for the current state
   - `1`, `2`, `3` choose the memory mode after recording
   - `Esc` resets the session, or cancels the current take while recording
+- A first hands-free hardware path now exists through an Arduino Leonardo acting as a USB keyboard button. See [docs/HANDS_FREE_CONTROLS.md](./docs/HANDS_FREE_CONTROLS.md).
 - Recorded takes now get light silence trimming, peak normalization, and short fades before upload.
 
 ## Raspberry Pi / Piper kit posture
 - This frontend is still intentionally light: plain Django templates, plain CSS, and a single browser script. No front-end build step is required.
 - The intended deployment is a Raspberry Pi 3 class device running the site in Chromium kiosk mode with a USB microphone attached.
 - The guided prompts and large controls are designed to work with touch, mouse, or a simple keyboard, which fits a Piper kit enclosure better than precise small controls.
+- That same keyboard posture now also makes a Leonardo-based single-button trigger viable without any host-side bridge process.
 - The live mic meter is meant to give immediate confidence that the USB microphone is actually receiving sound before recording starts.
 
 ## Playback feel

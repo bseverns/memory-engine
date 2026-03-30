@@ -48,10 +48,63 @@
     return String(value || "").trim().toLowerCase();
   }
 
+  function questionChorusCompanionCount({
+    threadLength = 0,
+    poolSize = 0,
+    maxLayers = 2,
+    randomValue = Math.random(),
+  } = {}) {
+    if (poolSize < 3 || maxLayers <= 1) {
+      return 0;
+    }
+    // One companion is the normal rare chorus. A second companion is reserved
+    // for threads that have already demonstrated persistence in the room.
+    // The extra companion can arrive as a later echo even when the overlap
+    // budget only allows one simultaneous layer.
+    if (threadLength >= 3 && poolSize >= 5 && maxLayers >= 2 && randomValue < 0.12) {
+      return 2;
+    }
+    return 1;
+  }
+
+  function repairBenchProfile({
+    threadLength = 0,
+    cueDensity = "medium",
+  } = {}) {
+    const density = String(cueDensity || "medium").trim().toLowerCase() || "medium";
+    if (threadLength >= 3) {
+      return {
+        requestDensity: "light",
+        followDensity: "light",
+        followDelayMinMs: 120,
+        followDelayMaxMs: 240,
+        gapScale: 0.48,
+      };
+    }
+    if (threadLength >= 2) {
+      return {
+        requestDensity: density === "dense" ? "medium" : "light",
+        followDensity: "light",
+        followDelayMinMs: 150,
+        followDelayMaxMs: 300,
+        gapScale: 0.58,
+      };
+    }
+    return {
+      requestDensity: density === "dense" ? "medium" : density,
+      followDensity: density === "dense" ? "medium" : density,
+      followDelayMinMs: 220,
+      followDelayMaxMs: 440,
+      gapScale: 0.72,
+    };
+  }
+
   function threadFollowDecision({
     payload = {},
     cue = {},
     poolSize = 0,
+    threadLength = 0,
+    maxLayers = 2,
     randomValue = Math.random(),
   } = {}) {
     const signal = normalizedThreadSignal(payload.thread_signal);
@@ -62,10 +115,17 @@
     // This helper is small on purpose: it translates a server-owned thread hint
     // into a browser composition decision without re-implementing deployment policy.
     if (signal === "question_chorus" && topic && poolSize >= 3 && density !== "dense" && randomValue < 0.24) {
+      const companionCount = questionChorusCompanionCount({
+        threadLength,
+        poolSize,
+        maxLayers,
+        randomValue,
+      });
       return {
         mode: "question_chorus",
         preferredTopic: topic,
         preferredLifecycleStatus: lifecycleStatus || "open",
+        companionCount,
       };
     }
 
@@ -74,6 +134,7 @@
         mode: "repair_bench",
         preferredTopic: topic,
         preferredLifecycleStatus: lifecycleStatus,
+        companionCount: 0,
       };
     }
 
@@ -81,6 +142,7 @@
       mode: "none",
       preferredTopic: "",
       preferredLifecycleStatus: "",
+      companionCount: 0,
     };
   }
 
@@ -272,7 +334,9 @@
     overlapAllowedForCue,
     playFollowPayload,
     playLayeredPayload,
+    questionChorusCompanionCount,
     randomDelayBetween,
+    repairBenchProfile,
     threadFollowDecision,
     toneLevelForName,
   };

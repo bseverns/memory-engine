@@ -46,6 +46,8 @@ The recording kiosk may assume:
   - `kiosk_max_recording_seconds`
 - artifact save endpoints are the source of truth for whether a submission is
   accepted
+- local keyboard or HID input may drive the browser's existing shortcut path
+  without changing API contract ownership
 
 The recording kiosk must not assume:
 
@@ -53,6 +55,8 @@ The recording kiosk must not assume:
 - that intake is allowed just because the page rendered
 - that a playback artifact exists or is eligible without asking the API
 - that operator auth state is available on this surface
+- that a hardware button deserves its own network control path if it can safely
+  reuse the local shortcut contract
 
 ## `/room/`
 
