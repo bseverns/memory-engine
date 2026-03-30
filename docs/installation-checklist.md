@@ -2,6 +2,9 @@
 
 Use this checklist when turning a development node into a dedicated kiosk installation. It is written for the practical first deployment pass: one trusted operator, one kiosk device, one microphone, one playback output.
 
+If you need the quick "what does what" map before install-day verification,
+read [AT_A_GLANCE.md](./AT_A_GLANCE.md) first.
+
 If you want the recording screen to stay visually minimal, print the participant
 instructions from `docs/participant-prompt-card.md` and place them beside the
 recording station.

@@ -16,7 +16,14 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from .consent import consent_manifest, default_node_from_env, hash_token, make_revocation_token
-from .deployment_policy import deployment_room_loop_policy, playback_profile, wear_increment_multiplier
+from .deployment_policy import (
+    RESOLVED_LIFECYCLE_STATUSES,
+    deployment_room_loop_policy,
+    playback_profile,
+    resolved_lifecycle_status,
+    unresolved_lifecycle,
+    wear_increment_multiplier,
+)
 from .ingest_validation import UploadValidationError, validate_wav_upload
 from .media_access import (
     PURPOSE_EPHEMERAL_AUDIO,
@@ -135,6 +142,17 @@ def deployment_lifecycle_suggestions(deployment_code: str) -> list[str]:
     return ["open", "resolved"]
 
 
+def deployment_lifecycle_field(deployment_code: str) -> dict[str, object]:
+    # Keep operator metadata editing intentionally small and deployment-aware.
+    # This is a preset list for stewardship, not a schema migration path.
+    return {
+        "label": "Status",
+        "input_mode": "select",
+        "allow_blank": True,
+        "suggestions": deployment_lifecycle_suggestions(deployment_code),
+    }
+
+
 def deployment_topic_placeholder(deployment_code: str) -> str:
     code = deployment_spec(deployment_code).code
     if code == "repair":
@@ -167,6 +185,21 @@ def serialize_operator_artifact(artifact: Artifact, now) -> dict:
         "age_hours": round(artifact_age_hours(artifact, now), 2),
         "absence_hours": round(artifact_absence_hours(artifact, now), 2),
     }
+
+
+def artifact_thread_signal(artifact: Artifact) -> str:
+    deployment_code = deployment_spec(getattr(artifact, "deployment_kind", "memory")).code
+    topic_tag = str(getattr(artifact, "topic_tag", "") or "").strip()
+    lifecycle_status = resolved_lifecycle_status(getattr(artifact, "lifecycle_status", ""))
+
+    # This field is deliberately tiny: the browser gets one explicit hint about
+    # whether a follow-on thread behavior is even worth attempting, while the
+    # server remains the source of truth for actual artifact eligibility.
+    if deployment_code == "question" and topic_tag and unresolved_lifecycle(lifecycle_status):
+        return "question_chorus"
+    if deployment_code == "repair" and topic_tag and lifecycle_status not in RESOLVED_LIFECYCLE_STATUSES:
+        return "repair_bench"
+    return ""
 
 
 def intake_suspended() -> bool:
@@ -252,6 +285,8 @@ def create_audio_artifact(request):
         return Response({"error": memory_color_validation_error_message()}, status=400)
 
     active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+    # Ingest accepts a few alias names on purpose so stewards can add just
+    # enough deployment metadata without creating a second larger schema.
     topic_tag = parse_topic_tag(
         request.data.get("topic_tag")
         or request.data.get("topic")
@@ -341,6 +376,8 @@ def create_ephemeral_audio(request):
         return Response({"error": memory_color_validation_error_message()}, status=400)
 
     active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+    # Ephemeral takes still carry deployment/topic/status context so immediate
+    # playback can share the same review and room-facing vocabulary as saved takes.
     topic_tag = parse_topic_tag(
         request.data.get("topic_tag")
         or request.data.get("topic")
@@ -525,8 +562,13 @@ def pool_next(request):
             chunk for chunk in (piece.strip() for piece in raw_recent_topics.split(",")[:4])
             if chunk
         ]
+    preferred_topic = parse_topic_tag(request.query_params.get("preferred_topic")).lower()
+    preferred_lifecycle_status = parse_lifecycle_status(request.query_params.get("preferred_lifecycle_status"))
     segment_variant = (request.query_params.get("segment_variant") or "").strip()[:120]
 
+    # The browser may express taste and recent local history, but the API owns
+    # the final decision about what is playable and which deployment/thread
+    # hints are safe to honor for this selection.
     artifact, selected_lane = select_pool_artifact(
         now,
         requested_lane,
@@ -535,6 +577,8 @@ def pool_next(request):
         excluded_ids=excluded_ids,
         recent_densities=recent_densities,
         recent_topics=recent_topics,
+        preferred_topic=preferred_topic,
+        preferred_lifecycle_status=preferred_lifecycle_status,
         deployment_code=active_deployment.code,
     )
     if not artifact:
@@ -574,6 +618,7 @@ def pool_next(request):
         "deployment_kind": artifact.deployment_kind,
         "topic_tag": artifact.topic_tag,
         "lifecycle_status": artifact.lifecycle_status,
+        "thread_signal": artifact_thread_signal(artifact),
         "pool_size": playable_count,
         "playback_ack_url": media_playback_heard_url(playback_ack_token),
         "audio_url": media_raw_url(
@@ -598,6 +643,8 @@ def pool_heard(request, access_token: str):
         raise Http404("Playback acknowledgement is incomplete")
 
     cache_key = f"memory_engine_playback_heard:{nonce}"
+    # Audible playback is acknowledged once per issued token so browser retries
+    # do not compound wear or play counts.
     if not cache.add(cache_key, True, timeout=int(getattr(settings, "MEDIA_ACCESS_TOKEN_TTL_SECONDS", 900))):
         return Response({"ok": True, "duplicate": True})
 
@@ -665,6 +712,9 @@ def node_status(request):
     throttles = public_throttle_snapshots()
     warnings = []
     operator_state = steward_state_payload()
+    # `/api/v1/node/status` is intentionally the operator-facing synthesis
+    # layer: not raw component state alone, but the human warning posture that
+    # `/ops/` should render without inventing its own judgment model.
     warnings.extend(component_health_warnings(components))
     if throttles["public_ingest"]["recent_denials"] > 0 or throttles["public_ingest_ip"]["recent_denials"] > 0:
         warnings.append({
@@ -733,6 +783,9 @@ def node_status(request):
 
 @api_view(["GET"])
 def surface_state(request):
+    # This is the only public live-control surface for `/kiosk/` and `/room/`.
+    # It stays much smaller than `/api/v1/node/status` so public clients do not
+    # learn operator-only diagnostics just to respond to steward posture.
     return Response({
         "operator_state": steward_state_payload(),
         "ingest_budget": public_ingest_budget_snapshot(request),
@@ -802,6 +855,8 @@ def operator_recent_artifacts(request):
         ).order_by("-created_at")[:limit]
     )
 
+    # Keep `/ops/` scoped to the active deployment so metadata stewardship stays
+    # legible and does not quietly turn into a global moderation console.
     return Response({
         "deployment": {
             "code": active_deployment.code,
@@ -813,10 +868,7 @@ def operator_recent_artifacts(request):
                 "label": "Topic / category",
                 "placeholder": deployment_topic_placeholder(active_deployment.code),
             },
-            "lifecycle_status": {
-                "label": "Status",
-                "suggestions": deployment_lifecycle_suggestions(active_deployment.code),
-            },
+            "lifecycle_status": deployment_lifecycle_field(active_deployment.code),
         },
     })
 
@@ -855,6 +907,9 @@ def operator_update_artifact_metadata(request, artifact_id: int):
         changed_fields.append("lifecycle_status")
 
     if changed_fields:
+        # Metadata edits are steward actions, not hidden administrative state.
+        # Audit them alongside control changes so later debugging can explain
+        # why a deployment started feeling different.
         artifact.save(update_fields=changed_fields)
         detail_parts = []
         if "topic_tag" in changed_fields:

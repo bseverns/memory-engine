@@ -4,6 +4,15 @@ Local-first “room memory” appliance: record a short sound offering, choose c
 
 This repo now opens one layer wider: **Memory Engine is still the default deployment**, but it is treated as a memory-first deployment of a broader local-first artifact engine. This is an expansion, not a rebrand. The current runtime, routes, and operator flow stay intact while the config and docs now name future sibling deployments (`question`, `prompt`, `repair`, `witness`, `oracle`) that can be realized mostly through copy, metadata framing, and playback policy.
 
+## Start Here
+
+If you need the shortest possible orientation:
+
+- first-glance system map and "which knob matters where": [docs/AT_A_GLANCE.md](docs/AT_A_GLANCE.md)
+- deploy, backup, restore, and troubleshooting commands: [docs/maintenance.md](docs/maintenance.md)
+- full architecture and request/data flow: [docs/how-the-stack-works.md](docs/how-the-stack-works.md)
+- deployment temperament and playback differences: [docs/DEPLOYMENT_BEHAVIORS.md](docs/DEPLOYMENT_BEHAVIORS.md)
+
 ## What you get
 - Django + DRF API (Artifacts, Pool playback, Revocation, Node status)
 - Postgres for metadata

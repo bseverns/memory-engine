@@ -15,7 +15,7 @@ from memory_engine.deployments import DEFAULT_ENGINE_DEPLOYMENT, deployment_spec
 
 
 UNRESOLVED_LIFECYCLE_STATUSES = frozenset({"", "open", "unresolved", "pending"})
-RESOLVED_LIFECYCLE_STATUSES = frozenset({"answered", "resolved", "closed", "complete", "completed", "fixed"})
+RESOLVED_LIFECYCLE_STATUSES = frozenset({"answered", "resolved", "closed", "complete", "completed", "fixed", "obsolete"})
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,9 @@ class DeploymentPlaybackProfile:
     topic_cluster_boost: float = 1.0
 
 
+# This table is the canonical "temperament surface" for deployments.
+# The same profile feeds backend weighting, browser room-loop posture, and
+# operator-facing summaries, so behavior stays inspectable in one place.
 DEPLOYMENT_PLAYBACK_PROFILES: dict[str, DeploymentPlaybackProfile] = {
     "memory": DeploymentPlaybackProfile(
         code="memory",
@@ -180,6 +183,8 @@ def deployment_room_loop_policy(deployment_code: str | None) -> dict[str, object
 def room_loop_config_for_deployment(loop_config: dict, deployment_code: str | None) -> dict:
     config = deepcopy(loop_config)
     policy = dict(config.get("policy", {}))
+    # Keep the browser on the same named policy values the backend is using,
+    # rather than re-deriving deployment behavior in JavaScript.
     policy["activeDeployment"] = deployment_room_loop_policy(deployment_code)
     policy["deploymentProfiles"] = {
         code: deployment_room_loop_policy(code)

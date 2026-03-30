@@ -25,6 +25,10 @@ There are four practical sources of truth in the stack:
 
 The browser should not invent policy that belongs to the first three layers.
 
+If a new behavior needs a new cross-layer field, add it here explicitly. The
+goal is to keep surface boundaries inspectable, especially now that playback
+can carry light deployment-thread hints.
+
 ## `/kiosk/`
 
 The recording kiosk may assume:
@@ -74,6 +78,7 @@ The listening surface may assume:
   - `density`
   - `mood`
   - playback window fields
+  - deployment-thread hints such as `thread_signal`
 
 The listening surface must not assume:
 
@@ -81,6 +86,7 @@ The listening surface must not assume:
 - that browser-local recent history overrules server eligibility
 - that quiet-hours or scarcity policy should be redefined on the client
 - that a spectrogram image implies an artifact is currently playable
+- that deployment-thread behavior should be inferred without an explicit server field
 
 ## `/ops/`
 
@@ -93,6 +99,8 @@ The operator surface may assume:
   - retention summaries
 - `/api/v1/operator/controls` is the source of truth for live steward state and
   recent steward actions
+- `/api/v1/operator/artifacts` is the source of truth for which lightweight
+  metadata fields are editable in the active deployment
 - session-backed auth gates access to operator-only controls
 
 The operator surface must not assume:
@@ -124,6 +132,7 @@ Use this split when deciding where a new field belongs:
   - wear
   - playback window
   - featured return flag
+  - thread hint such as `question_chorus` or `repair_bench`
 
 ## Current payload contract
 
@@ -141,6 +150,9 @@ station fully hits its public write ceiling.
 - `lane`
 - `density`
 - `mood`
+- `topic_tag`
+- `lifecycle_status`
+- `thread_signal`
 - `pool_size`
 - `featured_return`
 - `playback_start_ms`
@@ -151,3 +163,14 @@ station fully hits its public write ceiling.
 
 If a new browser behavior needs a server-owned field, add it to the contract
 explicitly rather than inferring it from some other value.
+
+`/api/v1/pool/next` also currently accepts lightweight browser hints:
+
+- `exclude_ids`
+- `recent_densities`
+- `recent_topics`
+- `preferred_topic`
+- `preferred_lifecycle_status`
+
+Those hints are requests, not authority. The browser may suggest a thread or
+recent context, but the API still owns the final playable selection.

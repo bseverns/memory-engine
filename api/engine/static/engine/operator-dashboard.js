@@ -280,8 +280,28 @@
     const deployment = payload?.deployment?.label || "active deployment";
     const count = Number(payload?.artifacts?.length || 0);
     const suggestions = payload?.editable_fields?.lifecycle_status?.suggestions || [];
-    const suggestionText = suggestions.length ? ` Suggested statuses: ${suggestions.join(", ")}.` : "";
+    const suggestionText = suggestions.length ? ` Status picker presets: ${suggestions.join(", ")}.` : "";
     return `Showing ${count} recent artifact(s) for ${deployment}.${suggestionText}`;
+  }
+
+  function lifecycleStatusOptions(field, currentValue) {
+    const suggestions = Array.isArray(field?.suggestions) ? field.suggestions : [];
+    const allowBlank = field?.allow_blank !== false;
+    const current = String(currentValue || "").trim().toLowerCase();
+    const values = [];
+    if (allowBlank) {
+      values.push("");
+    }
+    suggestions.forEach((value) => {
+      const normalized = String(value || "").trim().toLowerCase();
+      if (normalized && !values.includes(normalized)) {
+        values.push(normalized);
+      }
+    });
+    if (current && !values.includes(current)) {
+      values.push(current);
+    }
+    return values;
   }
 
   function makeCard(doc, card) {
@@ -529,12 +549,16 @@
       const lifecycleStrong = doc.createElement("strong");
       lifecycleStrong.textContent = payload?.editable_fields?.lifecycle_status?.label || "Status";
       const lifecycleHint = doc.createElement("span");
-      lifecycleHint.textContent = `Examples: ${(payload?.editable_fields?.lifecycle_status?.suggestions || []).join(", ") || "open, resolved"}`;
+      lifecycleHint.textContent = `Deployment presets keep stewardship legible while staying compatible with older custom values.`;
       lifecycleText.append(lifecycleStrong, lifecycleHint);
-      const lifecycleInput = doc.createElement("input");
-      lifecycleInput.type = "text";
-      lifecycleInput.value = String(artifact.lifecycle_status || "");
-      lifecycleInput.placeholder = (payload?.editable_fields?.lifecycle_status?.suggestions || [])[0] || "open";
+      const lifecycleInput = doc.createElement("select");
+      lifecycleStatusOptions(payload?.editable_fields?.lifecycle_status, artifact.lifecycle_status).forEach((value) => {
+        const option = doc.createElement("option");
+        option.value = value;
+        option.textContent = value || "No status";
+        lifecycleInput.append(option);
+      });
+      lifecycleInput.value = String(artifact.lifecycle_status || "").trim().toLowerCase();
       lifecycleLabel.append(lifecycleText, lifecycleInput);
 
       fields.append(topicLabel, lifecycleLabel);
@@ -559,7 +583,14 @@
             lifecycle_status: lifecycleInput.value,
           });
           topicInput.value = String(updated.topic_tag || "");
-          lifecycleInput.value = String(updated.lifecycle_status || "");
+          const updatedStatus = String(updated.lifecycle_status || "").trim().toLowerCase();
+          if (!Array.from(lifecycleInput.options).some((option) => option.value === updatedStatus)) {
+            const option = doc.createElement("option");
+            option.value = updatedStatus;
+            option.textContent = updatedStatus || "No status";
+            lifecycleInput.append(option);
+          }
+          lifecycleInput.value = updatedStatus;
           status.textContent = "Saved";
         } catch (error) {
           status.textContent = error.message || "Save failed";
@@ -710,6 +741,7 @@
     renderPayload,
     artifactMetadataStatusLine,
     artifactSummaryCards,
+    lifecycleStatusOptions,
     memoryColorCards,
     retentionCards,
     start,

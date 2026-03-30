@@ -391,6 +391,79 @@ class PoolBehaviorTests(EngineTestCase):
         self.assertIsNotNone(selected)
         self.assertEqual(selected.id, recent_prompt.id)
 
+    def test_select_pool_artifact_for_question_prefers_explicit_thread_topic_and_status(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        threaded = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/question-threaded.wav",
+            deployment_kind="question",
+            topic_tag="entry_gate",
+            lifecycle_status="open",
+            created_at=now - timedelta(hours=10),
+            last_access_at=now - timedelta(hours=6),
+        )
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/question-answered.wav",
+            deployment_kind="question",
+            topic_tag="entry_gate",
+            lifecycle_status="answered",
+            created_at=now - timedelta(hours=9),
+            last_access_at=now - timedelta(hours=5),
+        )
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/question-other.wav",
+            deployment_kind="question",
+            topic_tag="maintenance",
+            lifecycle_status="open",
+            created_at=now - timedelta(hours=8),
+            last_access_at=now - timedelta(hours=4),
+        )
+
+        selected, _ = select_pool_artifact(
+            now,
+            deployment_code="question",
+            preferred_topic="entry_gate",
+            preferred_lifecycle_status="open",
+        )
+
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected.id, threaded.id)
+
+    def test_select_pool_artifact_for_repair_prefers_explicit_thread_topic(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        threaded = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/repair-threaded.wav",
+            deployment_kind="repair",
+            topic_tag="projector",
+            lifecycle_status="needs_part",
+            created_at=now - timedelta(hours=6),
+            last_access_at=now - timedelta(hours=3),
+        )
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/repair-other.wav",
+            deployment_kind="repair",
+            topic_tag="amp_rack",
+            lifecycle_status="pending",
+            created_at=now - timedelta(hours=5),
+            last_access_at=now - timedelta(hours=2),
+        )
+
+        selected, _ = select_pool_artifact(
+            now,
+            deployment_code="repair",
+            preferred_topic="projector",
+            preferred_lifecycle_status="needs_part",
+        )
+
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected.id, threaded.id)
+
     def test_select_pool_artifact_for_witness_prefers_settled_material(self):
         now = timezone.now()
         consent = self.make_consent("ROOM")
@@ -435,3 +508,32 @@ class PoolBehaviorTests(EngineTestCase):
         self.assertEqual(payload["deployment_kind"], "question")
         self.assertEqual(payload["topic_tag"], "entry_gate")
         self.assertEqual(payload["lifecycle_status"], "open")
+        self.assertEqual(payload["thread_signal"], "question_chorus")
+
+    @override_settings(ENGINE_DEPLOYMENT="repair")
+    def test_pool_next_accepts_thread_preference_query_params(self):
+        artifact = self.make_active_artifact(
+            raw_uri="raw/repair-thread.wav",
+            deployment_kind="repair",
+            topic_tag="projector",
+            lifecycle_status="needs_part",
+            created_at=timezone.now() - timedelta(hours=8),
+        )
+        self.make_active_artifact(
+            raw_uri="raw/repair-other.wav",
+            deployment_kind="repair",
+            topic_tag="amp_rack",
+            lifecycle_status="pending",
+            created_at=timezone.now() - timedelta(hours=7),
+        )
+
+        response = self.client.get(
+            "/api/v1/pool/next?preferred_topic=projector&preferred_lifecycle_status=needs_part"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["artifact_id"], artifact.id)
+        self.assertEqual(payload["topic_tag"], "projector")
+        self.assertEqual(payload["lifecycle_status"], "needs_part")
+        self.assertEqual(payload["thread_signal"], "repair_bench")

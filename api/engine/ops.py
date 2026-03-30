@@ -158,6 +158,8 @@ def queue_depth_component() -> dict:
         ok = False
     elif depth >= warning_depth:
         state = "warning"
+    # Queue depth is operator-facing posture, not scheduler truth. It tells the
+    # steward whether work is piling up faster than the appliance is clearing it.
     return {
         "ok": ok,
         "queue": queue_name,
@@ -215,6 +217,9 @@ def task_pipeline_component(*, now=None) -> dict:
             },
         }
 
+    # Scheduled-task failures are treated more seriously because they quietly
+    # age the archive into drift: expiry, pruning, and retention stop matching
+    # the consent/runtime posture even if the kiosk still appears alive.
     scheduled_issue = any(issue["scheduled"] for issue in issues)
     labels = ", ".join(issue["label"] for issue in issues[:3])
     detail = f"Recent background task failures need attention ({labels})."
@@ -239,6 +244,8 @@ def task_pipeline_component(*, now=None) -> dict:
 
 def component_health_warnings(components: dict) -> list[dict]:
     warnings = []
+    # These are the human-facing warning translations for `/ops/`. Keep the
+    # rules here so the browser renders the server's judgment instead of inventing its own.
     if not components.get("worker", {}).get("ok", True):
         warnings.append({
             "level": "critical",
@@ -343,6 +350,9 @@ def health_component_status() -> tuple[bool, dict]:
         components["queue"] = {"ok": False, "state": "critical", "error": str(exc)}
     components["tasks"] = task_pipeline_component()
 
+    # This broader readiness surface is allowed to go degraded even when
+    # `/healthz` is still green; that split lets the API container stay up
+    # while operators still learn that background work is drifting.
     cluster_ok = all(component["ok"] for component in components.values())
     return cluster_ok, components
 
@@ -379,6 +389,9 @@ def disk_status(path: str) -> dict:
 def pool_warnings(active_count: int, lane_counts: dict, mood_counts: dict, playable_count: int) -> list[dict]:
     warnings = []
 
+    # Pool warnings are compositional warnings, not database/storage failures.
+    # They exist so operators can notice when the room feel is flattening before
+    # participants experience it only as "the room got boring."
     if active_count <= int(settings.OPS_POOL_LOW_COUNT):
         warnings.append({
             "level": "warning",
@@ -445,6 +458,8 @@ def retention_summary(*, now=None) -> dict:
         .prefetch_related("derivative_set")
     )
 
+    # This is a steward summary, not a legal retention ledger: enough to answer
+    # "what is about to shed?" and "what survives only as residue?" at a glance.
     for artifact in active_artifacts:
         consent_json = artifact.consent.json or {}
         retention = consent_json.get("retention", {})

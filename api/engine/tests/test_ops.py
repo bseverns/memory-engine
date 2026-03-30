@@ -503,6 +503,8 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertEqual(len(payload["artifacts"]), 1)
         self.assertEqual(payload["artifacts"][0]["deployment_kind"], "question")
         self.assertEqual(payload["editable_fields"]["lifecycle_status"]["suggestions"][0], "open")
+        self.assertEqual(payload["editable_fields"]["lifecycle_status"]["input_mode"], "select")
+        self.assertTrue(payload["editable_fields"]["lifecycle_status"]["allow_blank"])
 
     @override_settings(ENGINE_DEPLOYMENT="repair")
     def test_operator_update_artifact_metadata_updates_topic_and_status(self):

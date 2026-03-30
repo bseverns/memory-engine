@@ -114,5 +114,18 @@ test("artifactMetadataStatusLine summarizes deployment-scoped metadata editing",
 
   assert.match(line, /Question Engine/);
   assert.match(line, /2 recent artifact/);
+  assert.match(line, /Status picker presets/);
   assert.match(line, /open, pending, answered, resolved/);
+});
+
+test("lifecycleStatusOptions preserves blanks, suggestions, and older custom values", () => {
+  const options = operatorDashboard.lifecycleStatusOptions(
+    {
+      allow_blank: true,
+      suggestions: ["pending", "needs_part", "fixed", "obsolete"],
+    },
+    "escalated",
+  );
+
+  assert.deepEqual(options, ["", "pending", "needs_part", "fixed", "obsolete", "escalated"]);
 });

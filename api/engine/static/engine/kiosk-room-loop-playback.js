@@ -29,6 +29,8 @@
     if (cue.density === "dense") {
       return false;
     }
+    // Generic overlap is intentionally conservative. Deployment-specific thread
+    // behavior gets its own path later instead of being hidden inside this chance roll.
     const densityLimit = String(overlapConfig.densityLimit || "medium");
     if (densityLimit === "light" && cue.density !== "light") {
       return false;
@@ -42,6 +44,46 @@
     return Math.round(start + (Math.random() * Math.max(0, end - start)));
   }
 
+  function normalizedThreadSignal(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function threadFollowDecision({
+    payload = {},
+    cue = {},
+    poolSize = 0,
+    randomValue = Math.random(),
+  } = {}) {
+    const signal = normalizedThreadSignal(payload.thread_signal);
+    const topic = String(payload.topic_tag || "").trim().toLowerCase();
+    const lifecycleStatus = String(payload.lifecycle_status || "").trim().toLowerCase();
+    const density = String(payload.density || cue.density || "medium").trim().toLowerCase();
+
+    // This helper is small on purpose: it translates a server-owned thread hint
+    // into a browser composition decision without re-implementing deployment policy.
+    if (signal === "question_chorus" && topic && poolSize >= 3 && density !== "dense" && randomValue < 0.24) {
+      return {
+        mode: "question_chorus",
+        preferredTopic: topic,
+        preferredLifecycleStatus: lifecycleStatus || "open",
+      };
+    }
+
+    if (signal === "repair_bench" && topic && poolSize >= 2 && randomValue < 0.52) {
+      return {
+        mode: "repair_bench",
+        preferredTopic: topic,
+        preferredLifecycleStatus: lifecycleStatus,
+      };
+    }
+
+    return {
+      mode: "none",
+      preferredTopic: "",
+      preferredLifecycleStatus: "",
+    };
+  }
+
   function buildPoolQuery({
     lane = "any",
     density = "any",
@@ -50,7 +92,11 @@
     excludeIds = [],
     recentDensities = [],
     recentTopics = [],
+    preferredTopic = "",
+    preferredLifecycleStatus = "",
   }) {
+    // Query fields here are the explicit browser -> API contract for playback
+    // requests. Keep additions named and inspectable rather than inferred.
     const params = new URLSearchParams({
       context: "kiosk",
       lane,
@@ -67,11 +113,19 @@
     if (recentTopics.length) {
       params.set("recent_topics", recentTopics.join(","));
     }
+    if (preferredTopic) {
+      params.set("preferred_topic", preferredTopic);
+    }
+    if (preferredLifecycleStatus) {
+      params.set("preferred_lifecycle_status", preferredLifecycleStatus);
+    }
     return params;
   }
 
   async function fetchPoolPayload(request) {
     const params = buildPoolQuery(request);
+    // `204` means "hold the room" rather than "hard error". The room loop uses
+    // that distinction to stay calm during scarcity or steward pauses.
     const response = await fetch(`/api/v1/pool/next?${params.toString()}`, { cache: "no-store" });
     if (response.status === 204) {
       return { hold: true, status: 204, payload: null };
@@ -89,6 +143,8 @@
     cue,
     recentDensities,
     recentTopics,
+    preferredTopic,
+    preferredLifecycleStatus,
     currentMoodBias,
   }) {
     const excludedIds = recentArtifactIdsForExclusion(config, persistentLoopWindow);
@@ -101,6 +157,47 @@
       excludeIds: combinedExclusions,
       recentDensities,
       recentTopics,
+      preferredTopic,
+      preferredLifecycleStatus,
+    });
+    const payload = result.payload;
+    if (!payload || Number(payload.artifact_id) === Number(primaryArtifactId)) {
+      return null;
+    }
+    return payload;
+  }
+
+  async function fetchThreadFollowPayload({
+    config,
+    persistentLoopWindow,
+    primaryArtifactId,
+    extraExcludedIds = [],
+    cue,
+    recentDensities,
+    recentTopics,
+    preferredTopic,
+    preferredLifecycleStatus,
+    currentMoodBias,
+    segmentPrefix = "thread",
+  }) {
+    // Follow-on requests deliberately exclude the primary artifact (and any
+    // already chosen companion) so thread behavior reads as recurrence, not duplication.
+    const excludedIds = recentArtifactIdsForExclusion(config, persistentLoopWindow);
+    const combinedExclusions = Array.from(new Set([
+      ...excludedIds,
+      Number(primaryArtifactId),
+      ...extraExcludedIds.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0),
+    ]));
+    const result = await fetchPoolPayload({
+      lane: cue.lane === "worn" ? "mid" : "any",
+      density: cue.density === "dense" ? "medium" : (cue.density || "medium"),
+      mood: cue.mood || currentMoodBias || "any",
+      segmentVariant: `${segmentPrefix}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+      excludeIds: combinedExclusions,
+      recentDensities,
+      recentTopics,
+      preferredTopic,
+      preferredLifecycleStatus,
     });
     const payload = result.payload;
     if (!payload || Number(payload.artifact_id) === Number(primaryArtifactId)) {
@@ -117,6 +214,29 @@
     playUrlWithLightChain,
     outputGainMultiplier,
   }) {
+    await sleep(Number(delayMs || 0));
+    if (!loopRunning() || playbackPausedBySteward()) {
+      return;
+    }
+    await playUrlWithLightChain(payload.audio_url, payload.wear, {
+      memoryColorProfile: payload.effect_profile,
+      startMs: payload.playback_start_ms,
+      durationMs: payload.playback_duration_ms,
+      outputGainMultiplier,
+    });
+    await acknowledgeAudiblePlayback(payload.playback_ack_url);
+  }
+
+  async function playFollowPayload({
+    payload,
+    delayMs,
+    loopRunning,
+    playbackPausedBySteward,
+    playUrlWithLightChain,
+    outputGainMultiplier,
+  }) {
+    // Sequential follow-ons are kept separate from layered playback so repair
+    // can feel like a notebook entry after another, not an accidental pileup.
     await sleep(Number(delayMs || 0));
     if (!loopRunning() || playbackPausedBySteward()) {
       return;
@@ -148,9 +268,12 @@
     acknowledgeAudiblePlayback,
     fetchLayerPayload,
     fetchPoolPayload,
+    fetchThreadFollowPayload,
     overlapAllowedForCue,
+    playFollowPayload,
     playLayeredPayload,
     randomDelayBetween,
+    threadFollowDecision,
     toneLevelForName,
   };
 }(typeof window !== "undefined" ? window : globalThis));

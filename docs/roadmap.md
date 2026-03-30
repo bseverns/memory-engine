@@ -74,6 +74,16 @@
   - topic/category and status only
   - audited through steward actions
   - intentionally kept out of a larger artifact-management surface
+- Deployment-specific metadata threading and stewardship refinement
+  - `/ops/` now presents deployment-specific status pickers instead of only free text hints
+  - `question` room-loop requests can now carry short topic/status threads
+  - `repair` room-loop requests can now carry short practical topic/status threads
+- Deeper question/repair room composition without widening the control surface
+  - `question` can now produce rare same-topic chorus moments for unresolved threaded material
+  - `repair` can now produce short same-topic bench-note follow-ons for practical threads
+- First documentation orientation pass for future stewards and maintainers
+  - new at-a-glance map of surfaces, subsystem ownership, first checks, and first knobs
+  - README and runbook now point to the quick orientation path before deeper docs
 
 ### Audience playback
 - Weighted pool selection with cooldown to reduce obvious repetition
@@ -131,7 +141,6 @@
 - Add deployment-aware retention/export presets for archival handoff bundles
 - Add installation-specific room identities that can be combined with deployment kind (e.g., `repair` + `shared_lab`)
 - Add a safe operator-facing way to mark questions `answered` / `resolved` and repairs `fixed` / `obsolete`
-- Add clearer per-deployment status pickers in `/ops/` if the free-text metadata editor proves too loose
 
 ### User / speaker
 - Add optional headphone or monitor-check mode for setup and microphone testing
@@ -143,6 +152,10 @@
 
 ### Operator / stewardship
 - Add one-command firewall / restart-on-boot setup for a specific server OS target
+- Continue documentation passes:
+  - quick-reference tables for common failure modes by service
+  - more explicit env-var grouping by subsystem and risk level
+  - one-page operator drill cards for intake, playback, storage, and restore incidents
 
 ## Later
 
@@ -157,8 +170,8 @@
 - Add audience-presence or ambient-volume sensing so the room can react to actual occupancy
 - Add installation-specific and deployment-specific "personalities" that package movement, tone, gap, and wear behavior together
 - Extend the now-real deployment-specific playback policies instead of keeping them as stubs:
-  - fuller `question` chorus / thread behavior
-  - fuller `repair` workbench / bench-notebook behavior
+  - fuller `question` chorus / thread behavior beyond the current rare same-topic layered returns
+  - fuller `repair` workbench / bench-notebook behavior beyond the current short same-topic follow-ons
   - deeper `oracle` ceremony controls
   - more explicit prompt chains and witness context handling, now that first-pass behavior exists
 - Add shared-pool or federated-pool options for multi-room installations

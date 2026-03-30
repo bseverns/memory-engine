@@ -12,6 +12,7 @@ from .deployment_policy import (
     pool_candidate_limit,
     pool_cooldown_seconds,
     playback_profile,
+    resolved_lifecycle_status,
     weight_adjustment,
 )
 from .models import Artifact, Derivative
@@ -63,6 +64,8 @@ def artifact_playback_window(
     revolution_seconds: int | None = None,
     variant: str = "",
 ):
+    # Long-form material is sliced deterministically per time revolution so the
+    # room can keep moving through a source without storing extra playback state.
     max_slice_ms = max(1000, int((max_slice_seconds or settings.ROOM_SOURCE_SLICE_MAX_SECONDS) * 1000))
     cycle_seconds = max(1, int(revolution_seconds or settings.ROOM_SOURCE_SLICE_REVOLUTION_SECONDS))
     full_duration_ms = max(0, int(artifact.duration_ms or 0))
@@ -267,8 +270,15 @@ def select_pool_artifact(
     excluded_ids: set[int] | None = None,
     recent_densities: list[str] | None = None,
     recent_topics: list[str] | None = None,
+    preferred_topic: str = "",
+    preferred_lifecycle_status: str = "",
     deployment_code: str = "memory",
 ):
+    # Selection is intentionally staged:
+    # 1. stay inside the active deployment
+    # 2. respect cooldown when possible
+    # 3. relax exclusions before leaving the deployment
+    # 4. only non-memory deployments with no playable pool fall back to memory
     cooldown_seconds = pool_cooldown_seconds(int(settings.POOL_PLAY_COOLDOWN_SECONDS), deployment_code)
     cooldown_threshold = now - timedelta(seconds=cooldown_seconds)
     candidate_limit = pool_candidate_limit(int(settings.POOL_CANDIDATE_LIMIT), deployment_code)
@@ -288,6 +298,8 @@ def select_pool_artifact(
         now=now,
         candidate_limit=candidate_limit,
         recent_topics=recent_topics,
+        preferred_topic=preferred_topic,
+        preferred_lifecycle_status=preferred_lifecycle_status,
     )
     if not candidates and excluded_ids:
         cooldown_qs = base_qs.filter(Q(last_access_at__isnull=True) | Q(last_access_at__lt=cooldown_threshold))
@@ -298,6 +310,8 @@ def select_pool_artifact(
             now=now,
             candidate_limit=candidate_limit,
             recent_topics=recent_topics,
+            preferred_topic=preferred_topic,
+            preferred_lifecycle_status=preferred_lifecycle_status,
         )
     if not candidates and deployment.code != "memory" and not deployment_has_playable:
         base_qs = playable_artifact_queryset(now)
@@ -310,6 +324,8 @@ def select_pool_artifact(
             now=now,
             candidate_limit=candidate_limit,
             recent_topics=recent_topics,
+            preferred_topic=preferred_topic,
+            preferred_lifecycle_status=preferred_lifecycle_status,
         )
 
     if not candidates:
@@ -350,6 +366,20 @@ def unresolved_queryset(queryset):
     return queryset.filter(lifecycle_status__in=tuple(UNRESOLVED_LIFECYCLE_STATUSES))
 
 
+def preferred_topic_queryset(queryset, preferred_topic: str | None):
+    topic = str(preferred_topic or "").strip().lower()
+    if not topic:
+        return queryset.none()
+    return queryset.filter(topic_tag__iexact=topic)
+
+
+def preferred_lifecycle_queryset(queryset, preferred_lifecycle_status: str | None):
+    lifecycle_status = resolved_lifecycle_status(preferred_lifecycle_status or "")
+    if not lifecycle_status:
+        return queryset.none()
+    return queryset.filter(lifecycle_status__iexact=lifecycle_status)
+
+
 def topic_cluster_queryset(queryset, recent_topics: list[str] | None):
     topics = [str(topic or "").strip().lower() for topic in (recent_topics or []) if str(topic or "").strip()]
     if not topics:
@@ -360,15 +390,41 @@ def topic_cluster_queryset(queryset, recent_topics: list[str] | None):
     return queryset.filter(topic_query)
 
 
-def select_candidates_for_deployment(*, cooldown_qs, preferred_base_qs, deployment_code: str, now, candidate_limit: int, recent_topics: list[str] | None = None):
+def select_candidates_for_deployment(
+    *,
+    cooldown_qs,
+    preferred_base_qs,
+    deployment_code: str,
+    now,
+    candidate_limit: int,
+    recent_topics: list[str] | None = None,
+    preferred_topic: str = "",
+    preferred_lifecycle_status: str = "",
+):
     code = deployment_spec(deployment_code).code
     recent_topics = [str(topic or "").strip().lower() for topic in (recent_topics or []) if str(topic or "").strip()]
     batches = []
+    threaded_cooldown_qs = preferred_topic_queryset(cooldown_qs, preferred_topic)
+    threaded_base_qs = preferred_topic_queryset(preferred_base_qs, preferred_topic)
+    preferred_status_cooldown_qs = preferred_lifecycle_queryset(cooldown_qs, preferred_lifecycle_status)
+    preferred_status_base_qs = preferred_lifecycle_queryset(preferred_base_qs, preferred_lifecycle_status)
 
     if code == "question":
+        # Question wants the room to feel unresolved before it feels merely
+        # recent, so threaded open material gets first pick at the candidate set.
+        unresolved_cooldown_qs = unresolved_queryset(cooldown_qs)
+        unresolved_base_qs = unresolved_queryset(preferred_base_qs)
+        threaded_unresolved_cooldown_qs = preferred_topic_queryset(unresolved_cooldown_qs, preferred_topic)
+        threaded_unresolved_base_qs = preferred_topic_queryset(unresolved_base_qs, preferred_topic)
         batches.extend([
+            preferred_lifecycle_queryset(threaded_unresolved_cooldown_qs, preferred_lifecycle_status).order_by("-created_at", "play_count", "wear"),
+            threaded_unresolved_cooldown_qs.order_by("-created_at", "play_count", "wear"),
+            preferred_lifecycle_queryset(unresolved_cooldown_qs, preferred_lifecycle_status).order_by("-created_at", "play_count", "wear"),
             topic_cluster_queryset(unresolved_queryset(cooldown_qs), recent_topics).order_by("-created_at", "play_count", "wear"),
-            unresolved_queryset(cooldown_qs).order_by("-created_at", "play_count", "wear"),
+            unresolved_cooldown_qs.order_by("-created_at", "play_count", "wear"),
+            preferred_lifecycle_queryset(threaded_unresolved_base_qs, preferred_lifecycle_status).order_by("last_access_at", "-created_at", "play_count", "wear"),
+            threaded_unresolved_base_qs.order_by("last_access_at", "-created_at", "play_count", "wear"),
+            preferred_status_base_qs.order_by("last_access_at", "-created_at", "play_count", "wear"),
             topic_cluster_queryset(preferred_base_qs, recent_topics).order_by("last_access_at", "-created_at", "play_count", "wear"),
             preferred_base_qs.order_by("last_access_at", "-created_at", "play_count", "wear"),
         ])
@@ -387,10 +443,22 @@ def select_candidates_for_deployment(*, cooldown_qs, preferred_base_qs, deployme
         recent_threshold = now - timedelta(days=14)
         recent_cooldown_qs = cooldown_qs.filter(created_at__gte=recent_threshold)
         recent_base_qs = preferred_base_qs.filter(created_at__gte=recent_threshold)
+        threaded_recent_cooldown_qs = preferred_topic_queryset(recent_cooldown_qs, preferred_topic)
+        threaded_recent_base_qs = preferred_topic_queryset(recent_base_qs, preferred_topic)
+        # Repair is more literal than memory: keep useful recent notes in reach,
+        # and only widen back out to the full deployment once the practical
+        # thread cannot be sustained.
         batches.extend([
+            preferred_lifecycle_queryset(threaded_recent_cooldown_qs, preferred_lifecycle_status).order_by("-created_at", "play_count", "wear"),
+            threaded_recent_cooldown_qs.order_by("-created_at", "play_count", "wear"),
+            preferred_lifecycle_queryset(recent_cooldown_qs, preferred_lifecycle_status).order_by("-created_at", "play_count", "wear"),
             topic_cluster_queryset(recent_cooldown_qs, recent_topics).order_by("-created_at", "play_count", "wear"),
             recent_cooldown_qs.order_by("-created_at", "play_count", "wear"),
+            preferred_lifecycle_queryset(threaded_recent_base_qs, preferred_lifecycle_status).order_by("-created_at", "last_access_at", "play_count", "wear"),
+            threaded_recent_base_qs.order_by("-created_at", "last_access_at", "play_count", "wear"),
+            preferred_status_cooldown_qs.order_by("-created_at", "last_access_at", "play_count", "wear"),
             topic_cluster_queryset(cooldown_qs, recent_topics).order_by("-created_at", "play_count", "wear"),
+            threaded_base_qs.order_by("-created_at", "last_access_at", "play_count", "wear"),
             recent_base_qs.order_by("-created_at", "last_access_at", "play_count", "wear"),
             preferred_base_qs.order_by("-created_at", "last_access_at", "play_count", "wear"),
         ])

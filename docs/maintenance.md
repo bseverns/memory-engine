@@ -2,6 +2,10 @@
 
 This project is intentionally light on moving parts, but the operator path is still easier if there is one place to look for the recurring commands.
 
+If you need the 60-second system map before touching anything, read
+[AT_A_GLANCE.md](./AT_A_GLANCE.md) first. It points to the main subsystems,
+their code owners, and the first knobs to check when the node drifts.
+
 ## Operator shortcuts
 
 Bootstrap a new server:

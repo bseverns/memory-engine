@@ -10,8 +10,8 @@ alone, though `memory`, `question`, and `repair` remain the most developed.
 | Deployment | Room feel now | Selection / weighting | Wear / legibility | Room-loop posture |
 |---|---|---|---|---|
 | `memory` | weathered, layered, composed | baseline lane, mood, age, and featured-return weighting | normal wear | baseline anti-repetition, gap pacing, overlap |
-| `question` | unresolved, returning, lightly haunted | boosts `status=open` / unresolved items, recent questions, and recent-topic clustering | lighter wear keeps questions readable longer | shorter anti-repetition, slightly quicker gaps, slightly more recurrence |
-| `repair` | practical, recent, useful | boosts recent items, shorter notes, and near-term topic recurrence | much lighter wear for clarity | shorter gaps, calmer tone bed, less overlap |
+| `question` | unresolved, returning, lightly haunted | boosts `status=open` / unresolved items, recent questions, recent-topic clustering, and explicit topic/status threads | lighter wear keeps questions readable longer | shorter anti-repetition, slightly quicker gaps, plus rare question-chorus layering |
+| `repair` | practical, recent, useful | boosts recent items, shorter notes, near-term topic recurrence, and explicit work-thread returns | much lighter wear for clarity | shorter gaps, calmer tone bed, less overlap, plus short bench-log follow-ons |
 | `oracle` | sparse, ceremonial, event-like | penalizes brand-new material, favors older absent fragments and featured returns | very light wear | longer gaps, longer pauses, very low overlap |
 | `prompt` | catalytic, quick, recirculating | boosts recent shorter prompt responses and recent-topic echoes | lighter wear than memory | shortest anti-repetition, quicker gaps, slightly more overlap |
 | `witness` | settled, contextual, documentary | cools hyper-recent material and favors settled contextual notes | gentler wear than memory | longer anti-repetition, calmer pacing, lower overlap |
@@ -90,6 +90,8 @@ Implemented now:
 - answered / resolved states are cooled down
 - recent questions are favored, but older open questions can still return
 - recent `topic_tag` history can cluster adjacent questions loosely
+- the room loop can carry a short topic/status thread so an unresolved question can return as a deliberate revisit
+- some threaded unresolved questions now trigger a rare same-topic layered return, producing a small chorus moment instead of only single-file recurrence
 - wear is lighter than memory so question audio stays more legible
 - room-loop anti-repetition is shorter than memory
 - room-loop gaps are modestly quicker than memory
@@ -107,6 +109,8 @@ Implemented now:
 - recent material is strongly favored
 - shorter items are boosted, dense/long items are cooled
 - near-term topic recurrence is supported with `topic_tag`
+- the room loop can prefer a recent practical thread so related bench notes return while still useful
+- some repair threads now trigger a short same-topic follow-on note, so the room can feel like a bench notebook instead of isolated tips
 - wear is much lighter than memory to preserve clarity
 - room-loop gaps are shorter than memory
 - room tone is reduced and overlap chance is lower
@@ -187,6 +191,7 @@ around what that afterlife means.
 
 - only recent artifacts from the active deployment are shown
 - only `topic_tag` and `lifecycle_status` are editable
+- `lifecycle_status` now uses deployment-specific picker presets, while still preserving older custom values already in the archive
 - edits are audited through steward actions
 
 This keeps stewardship inspectable without turning the dashboard into a large
@@ -195,5 +200,4 @@ artifact management console.
 ## Next Likely Extensions
 
 - deployment-specific room personalities that package tone, movement, and density more explicitly
-- broader status presets or dropdowns per deployment if operators need them often
 - room-state transitions driven by recent recording activity, not just playback history

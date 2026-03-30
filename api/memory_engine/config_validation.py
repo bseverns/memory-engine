@@ -33,6 +33,8 @@ def validate_runtime_settings(settings_obj) -> None:
         bool(getattr(settings_obj, "CSRF_COOKIE_SECURE", False)),
     ])
     trust_forwarded_for = bool(getattr(settings_obj, "TRUST_X_FORWARDED_FOR", False))
+    # Fail fast on "looks production-ish but is still wired like development"
+    # setups; these tend to show up later as confusing auth or proxy bugs.
     if secure_cookies_enabled:
         for origin in csrf_trusted_origins:
             if origin.startswith("https://"):
@@ -74,6 +76,9 @@ def validate_runtime_settings(settings_obj) -> None:
         ):
             errors.append("ROOM_TONE_SOURCE_URL must start with /, http://, or https://.")
 
+    # Most checks below are intentionally boring scalar/range checks. The goal is
+    # to reject obviously unstable runtime posture at startup instead of letting
+    # it degrade into harder-to-diagnose room or operator behavior later.
     ensure_positive(errors, settings_obj, "WEAR_EPSILON_PER_PLAY", upper_bound=1.0)
     ensure_non_negative(errors, settings_obj, "POOL_PLAY_COOLDOWN_SECONDS")
     ensure_positive(errors, settings_obj, "POOL_CANDIDATE_LIMIT")
@@ -145,6 +150,8 @@ def validate_runtime_settings(settings_obj) -> None:
 
     fresh_max_age = float(getattr(settings_obj, "POOL_FRESH_MAX_AGE_HOURS", 0.0))
     worn_min_age = float(getattr(settings_obj, "POOL_WORN_MIN_AGE_HOURS", 0.0))
+    # Relationship checks matter more than individual ranges here. A config can
+    # be numerically valid and still collapse the intended room behavior.
     if worn_min_age <= fresh_max_age:
         errors.append("POOL_WORN_MIN_AGE_HOURS must be greater than POOL_FRESH_MAX_AGE_HOURS.")
 

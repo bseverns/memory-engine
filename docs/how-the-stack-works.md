@@ -14,6 +14,9 @@ If you need explicit client-role instructions for a real install, use
 If you need the shortest explicit browser/API boundary notes, use
 `docs/surface-contract.md`.
 
+If you need a faster first-glance map before reading this full architecture
+walkthrough, use `docs/AT_A_GLANCE.md`.
+
 ## Design posture
 
 The stack is intentionally local-first and appliance-shaped.
@@ -35,6 +38,11 @@ That split matters:
 - Postgres is the source of truth for artifact state
 - MinIO is the source of truth for stored bytes
 - Redis is only transport for Celery
+
+For `question` and `repair`, the pool payload now also exposes a small
+`thread_signal`. The browser uses that to request one more same-topic return
+when the room should briefly behave like a chorus or a bench notebook, without
+adding a second opaque state system.
 
 ## Runtime topology
 
@@ -214,6 +222,13 @@ small JSON payload describing the change.
 That same audit path now also records lightweight artifact metadata edits made
 through `/ops/`, so topic/status stewardship remains visible without building a
 larger moderation subsystem.
+
+The `/ops/` metadata editor stays intentionally narrow:
+
+- `topic_tag` remains free text for lightweight clustering
+- `lifecycle_status` is presented as a deployment-specific picker
+- existing older custom status values are still preserved and editable if they
+  already exist on an artifact
 
 The core data shape is:
 
