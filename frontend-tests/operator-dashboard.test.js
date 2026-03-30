@@ -100,3 +100,19 @@ test("artifactSummaryCards summarize totals, lanes, and dominant moods", () => {
   assert.match(cards[3].detail, /hushed 4/);
   assert.match(cards[3].detail, /weathered 3/);
 });
+
+test("artifactMetadataStatusLine summarizes deployment-scoped metadata editing", () => {
+  const line = operatorDashboard.artifactMetadataStatusLine({
+    deployment: { label: "Question Engine" },
+    artifacts: [{ id: 1 }, { id: 2 }],
+    editable_fields: {
+      lifecycle_status: {
+        suggestions: ["open", "pending", "answered", "resolved"],
+      },
+    },
+  });
+
+  assert.match(line, /Question Engine/);
+  assert.match(line, /2 recent artifact/);
+  assert.match(line, /open, pending, answered, resolved/);
+});

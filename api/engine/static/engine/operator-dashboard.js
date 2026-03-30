@@ -266,6 +266,24 @@
     }));
   }
 
+  function formatDurationMs(durationMs) {
+    const totalSeconds = Math.max(0, Math.round(Number(durationMs || 0) / 1000));
+    if (totalSeconds < 60) {
+      return `${totalSeconds}s`;
+    }
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+
+  function artifactMetadataStatusLine(payload) {
+    const deployment = payload?.deployment?.label || "active deployment";
+    const count = Number(payload?.artifacts?.length || 0);
+    const suggestions = payload?.editable_fields?.lifecycle_status?.suggestions || [];
+    const suggestionText = suggestions.length ? ` Suggested statuses: ${suggestions.join(", ")}.` : "";
+    return `Showing ${count} recent artifact(s) for ${deployment}.${suggestionText}`;
+  }
+
   function makeCard(doc, card) {
     const el = doc.createElement(card.tagName || "article");
     el.className = card.className || "";
@@ -352,6 +370,8 @@
       opsControlsSave: doc.getElementById("opsControlsSave"),
       opsControlStatus: doc.getElementById("opsControlStatus"),
       opsRecentActions: doc.getElementById("opsRecentActions"),
+      opsArtifactMetadata: doc.getElementById("opsArtifactMetadata"),
+      opsArtifactMetadataStatus: doc.getElementById("opsArtifactMetadataStatus"),
     };
   }
 
@@ -454,6 +474,107 @@
     dom.opsRefreshed.textContent = "Last refresh failed";
   }
 
+  function renderArtifactMetadata(doc, dom, payload, saveArtifactMetadata) {
+    if (!dom.opsArtifactMetadata) return;
+
+    const artifacts = Array.isArray(payload?.artifacts) ? payload.artifacts : [];
+    if (dom.opsArtifactMetadataStatus) {
+      dom.opsArtifactMetadataStatus.textContent = artifactMetadataStatusLine(payload || {});
+    }
+
+    if (!artifacts.length) {
+      replaceCardList(doc, dom.opsArtifactMetadata, [{
+        tagName: "article",
+        className: "component-card ready",
+        title: "No recent artifacts in this deployment",
+        detail: "Recordings will appear here once the current deployment has active artifacts to steward.",
+      }]);
+      return;
+    }
+
+    const cards = artifacts.map((artifact) => {
+      const card = doc.createElement("article");
+      card.className = "component-card ready ops-artifact-editor";
+
+      const head = doc.createElement("div");
+      head.className = "ops-artifact-editor-head";
+      const title = doc.createElement("strong");
+      title.textContent = `Artifact ${artifact.id}`;
+      const meta = doc.createElement("span");
+      meta.className = "ops-artifact-editor-meta";
+      const createdAt = artifact.created_at ? new Date(artifact.created_at).toLocaleString() : "unknown time";
+      meta.textContent = `${createdAt} · ${formatDurationMs(artifact.duration_ms)} · ${artifact.lane || "mid"} / ${artifact.density || "medium"} / ${artifact.mood || "suspended"} · heard ${artifact.play_count || 0}`;
+      head.append(title, meta);
+
+      const fields = doc.createElement("div");
+      fields.className = "ops-artifact-editor-fields";
+
+      const topicLabel = doc.createElement("label");
+      topicLabel.className = "ops-login-field";
+      const topicText = doc.createElement("span");
+      const topicStrong = doc.createElement("strong");
+      topicStrong.textContent = payload?.editable_fields?.topic_tag?.label || "Topic / category";
+      const topicHint = doc.createElement("span");
+      topicHint.textContent = `Used for lightweight clustering and operator trace.`;
+      topicText.append(topicStrong, topicHint);
+      const topicInput = doc.createElement("input");
+      topicInput.type = "text";
+      topicInput.value = String(artifact.topic_tag || "");
+      topicInput.placeholder = payload?.editable_fields?.topic_tag?.placeholder || "entry_gate";
+      topicLabel.append(topicText, topicInput);
+
+      const lifecycleLabel = doc.createElement("label");
+      lifecycleLabel.className = "ops-login-field";
+      const lifecycleText = doc.createElement("span");
+      const lifecycleStrong = doc.createElement("strong");
+      lifecycleStrong.textContent = payload?.editable_fields?.lifecycle_status?.label || "Status";
+      const lifecycleHint = doc.createElement("span");
+      lifecycleHint.textContent = `Examples: ${(payload?.editable_fields?.lifecycle_status?.suggestions || []).join(", ") || "open, resolved"}`;
+      lifecycleText.append(lifecycleStrong, lifecycleHint);
+      const lifecycleInput = doc.createElement("input");
+      lifecycleInput.type = "text";
+      lifecycleInput.value = String(artifact.lifecycle_status || "");
+      lifecycleInput.placeholder = (payload?.editable_fields?.lifecycle_status?.suggestions || [])[0] || "open";
+      lifecycleLabel.append(lifecycleText, lifecycleInput);
+
+      fields.append(topicLabel, lifecycleLabel);
+
+      const actions = doc.createElement("div");
+      actions.className = "ops-artifact-editor-actions";
+      const saveButton = doc.createElement("button");
+      saveButton.type = "button";
+      saveButton.className = "btn secondary";
+      saveButton.textContent = "Save metadata";
+      const status = doc.createElement("span");
+      status.className = "ops-artifact-editor-status";
+      status.textContent = "Ready";
+      actions.append(saveButton, status);
+
+      saveButton.addEventListener("click", async () => {
+        saveButton.disabled = true;
+        status.textContent = "Saving…";
+        try {
+          const updated = await saveArtifactMetadata(artifact.id, {
+            topic_tag: topicInput.value,
+            lifecycle_status: lifecycleInput.value,
+          });
+          topicInput.value = String(updated.topic_tag || "");
+          lifecycleInput.value = String(updated.lifecycle_status || "");
+          status.textContent = "Saved";
+        } catch (error) {
+          status.textContent = error.message || "Save failed";
+        } finally {
+          saveButton.disabled = false;
+        }
+      });
+
+      card.append(head, fields, actions);
+      return card;
+    });
+
+    dom.opsArtifactMetadata.replaceChildren(...cards);
+  }
+
   async function fetchJson(fetchImpl, url, options = {}) {
     const response = await fetchImpl(url, options);
     if (!response.ok) {
@@ -488,6 +609,36 @@
       }
     }
 
+    async function saveArtifactMetadata(artifactId, values) {
+      const payload = await fetchJson(fetchImpl, `/api/v1/operator/artifacts/${artifactId}/metadata`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": readCookie(doc, "csrftoken"),
+        },
+        body: JSON.stringify(values || {}),
+      });
+      await refreshControls();
+      return payload.artifact || {};
+    }
+
+    async function refreshArtifacts() {
+      try {
+        const payload = await fetchJson(fetchImpl, "/api/v1/operator/artifacts", { cache: "no-store" });
+        renderArtifactMetadata(doc, dom, payload, saveArtifactMetadata);
+      } catch (error) {
+        if (dom.opsArtifactMetadataStatus) {
+          dom.opsArtifactMetadataStatus.textContent = error.message || "Artifact metadata refresh failed.";
+        }
+        replaceCardList(doc, dom.opsArtifactMetadata, [{
+          tagName: "article",
+          className: "component-card broken",
+          title: "Artifact metadata unavailable",
+          detail: "Unable to load recent artifacts for metadata stewardship.",
+        }]);
+      }
+    }
+
     async function saveControls(event) {
       event.preventDefault();
       if (!dom.opsControlsSave) return;
@@ -516,6 +667,7 @@
         });
         renderControlPayload(doc, dom, payload);
         await refreshStatus();
+        await refreshArtifacts();
       } catch (error) {
         if (dom.opsControlStatus) {
           dom.opsControlStatus.textContent = error.message || "Control update failed.";
@@ -533,9 +685,11 @@
 
     void refreshStatus();
     void refreshControls();
+    void refreshArtifacts();
     const intervalId = root.setInterval(() => {
       void refreshStatus();
       void refreshControls();
+      void refreshArtifacts();
     }, intervalMs);
 
     return {
@@ -554,6 +708,7 @@
     renderControlPayload,
     renderError,
     renderPayload,
+    artifactMetadataStatusLine,
     artifactSummaryCards,
     memoryColorCards,
     retentionCards,

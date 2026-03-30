@@ -452,6 +452,11 @@ class OperatorBehaviorTests(EngineTestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_operator_recent_artifacts_requires_operator_session(self):
+        response = self.client.get("/api/v1/operator/artifacts")
+
+        self.assertEqual(response.status_code, 403)
+
     def test_operator_artifact_summary_downloads_json_payload(self):
         self.login_operator()
         consent = self.make_consent("ROOM")
@@ -471,6 +476,81 @@ class OperatorBehaviorTests(EngineTestCase):
         payload = response.json()
         self.assertEqual(payload["memory_colors"]["counts"]["warm"], 1)
         self.assertEqual(payload["playable"], 1)
+
+    @override_settings(ENGINE_DEPLOYMENT="question")
+    def test_operator_recent_artifacts_lists_only_active_deployment(self):
+        self.login_operator()
+        self.make_active_artifact(
+            raw_uri="raw/question-one.wav",
+            deployment_kind="question",
+            topic_tag="entry_gate",
+            lifecycle_status="open",
+            created_at=timezone.now() - timedelta(hours=5),
+        )
+        self.make_active_artifact(
+            raw_uri="raw/repair-one.wav",
+            deployment_kind="repair",
+            topic_tag="projector",
+            lifecycle_status="pending",
+            created_at=timezone.now() - timedelta(hours=4),
+        )
+
+        response = self.client.get("/api/v1/operator/artifacts")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["deployment"]["code"], "question")
+        self.assertEqual(len(payload["artifacts"]), 1)
+        self.assertEqual(payload["artifacts"][0]["deployment_kind"], "question")
+        self.assertEqual(payload["editable_fields"]["lifecycle_status"]["suggestions"][0], "open")
+
+    @override_settings(ENGINE_DEPLOYMENT="repair")
+    def test_operator_update_artifact_metadata_updates_topic_and_status(self):
+        self.login_operator()
+        artifact = self.make_active_artifact(
+            raw_uri="raw/repair-note.wav",
+            deployment_kind="repair",
+            topic_tag="projector",
+            lifecycle_status="pending",
+        )
+
+        response = self.client.post(
+            f"/api/v1/operator/artifacts/{artifact.id}/metadata",
+            data={
+                "topic_tag": "amp_rack",
+                "lifecycle_status": "fixed",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        artifact.refresh_from_db()
+        self.assertEqual(artifact.topic_tag, "amp_rack")
+        self.assertEqual(artifact.lifecycle_status, "fixed")
+        self.assertEqual(response.json()["changed_fields"], ["topic_tag", "lifecycle_status"])
+        audit = StewardAction.objects.filter(action="artifact.metadata.updated").latest("created_at")
+        self.assertIn("artifact", audit.detail)
+        self.assertEqual(audit.payload["artifact_id"], artifact.id)
+        self.assertEqual(audit.payload["topic_tag"], "amp_rack")
+        self.assertEqual(audit.payload["lifecycle_status"], "fixed")
+
+    @override_settings(ENGINE_DEPLOYMENT="question")
+    def test_operator_update_artifact_metadata_rejects_other_deployment_artifact(self):
+        self.login_operator()
+        artifact = self.make_active_artifact(
+            raw_uri="raw/repair-note.wav",
+            deployment_kind="repair",
+            topic_tag="projector",
+            lifecycle_status="pending",
+        )
+
+        response = self.client.post(
+            f"/api/v1/operator/artifacts/{artifact.id}/metadata",
+            data={"topic_tag": "entry_gate", "lifecycle_status": "open"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 404)
 
     def test_node_status_requires_operator_session(self):
         response = self.client.get("/api/v1/node/status")

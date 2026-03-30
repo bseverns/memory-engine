@@ -47,12 +47,12 @@ DEPLOYMENT_SPECS: tuple[DeploymentSpec, ...] = (
     DeploymentSpec(
         code="prompt",
         label="Prompt Engine",
-        short_description="Prompt-led intake where authored cues catalyze variation.",
+        short_description="Prompt-led intake where recent responses recirculate sooner and keep the room moving.",
         participant_noun="prompt response",
         framing_noun="prompt offering",
         copy_catalog_key="prompt",
         playback_policy_key="prompt_catalytic",
-        ops_note="Keeps variety high and returns catalyst-like cues quickly.",
+        ops_note="Keeps recent responses circulating quickly with lighter wear and catalytic pacing.",
     ),
     DeploymentSpec(
         code="repair",
@@ -67,12 +67,12 @@ DEPLOYMENT_SPECS: tuple[DeploymentSpec, ...] = (
     DeploymentSpec(
         code="witness",
         label="Witness Engine",
-        short_description="Observation-oriented capture with documentary pacing.",
+        short_description="Observation-oriented capture with steadier documentary pacing and contextual return.",
         participant_noun="witness note",
         framing_noun="witness offering",
         copy_catalog_key="witness",
         playback_policy_key="witness_documentary",
-        ops_note="Prefers careful contextual pacing and documentary clarity.",
+        ops_note="Prefers settled contextual return, calmer pacing, and gentler wear.",
     ),
     DeploymentSpec(
         code="oracle",

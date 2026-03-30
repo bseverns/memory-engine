@@ -132,6 +132,8 @@ The app API routes in `api/engine/urls.py` break down into five groups:
   `/api/v1/surface/state`
   `/api/v1/surface/fossils/<token>`
   `/api/v1/node/status`
+  `/api/v1/operator/artifacts`
+  `/api/v1/operator/artifacts/<id>/metadata`
   `/api/v1/operator/controls`
 - blob and derivative access
   `/api/v1/media/raw/<token>`
@@ -208,6 +210,10 @@ needs all client machines to agree on the same current stewardship posture.
 
 Records each live operator control change with a timestamp, actor label, and a
 small JSON payload describing the change.
+
+That same audit path now also records lightweight artifact metadata edits made
+through `/ops/`, so topic/status stewardship remains visible without building a
+larger moderation subsystem.
 
 The core data shape is:
 

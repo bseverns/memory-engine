@@ -62,11 +62,18 @@
   - `question` now favors unresolved recurrence and topic clustering
   - `repair` now favors recent practical return and higher clarity
   - `oracle` now uses sparser, more ceremonial resurfacing
+- First substantive follow-through for the remaining supported deployments:
+  - `prompt` now recirculates recent catalytic material sooner
+  - `witness` now favors settled contextual return over hyper-recency
 - Lightweight deployment metadata use made real in playback:
   - `lifecycle_status` now drives `question` recurrence
   - `topic_tag` now supports loose `question` and `repair` clustering
   - ingest accepts `topic` / `category` and `status` aliases without schema sprawl
 - Deployment-specific wear and room-loop posture are now active rather than documented only
+- Lightweight `/ops/` metadata editing for recent artifacts in the active deployment
+  - topic/category and status only
+  - audited through steward actions
+  - intentionally kept out of a larger artifact-management surface
 
 ### Audience playback
 - Weighted pool selection with cooldown to reduce obvious repetition
@@ -120,11 +127,11 @@
 
 ### Multi-deployment follow-through
 - Add deployment-specific intake cards so stewards can tune prompts without touching code
-- Add lightweight deployment-aware metadata editing in `/ops/` (topic + lifecycle only)
 - Add deployment-aware playback policy presets visible in operator status exports
 - Add deployment-aware retention/export presets for archival handoff bundles
 - Add installation-specific room identities that can be combined with deployment kind (e.g., `repair` + `shared_lab`)
 - Add a safe operator-facing way to mark questions `answered` / `resolved` and repairs `fixed` / `obsolete`
+- Add clearer per-deployment status pickers in `/ops/` if the free-text metadata editor proves too loose
 
 ### User / speaker
 - Add optional headphone or monitor-check mode for setup and microphone testing
@@ -153,7 +160,7 @@
   - fuller `question` chorus / thread behavior
   - fuller `repair` workbench / bench-notebook behavior
   - deeper `oracle` ceremony controls
-  - first substantive behavior for `prompt` and `witness`
+  - more explicit prompt chains and witness context handling, now that first-pass behavior exists
 - Add shared-pool or federated-pool options for multi-room installations
 - Add richer visual layers such as projected fossils, spectrogram drift, or low-light companion displays
 - Add semantic or transcript-aware grouping if metadata-only composition plateaus

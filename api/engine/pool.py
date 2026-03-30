@@ -372,6 +372,17 @@ def select_candidates_for_deployment(*, cooldown_qs, preferred_base_qs, deployme
             topic_cluster_queryset(preferred_base_qs, recent_topics).order_by("last_access_at", "-created_at", "play_count", "wear"),
             preferred_base_qs.order_by("last_access_at", "-created_at", "play_count", "wear"),
         ])
+    elif code == "prompt":
+        recent_threshold = now - timedelta(days=10)
+        recent_cooldown_qs = cooldown_qs.filter(created_at__gte=recent_threshold)
+        recent_base_qs = preferred_base_qs.filter(created_at__gte=recent_threshold)
+        batches.extend([
+            topic_cluster_queryset(recent_cooldown_qs, recent_topics).order_by("-created_at", "play_count", "wear"),
+            recent_cooldown_qs.order_by("-created_at", "play_count", "wear"),
+            topic_cluster_queryset(cooldown_qs, recent_topics).order_by("-created_at", "play_count", "wear"),
+            recent_base_qs.order_by("-created_at", "last_access_at", "play_count", "wear"),
+            preferred_base_qs.order_by("-created_at", "last_access_at", "play_count", "wear"),
+        ])
     elif code == "repair":
         recent_threshold = now - timedelta(days=14)
         recent_cooldown_qs = cooldown_qs.filter(created_at__gte=recent_threshold)
@@ -382,6 +393,16 @@ def select_candidates_for_deployment(*, cooldown_qs, preferred_base_qs, deployme
             topic_cluster_queryset(cooldown_qs, recent_topics).order_by("-created_at", "play_count", "wear"),
             recent_base_qs.order_by("-created_at", "last_access_at", "play_count", "wear"),
             preferred_base_qs.order_by("-created_at", "last_access_at", "play_count", "wear"),
+        ])
+    elif code == "witness":
+        settled_threshold = now - timedelta(hours=6)
+        settled_cooldown_qs = cooldown_qs.filter(created_at__lt=settled_threshold)
+        settled_base_qs = preferred_base_qs.filter(created_at__lt=settled_threshold)
+        batches.extend([
+            settled_cooldown_qs.order_by("last_access_at", "-created_at", "play_count", "wear"),
+            settled_base_qs.order_by("last_access_at", "-created_at", "play_count", "wear"),
+            cooldown_qs.order_by("last_access_at", "-created_at", "play_count", "wear"),
+            preferred_base_qs.order_by("last_access_at", "-created_at", "play_count", "wear"),
         ])
     elif code == "oracle":
         oracle_threshold = now - timedelta(hours=12)

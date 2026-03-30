@@ -108,3 +108,70 @@ test("repair deployment lowers room-tone gain compared with memory", () => {
 
   assert.ok(repairTone < memoryTone);
 });
+
+test("prompt deployment shortens the anti-repetition window further than memory", () => {
+  const policy = loadRoomLoopPolicy();
+
+  const size = policy.antiRepetitionWindowSize({
+    engineDeployment: "prompt",
+    roomAntiRepetitionWindowSize: 12,
+    roomLoopConfig: {
+      policy: {
+        activeDeployment: {
+          code: "prompt",
+          antiRepetitionWindow: 7,
+        },
+      },
+    },
+  });
+
+  assert.equal(size, 7);
+});
+
+test("witness deployment stretches gap timing compared with memory", () => {
+  const policy = loadRoomLoopPolicy();
+  const intensity = { cueGapMultiplier: 1.0, pauseGapMultiplier: 1.0, roomToneMultiplier: 1.0 };
+  const movement = { gapMultiplier: 1.0 };
+  const memoryGap = policy.adaptiveGapMultiplier(
+    { engineDeployment: "memory" },
+    {
+      policy: {
+        scarcity: {
+          normal: { gapMultiplier: 1.0, pauseMultiplier: 1.0, toneMultiplier: 1.0 },
+        },
+        activeDeployment: {
+          code: "memory",
+          cueGapMultiplier: 1.0,
+          pauseGapMultiplier: 1.0,
+          toneGainMultiplier: 1.0,
+        },
+      },
+    },
+    intensity,
+    20,
+    movement,
+    false,
+  );
+  const witnessGap = policy.adaptiveGapMultiplier(
+    { engineDeployment: "witness" },
+    {
+      policy: {
+        scarcity: {
+          normal: { gapMultiplier: 1.0, pauseMultiplier: 1.0, toneMultiplier: 1.0 },
+        },
+        activeDeployment: {
+          code: "witness",
+          cueGapMultiplier: 1.16,
+          pauseGapMultiplier: 1.22,
+          toneGainMultiplier: 0.96,
+        },
+      },
+    },
+    intensity,
+    20,
+    movement,
+    false,
+  );
+
+  assert.ok(witnessGap > memoryGap);
+});

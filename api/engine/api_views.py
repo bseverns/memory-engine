@@ -50,8 +50,10 @@ from .ops import (
 )
 from .pool import (
     artifact_age_hours,
+    artifact_absence_hours,
     artifact_density,
     artifact_is_featured_return,
+    artifact_lane,
     artifact_mood,
     artifact_playback_key,
     artifact_playback_window,
@@ -116,6 +118,55 @@ def parse_topic_tag(value) -> str:
 
 def parse_lifecycle_status(value) -> str:
     return str(value or "").strip().lower()[:32]
+
+
+def deployment_lifecycle_suggestions(deployment_code: str) -> list[str]:
+    code = deployment_spec(deployment_code).code
+    if code == "question":
+        return ["open", "pending", "answered", "resolved"]
+    if code == "repair":
+        return ["pending", "needs_part", "fixed", "obsolete"]
+    if code == "prompt":
+        return ["seed", "echo", "spent"]
+    if code == "witness":
+        return ["observed", "verified", "contextual"]
+    if code == "oracle":
+        return ["held", "spent"]
+    return ["open", "resolved"]
+
+
+def deployment_topic_placeholder(deployment_code: str) -> str:
+    code = deployment_spec(deployment_code).code
+    if code == "repair":
+        return "projector"
+    if code == "question":
+        return "entry_gate"
+    if code == "prompt":
+        return "session_cue"
+    if code == "witness":
+        return "context"
+    if code == "oracle":
+        return "omen"
+    return "memory_thread"
+
+
+def serialize_operator_artifact(artifact: Artifact, now) -> dict:
+    return {
+        "id": artifact.id,
+        "created_at": artifact.created_at,
+        "last_access_at": artifact.last_access_at,
+        "duration_ms": int(artifact.duration_ms or 0),
+        "play_count": int(artifact.play_count or 0),
+        "wear": float(artifact.wear or 0.0),
+        "deployment_kind": str(artifact.deployment_kind or "memory"),
+        "topic_tag": str(artifact.topic_tag or ""),
+        "lifecycle_status": str(artifact.lifecycle_status or ""),
+        "lane": artifact_lane(artifact, now),
+        "density": artifact_density(artifact),
+        "mood": artifact_mood(artifact, now),
+        "age_hours": round(artifact_age_hours(artifact, now), 2),
+        "absence_hours": round(artifact_absence_hours(artifact, now), 2),
+    }
 
 
 def intake_suspended() -> bool:
@@ -734,6 +785,99 @@ def operator_artifact_summary(request):
     response = Response(payload)
     response["Content-Disposition"] = 'attachment; filename="artifact-summary.json"'
     return response
+
+
+@api_view(["GET"])
+def operator_recent_artifacts(request):
+    if not operator_session_active(request):
+        return operator_api_denied()
+
+    now = timezone.now()
+    active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+    limit = max(1, min(12, parse_intish(request.query_params.get("limit"), 6)))
+    artifacts = list(
+        Artifact.objects.filter(
+            status=Artifact.STATUS_ACTIVE,
+            deployment_kind=active_deployment.code,
+        ).order_by("-created_at")[:limit]
+    )
+
+    return Response({
+        "deployment": {
+            "code": active_deployment.code,
+            "label": active_deployment.label,
+        },
+        "artifacts": [serialize_operator_artifact(artifact, now) for artifact in artifacts],
+        "editable_fields": {
+            "topic_tag": {
+                "label": "Topic / category",
+                "placeholder": deployment_topic_placeholder(active_deployment.code),
+            },
+            "lifecycle_status": {
+                "label": "Status",
+                "suggestions": deployment_lifecycle_suggestions(active_deployment.code),
+            },
+        },
+    })
+
+
+@api_view(["POST"])
+@parser_classes([JSONParser])
+def operator_update_artifact_metadata(request, artifact_id: int):
+    if not operator_session_active(request):
+        return operator_api_denied()
+
+    active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+    try:
+        artifact = Artifact.objects.get(
+            id=int(artifact_id),
+            deployment_kind=active_deployment.code,
+        )
+    except Artifact.DoesNotExist:
+        return Response({"error": "artifact not found in active deployment"}, status=404)
+
+    topic_tag = parse_topic_tag(
+        request.data.get("topic_tag")
+        or request.data.get("topic")
+        or request.data.get("category")
+    )
+    lifecycle_status = parse_lifecycle_status(
+        request.data.get("lifecycle_status")
+        or request.data.get("status")
+    )
+
+    changed_fields = []
+    if artifact.topic_tag != topic_tag:
+        artifact.topic_tag = topic_tag
+        changed_fields.append("topic_tag")
+    if artifact.lifecycle_status != lifecycle_status:
+        artifact.lifecycle_status = lifecycle_status
+        changed_fields.append("lifecycle_status")
+
+    if changed_fields:
+        artifact.save(update_fields=changed_fields)
+        detail_parts = []
+        if "topic_tag" in changed_fields:
+            detail_parts.append(f"topic {topic_tag or 'cleared'}")
+        if "lifecycle_status" in changed_fields:
+            detail_parts.append(f"status {lifecycle_status or 'cleared'}")
+        record_steward_action(
+            action="artifact.metadata.updated",
+            actor=request_operator_label(request),
+            detail=f"artifact {artifact.id} metadata updated ({', '.join(detail_parts)})",
+            payload={
+                "artifact_id": artifact.id,
+                "deployment_kind": artifact.deployment_kind,
+                "changed_fields": changed_fields,
+                "topic_tag": artifact.topic_tag,
+                "lifecycle_status": artifact.lifecycle_status,
+            },
+        )
+
+    return Response({
+        "artifact": serialize_operator_artifact(artifact, timezone.now()),
+        "changed_fields": changed_fields,
+    })
 
 
 def media_proxy_raw(request, access_token: str):

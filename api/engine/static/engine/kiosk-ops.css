@@ -66,6 +66,38 @@
   font:inherit;
 }
 
+.ops-artifact-editor{
+  display:grid;
+  gap:14px;
+}
+
+.ops-artifact-editor-head{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.ops-artifact-editor-meta{
+  color:var(--muted);
+}
+
+.ops-artifact-editor-fields{
+  display:grid;
+  gap:12px;
+  grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.ops-artifact-editor-actions{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:12px;
+}
+
+.ops-artifact-editor-status{
+  color:var(--muted);
+}
+
 .ops-login-error{
   margin:16px 0 0;
   color:var(--record);

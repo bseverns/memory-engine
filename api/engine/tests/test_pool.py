@@ -257,6 +257,64 @@ class PoolBehaviorTests(EngineTestCase):
 
         self.assertGreater(recent_weight, old_weight)
 
+    def test_pool_weight_prompt_prefers_recent_catalytic_material(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        recent_prompt = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/prompt-recent.wav",
+            deployment_kind="prompt",
+            topic_tag="call_and_response",
+            duration_ms=6000,
+            created_at=now - timedelta(hours=8),
+            last_access_at=now - timedelta(hours=4),
+        )
+        old_prompt = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/prompt-old.wav",
+            deployment_kind="prompt",
+            topic_tag="spent",
+            duration_ms=26000,
+            created_at=now - timedelta(days=20),
+            last_access_at=now - timedelta(days=6),
+        )
+
+        recent_weight = pool_weight(
+            recent_prompt,
+            now,
+            cooldown_seconds=90,
+            recent_topics=["call_and_response"],
+            deployment_code="prompt",
+        )
+        old_weight = pool_weight(old_prompt, now, cooldown_seconds=90, deployment_code="prompt")
+
+        self.assertGreater(recent_weight, old_weight)
+
+    def test_pool_weight_witness_prefers_settled_contextual_material(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        settled = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/witness-settled.wav",
+            deployment_kind="witness",
+            duration_ms=14000,
+            created_at=now - timedelta(hours=30),
+            last_access_at=now - timedelta(hours=12),
+        )
+        new_item = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/witness-new.wav",
+            deployment_kind="witness",
+            duration_ms=4000,
+            created_at=now - timedelta(hours=1),
+            last_access_at=now - timedelta(hours=1),
+        )
+
+        settled_weight = pool_weight(settled, now, cooldown_seconds=90, deployment_code="witness")
+        new_weight = pool_weight(new_item, now, cooldown_seconds=90, deployment_code="witness")
+
+        self.assertGreater(settled_weight, new_weight)
+
     def test_pool_weight_oracle_penalizes_brand_new_material(self):
         now = timezone.now()
         consent = self.make_consent("ROOM")
@@ -303,6 +361,61 @@ class PoolBehaviorTests(EngineTestCase):
 
         self.assertIsNotNone(selected)
         self.assertEqual(selected.id, question_artifact.id)
+
+    def test_select_pool_artifact_for_prompt_prefers_recent_prompt_material(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        recent_prompt = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/prompt-recent.wav",
+            deployment_kind="prompt",
+            topic_tag="call_and_response",
+            created_at=now - timedelta(hours=6),
+            last_access_at=now - timedelta(hours=4),
+        )
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/prompt-old.wav",
+            deployment_kind="prompt",
+            topic_tag="spent",
+            created_at=now - timedelta(days=25),
+            last_access_at=now - timedelta(days=8),
+        )
+
+        selected, _ = select_pool_artifact(
+            now,
+            deployment_code="prompt",
+            recent_topics=["call_and_response"],
+        )
+
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected.id, recent_prompt.id)
+
+    def test_select_pool_artifact_for_witness_prefers_settled_material(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        settled = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/witness-settled.wav",
+            deployment_kind="witness",
+            created_at=now - timedelta(hours=18),
+            last_access_at=now - timedelta(hours=12),
+        )
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/witness-fresh.wav",
+            deployment_kind="witness",
+            created_at=now - timedelta(hours=2),
+            last_access_at=now - timedelta(hours=2),
+        )
+
+        selected, _ = select_pool_artifact(
+            now,
+            deployment_code="witness",
+        )
+
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected.id, settled.id)
 
     @override_settings(ENGINE_DEPLOYMENT="question")
     def test_pool_next_returns_question_metadata_for_room_loop_clustering(self):

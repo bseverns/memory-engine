@@ -61,17 +61,19 @@ DEPLOYMENT_PLAYBACK_PROFILES: dict[str, DeploymentPlaybackProfile] = {
     ),
     "prompt": DeploymentPlaybackProfile(
         code="prompt",
-        behavior_summary="Prompt responses stay lively and avoid settling too quickly.",
-        afterlife_summary="Catalytic responses circulate sooner and older prompts cool faster.",
-        tuning_source="Light prompt weighting on top of the shared loop.",
-        candidate_limit_multiplier=1.05,
-        cooldown_multiplier=0.9,
-        wear_multiplier=0.8,
-        anti_repetition_window=10,
-        cue_gap_multiplier=0.94,
-        pause_gap_multiplier=0.96,
-        tone_gain_multiplier=0.96,
-        overlap_chance_multiplier=1.05,
+        behavior_summary="Prompt responses stay catalytic, recirculate sooner, and keep the room moving.",
+        afterlife_summary="Recent prompts can echo back quickly; old spent prompts cool down instead of weathering into memory.",
+        tuning_source="Prompt weighting, quicker recirculation, lighter wear, and more catalytic pacing.",
+        candidate_limit_multiplier=1.12,
+        cooldown_multiplier=0.72,
+        wear_multiplier=0.55,
+        anti_repetition_window=7,
+        cue_gap_multiplier=0.76,
+        pause_gap_multiplier=0.82,
+        tone_gain_multiplier=0.9,
+        overlap_chance_multiplier=1.22,
+        featured_return_multiplier=0.84,
+        topic_cluster_boost=1.16,
     ),
     "repair": DeploymentPlaybackProfile(
         code="repair",
@@ -91,17 +93,17 @@ DEPLOYMENT_PLAYBACK_PROFILES: dict[str, DeploymentPlaybackProfile] = {
     ),
     "witness": DeploymentPlaybackProfile(
         code="witness",
-        behavior_summary="Witness notes keep documentary pacing and avoid hyper-recency spikes.",
-        afterlife_summary="Return stays measured and contextual rather than restless.",
-        tuning_source="Witness weighting with modestly calmer loop pacing.",
+        behavior_summary="Witness notes return with steadier documentary pacing and contextual clarity.",
+        afterlife_summary="Very recent takes settle first; contextual notes return later with lower churn.",
+        tuning_source="Witness weighting, calmer pacing, longer anti-repetition, and gentler wear.",
         candidate_limit_multiplier=1.0,
-        cooldown_multiplier=1.05,
-        wear_multiplier=0.7,
-        anti_repetition_window=12,
-        cue_gap_multiplier=1.08,
-        pause_gap_multiplier=1.1,
-        tone_gain_multiplier=1.02,
-        overlap_chance_multiplier=0.85,
+        cooldown_multiplier=1.18,
+        wear_multiplier=0.48,
+        anti_repetition_window=15,
+        cue_gap_multiplier=1.16,
+        pause_gap_multiplier=1.22,
+        tone_gain_multiplier=0.96,
+        overlap_chance_multiplier=0.5,
     ),
     "oracle": DeploymentPlaybackProfile(
         code="oracle",
@@ -238,12 +240,46 @@ def weight_artifact_for_question(
     return weight
 
 
-def weight_artifact_for_prompt(*, age_hours: float, **_: object) -> float:
-    if age_hours <= 36:
-        return 1.12
-    if age_hours >= 360:
-        return 0.88
-    return 1.0
+def weight_artifact_for_prompt(
+    *,
+    age_hours: float,
+    topic_tag: str,
+    recent_topics: Sequence[str] | None,
+    duration_ms: int,
+    lane: str,
+    density: str,
+    mood: str,
+    **_: object,
+) -> float:
+    weight = 1.0
+    if age_hours <= 24:
+        weight *= 1.28
+    elif age_hours <= 96:
+        weight *= 1.12
+    elif age_hours >= 336:
+        weight *= 0.82
+
+    if duration_ms <= 9000:
+        weight *= 1.12
+    elif duration_ms >= 22000:
+        weight *= 0.82
+
+    if topic_tag and topic_tag.lower() in recent_topic_list(recent_topics):
+        weight *= playback_profile("prompt").topic_cluster_boost
+
+    if lane in {"fresh", "mid"}:
+        weight *= 1.08
+    else:
+        weight *= 0.88
+
+    if density == "dense":
+        weight *= 0.86
+    if mood in {"clear", "gathering"}:
+        weight *= 1.12
+    elif mood == "weathered":
+        weight *= 0.82
+
+    return weight
 
 
 def weight_artifact_for_repair(
@@ -295,12 +331,41 @@ def weight_artifact_for_repair(
     return weight
 
 
-def weight_artifact_for_witness(*, age_hours: float, **_: object) -> float:
-    if age_hours < 2:
-        return 0.86
-    if 8 <= age_hours <= 168:
-        return 1.14
-    return 1.0
+def weight_artifact_for_witness(
+    *,
+    age_hours: float,
+    duration_ms: int,
+    lane: str,
+    density: str,
+    mood: str,
+    **_: object,
+) -> float:
+    weight = 1.0
+    if age_hours < 6:
+        weight *= 0.76
+    elif 12 <= age_hours <= 240:
+        weight *= 1.18
+    elif age_hours >= 720:
+        weight *= 0.92
+
+    if duration_ms >= 9000:
+        weight *= 1.06
+    else:
+        weight *= 0.94
+
+    if lane == "mid":
+        weight *= 1.12
+    elif lane == "fresh":
+        weight *= 0.88
+
+    if density == "light":
+        weight *= 0.9
+    if mood in {"hushed", "suspended"}:
+        weight *= 1.12
+    elif mood == "gathering":
+        weight *= 0.86
+
+    return weight
 
 
 def weight_artifact_for_oracle(

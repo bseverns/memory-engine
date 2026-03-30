@@ -1,8 +1,9 @@
 # Deployment Behaviors
 
 This repo is one local-first artifact machine with explicit deployment kinds.
-`memory` remains the canonical baseline. `question`, `repair`, and `oracle`
-now have real playback differences, not just alternate copy.
+`memory` remains the canonical baseline. `question`, `repair`, `oracle`,
+`prompt`, and `witness` now all differ through explicit policy rather than copy
+alone, though `memory`, `question`, and `repair` remain the most developed.
 
 ## What Is Actually Distinct Now
 
@@ -12,8 +13,8 @@ now have real playback differences, not just alternate copy.
 | `question` | unresolved, returning, lightly haunted | boosts `status=open` / unresolved items, recent questions, and recent-topic clustering | lighter wear keeps questions readable longer | shorter anti-repetition, slightly quicker gaps, slightly more recurrence |
 | `repair` | practical, recent, useful | boosts recent items, shorter notes, and near-term topic recurrence | much lighter wear for clarity | shorter gaps, calmer tone bed, less overlap |
 | `oracle` | sparse, ceremonial, event-like | penalizes brand-new material, favors older absent fragments and featured returns | very light wear | longer gaps, longer pauses, very low overlap |
-| `prompt` | structurally supported | light weighting only | lighter than memory | modestly livelier pacing |
-| `witness` | structurally supported | light weighting only | lighter than memory | calmer pacing |
+| `prompt` | catalytic, quick, recirculating | boosts recent shorter prompt responses and recent-topic echoes | lighter wear than memory | shortest anti-repetition, quicker gaps, slightly more overlap |
+| `witness` | settled, contextual, documentary | cools hyper-recent material and favors settled contextual notes | gentler wear than memory | longer anti-repetition, calmer pacing, lower overlap |
 
 ## Metadata In Play
 
@@ -65,6 +66,11 @@ Operator awareness:
 - `api/engine/static/engine/operator-dashboard.js`
 - `api/engine/api_views.py`
 
+Operator metadata editing:
+
+- `GET /api/v1/operator/artifacts`
+- `POST /api/v1/operator/artifacts/<id>/metadata`
+
 ## Implemented Policy Summary
 
 ### `memory`
@@ -107,9 +113,38 @@ Implemented now:
 
 Not implemented:
 
-- dedicated repair metadata editor in `/ops/`
 - structured tool / part / issue taxonomies
 - repair-specific retention controls
+
+### `prompt`
+
+Implemented now:
+
+- recent prompt responses are favored over old spent material
+- shorter prompts are boosted over long dense ones
+- recent `topic_tag` history can echo prompt-adjacent material
+- anti-repetition is shorter than memory
+- gaps are quicker and overlap is slightly more permissive
+
+Not implemented:
+
+- steward-authored prompt packs
+- explicit prompt chains or thread awareness
+
+### `witness`
+
+Implemented now:
+
+- very recent witness notes are cooled until they settle
+- settled mid-age material is favored
+- longer contextual notes are slightly preferred over clipped fragments
+- anti-repetition is longer than memory
+- pacing is calmer and overlap is reduced
+
+Not implemented:
+
+- richer witness verification workflow
+- witness-specific context fields beyond topic/status
 
 ### `oracle`
 
@@ -146,9 +181,19 @@ around what that afterlife means.
 - if a non-memory deployment has no playable artifacts at all, the pool can still fall back safely
 - if a non-memory deployment does have playable artifacts, the selector stays inside that deployment before falling back elsewhere
 
+## Operator Editing
+
+`/ops/` now includes a small deployment-scoped artifact metadata section:
+
+- only recent artifacts from the active deployment are shown
+- only `topic_tag` and `lifecycle_status` are editable
+- edits are audited through steward actions
+
+This keeps stewardship inspectable without turning the dashboard into a large
+artifact management console.
+
 ## Next Likely Extensions
 
-- lightweight steward editing of `topic_tag` and `lifecycle_status` in `/ops/`
 - deployment-specific room personalities that package tone, movement, and density more explicitly
-- fuller behavior for `prompt` and `witness`
+- broader status presets or dropdowns per deployment if operators need them often
 - room-state transitions driven by recent recording activity, not just playback history
