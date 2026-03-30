@@ -5,6 +5,7 @@ import wave
 from types import SimpleNamespace
 
 from django.test import TestCase
+from django.db.models import F
 from django.utils import timezone
 
 from memory_engine.config_validation import validate_runtime_settings
@@ -40,6 +41,14 @@ class EngineTestCase(TestCase):
             "expires_at": timezone.now() + timedelta(hours=24),
         }
         payload.update(overrides)
+        if "stack_position" not in overrides and payload.get("status") == Artifact.STATUS_ACTIVE:
+            deployment_code = str(payload.get("deployment_kind") or "memory")
+            Artifact.objects.filter(
+                status=Artifact.STATUS_ACTIVE,
+                deployment_kind=deployment_code,
+                stack_position__gte=1,
+            ).update(stack_position=F("stack_position") + 1)
+            payload["stack_position"] = 1
         return Artifact.objects.create(**payload)
 
 

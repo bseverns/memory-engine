@@ -113,7 +113,8 @@ test("artifactMetadataStatusLine summarizes deployment-scoped metadata editing",
   });
 
   assert.match(line, /Question Engine/);
-  assert.match(line, /2 recent artifact/);
+  assert.match(line, /2 stacked artifact/);
+  assert.match(line, /closes the gap automatically/);
   assert.match(line, /Status picker presets/);
   assert.match(line, /open, pending, answered, resolved/);
 });

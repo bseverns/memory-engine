@@ -30,10 +30,10 @@ next to the machine.
 ## If Something In The Archive Needs To Leave Right Now
 
 1. Open `/ops/`.
-2. Find the recent artifact in the active deployment list.
-3. Use `Remove from circulation`.
+2. Find the memory in the active deployment stack.
+3. Use `Remove from stack`.
 4. Confirm the action.
-5. The action is audited automatically.
+5. The stack closes the gap automatically and the action is audited.
 
 ## If `/ops/` Says Degraded
 

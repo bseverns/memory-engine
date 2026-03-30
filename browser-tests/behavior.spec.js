@@ -384,6 +384,7 @@ test.describe("browser behavior contracts", () => {
       artifactCalls += 1;
       const artifacts = artifactCalls === 1 ? [{
         id: 41,
+        stack_position: 1,
         created_at: "2026-03-30T18:00:00Z",
         last_access_at: "2026-03-30T18:10:00Z",
         duration_ms: 3200,
@@ -397,7 +398,39 @@ test.describe("browser behavior contracts", () => {
         mood: "clear",
         age_hours: 1.4,
         absence_hours: 0.4,
-      }] : [];
+      }, {
+        id: 40,
+        stack_position: 2,
+        created_at: "2026-03-30T17:50:00Z",
+        last_access_at: "2026-03-30T18:05:00Z",
+        duration_ms: 2800,
+        play_count: 1,
+        wear: 0.04,
+        deployment_kind: "question",
+        topic_tag: "entry_gate",
+        lifecycle_status: "pending",
+        lane: "fresh",
+        density: "light",
+        mood: "clear",
+        age_hours: 1.8,
+        absence_hours: 0.7,
+      }] : [{
+        id: 40,
+        stack_position: 1,
+        created_at: "2026-03-30T17:50:00Z",
+        last_access_at: "2026-03-30T18:05:00Z",
+        duration_ms: 2800,
+        play_count: 1,
+        wear: 0.04,
+        deployment_kind: "question",
+        topic_tag: "entry_gate",
+        lifecycle_status: "pending",
+        lane: "fresh",
+        density: "light",
+        mood: "clear",
+        age_hours: 1.8,
+        absence_hours: 0.7,
+      }];
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -405,7 +438,7 @@ test.describe("browser behavior contracts", () => {
           artifacts,
           operator_actions: {
             remove_from_circulation: {
-              label: "Remove from circulation",
+              label: "Remove from stack",
               description: "Emergency steward action.",
             },
           },
@@ -432,14 +465,16 @@ test.describe("browser behavior contracts", () => {
           artifact_id: 41,
           status: "REVOKED",
           deleted_derivatives: 1,
+          removed_stack_position: 1,
         }),
       });
     });
 
     await signIntoOps(page);
     page.on("dialog", (dialog) => dialog.accept());
-    await page.getByRole("button", { name: "Remove from circulation" }).click();
-    await expect(page.locator("#opsArtifactMetadata")).toContainText("No recent artifacts in this deployment");
+    await page.locator(".ops-artifact-editor").filter({ hasText: "Artifact 41" }).getByRole("button", { name: "Remove from stack" }).click();
+    await expect(page.locator("#opsArtifactMetadata")).toContainText("Stack #1 · Artifact 40");
+    await expect(page.locator("#opsArtifactMetadata")).not.toContainText("Artifact 41");
   });
 
   test("steward controls propagate to kiosk and room without reload-specific hacks", async ({ page }) => {

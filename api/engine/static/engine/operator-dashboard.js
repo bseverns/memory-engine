@@ -285,7 +285,7 @@
     const count = Number(payload?.artifacts?.length || 0);
     const suggestions = payload?.editable_fields?.lifecycle_status?.suggestions || [];
     const suggestionText = suggestions.length ? ` Status picker presets: ${suggestions.join(", ")}.` : "";
-    return `Showing ${count} recent artifact(s) for ${deployment}.${suggestionText}`;
+    return `Showing ${count} stacked artifact(s) for ${deployment}. Remove one and the remaining stack closes the gap automatically.${suggestionText}`;
   }
 
   function lifecycleStatusOptions(field, currentValue) {
@@ -758,7 +758,10 @@
       const head = doc.createElement("div");
       head.className = "ops-artifact-editor-head";
       const title = doc.createElement("strong");
-      title.textContent = `Artifact ${artifact.id}`;
+      const stackPosition = Math.max(0, Number(artifact.stack_position || 0));
+      title.textContent = stackPosition
+        ? `Stack #${stackPosition} · Artifact ${artifact.id}`
+        : `Artifact ${artifact.id}`;
       const meta = doc.createElement("span");
       meta.className = "ops-artifact-editor-meta";
       const createdAt = artifact.created_at ? new Date(artifact.created_at).toLocaleString() : "unknown time";
@@ -811,7 +814,7 @@
       const removeButton = doc.createElement("button");
       removeButton.type = "button";
       removeButton.className = "btn secondary";
-      removeButton.textContent = "Remove from circulation";
+      removeButton.textContent = "Remove from stack";
       const status = doc.createElement("span");
       status.className = "ops-artifact-editor-status";
       status.textContent = "Ready";
@@ -846,7 +849,7 @@
 
       removeButton.addEventListener("click", async () => {
         const confirmed = globalObjectRef.confirm(
-          `Remove artifact ${artifact.id} from circulation now? This pulls it out of playback immediately.`,
+          `Remove artifact ${artifact.id} from the stack now? This pulls it out of playback immediately and shifts the remaining memories up.`,
         );
         if (!confirmed) {
           return;

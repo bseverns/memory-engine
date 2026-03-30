@@ -480,12 +480,19 @@ class OperatorBehaviorTests(EngineTestCase):
     @override_settings(ENGINE_DEPLOYMENT="question")
     def test_operator_recent_artifacts_lists_only_active_deployment(self):
         self.login_operator()
-        self.make_active_artifact(
+        older = self.make_active_artifact(
             raw_uri="raw/question-one.wav",
             deployment_kind="question",
             topic_tag="entry_gate",
             lifecycle_status="open",
             created_at=timezone.now() - timedelta(hours=5),
+        )
+        newer = self.make_active_artifact(
+            raw_uri="raw/question-two.wav",
+            deployment_kind="question",
+            topic_tag="entry_gate",
+            lifecycle_status="pending",
+            created_at=timezone.now() - timedelta(hours=3),
         )
         self.make_active_artifact(
             raw_uri="raw/repair-one.wav",
@@ -500,12 +507,17 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["deployment"]["code"], "question")
-        self.assertEqual(len(payload["artifacts"]), 1)
+        self.assertEqual(len(payload["artifacts"]), 2)
+        self.assertEqual(payload["artifacts"][0]["id"], newer.id)
+        self.assertEqual(payload["artifacts"][0]["stack_position"], 1)
+        self.assertEqual(payload["artifacts"][1]["id"], older.id)
+        self.assertEqual(payload["artifacts"][1]["stack_position"], 2)
         self.assertEqual(payload["artifacts"][0]["deployment_kind"], "question")
         self.assertEqual(payload["editable_fields"]["lifecycle_status"]["suggestions"][0], "open")
         self.assertEqual(payload["editable_fields"]["lifecycle_status"]["input_mode"], "select")
         self.assertTrue(payload["editable_fields"]["lifecycle_status"]["allow_blank"])
         self.assertIn("remove_from_circulation", payload["operator_actions"])
+        self.assertEqual(payload["operator_actions"]["remove_from_circulation"]["label"], "Remove from stack")
 
     @override_settings(ENGINE_DEPLOYMENT="repair")
     def test_operator_update_artifact_metadata_updates_topic_and_status(self):
@@ -565,6 +577,12 @@ class OperatorBehaviorTests(EngineTestCase):
             topic_tag="entry_gate",
             lifecycle_status="open",
         )
+        follower = self.make_active_artifact(
+            raw_uri="raw/question-follow.wav",
+            deployment_kind="question",
+            topic_tag="entry_gate",
+            lifecycle_status="pending",
+        )
         Derivative.objects.create(
             artifact=artifact,
             kind=Derivative.KIND_SPECTROGRAM_PNG,
@@ -579,16 +597,21 @@ class OperatorBehaviorTests(EngineTestCase):
 
         self.assertEqual(response.status_code, 200)
         artifact.refresh_from_db()
+        follower.refresh_from_db()
         self.assertEqual(artifact.status, artifact.STATUS_REVOKED)
         self.assertEqual(artifact.raw_uri, "")
+        self.assertEqual(artifact.stack_position, 0)
+        self.assertEqual(follower.stack_position, 1)
         self.assertFalse(Derivative.objects.filter(artifact=artifact).exists())
         self.assertEqual(response.json()["status"], artifact.STATUS_REVOKED)
         self.assertEqual(response.json()["deleted_derivatives"], 1)
+        self.assertEqual(response.json()["removed_stack_position"], 2)
         delete_key_mock.assert_any_call("raw/question.wav")
         delete_key_mock.assert_any_call("derivatives/question.png")
         audit = StewardAction.objects.filter(action="artifact.removed_from_circulation").latest("created_at")
         self.assertEqual(audit.payload["artifact_id"], artifact.id)
         self.assertEqual(audit.payload["deployment_kind"], "question")
+        self.assertEqual(audit.payload["removed_stack_position"], 2)
 
     @override_settings(ENGINE_DEPLOYMENT="question")
     def test_operator_remove_artifact_rejects_other_deployment_artifact(self):

@@ -24,6 +24,7 @@ from .deployment_policy import (
     unresolved_lifecycle,
     wear_increment_multiplier,
 )
+from .artifact_stack import compact_stack_after_position, reserve_stack_top
 from .ingest_validation import UploadValidationError, validate_wav_upload
 from .media_access import (
     PURPOSE_EPHEMERAL_AUDIO,
@@ -171,6 +172,7 @@ def deployment_topic_placeholder(deployment_code: str) -> str:
 def serialize_operator_artifact(artifact: Artifact, now) -> dict:
     return {
         "id": artifact.id,
+        "stack_position": int(getattr(artifact, "stack_position", 0) or 0),
         "created_at": artifact.created_at,
         "last_access_at": artifact.last_access_at,
         "duration_ms": int(artifact.duration_ms or 0),
@@ -315,6 +317,7 @@ def create_audio_artifact(request):
     key = ""
     with transaction.atomic():
         consent = ConsentManifest.objects.create(json=manifest, revocation_token_hash=hash_token(token))
+        stack_position = reserve_stack_top(active_deployment.code)
         artifact = Artifact.objects.create(
             node=node,
             consent=consent,
@@ -325,6 +328,7 @@ def create_audio_artifact(request):
             deployment_kind=active_deployment.code,
             topic_tag=topic_tag,
             lifecycle_status=lifecycle_status,
+            stack_position=stack_position,
             expires_at=(
                 timezone.now() + timedelta(days=int(manifest["retention"]["derivative_ttl_days"]))
                 if consent_mode == "FOSSIL"
@@ -495,6 +499,7 @@ def revoke(request):
 
     artifacts = Artifact.objects.filter(consent=consent).exclude(status=Artifact.STATUS_REVOKED)
     for artifact in artifacts:
+        removed_position = int(artifact.stack_position or 0)
         if artifact.raw_uri:
             try:
                 delete_key(artifact.raw_uri)
@@ -502,7 +507,9 @@ def revoke(request):
                 pass
         artifact.status = Artifact.STATUS_REVOKED
         artifact.raw_uri = ""
-        artifact.save(update_fields=["status", "raw_uri"])
+        artifact.stack_position = 0
+        artifact.save(update_fields=["status", "raw_uri", "stack_position"])
+        compact_stack_after_position(artifact.deployment_kind, removed_position)
         for derivative in Derivative.objects.filter(artifact=artifact):
             try:
                 delete_key(derivative.uri)
@@ -852,7 +859,7 @@ def operator_recent_artifacts(request):
         Artifact.objects.filter(
             status=Artifact.STATUS_ACTIVE,
             deployment_kind=active_deployment.code,
-        ).order_by("-created_at")[:limit]
+        ).order_by("stack_position", "-created_at")[:limit]
     )
 
     # Keep `/ops/` scoped to the active deployment so metadata stewardship stays
@@ -865,8 +872,8 @@ def operator_recent_artifacts(request):
         "artifacts": [serialize_operator_artifact(artifact, now) for artifact in artifacts],
         "operator_actions": {
             "remove_from_circulation": {
-                "label": "Remove from circulation",
-                "description": "Emergency steward action. Pulls this artifact out of playback immediately and records an audit event.",
+                "label": "Remove from stack",
+                "description": "Emergency steward action. Pulls this artifact out of playback immediately, closes the gap, and records an audit event.",
             },
         },
         "editable_fields": {
@@ -959,6 +966,7 @@ def operator_remove_artifact_from_circulation(request, artifact_id: int):
 
         if artifact.status != Artifact.STATUS_ACTIVE:
             return Response({"error": "artifact is not active"}, status=409)
+        removed_position = int(artifact.stack_position or 0)
 
         derivative_queryset = Derivative.objects.filter(artifact=artifact)
         deleted_derivatives = derivative_queryset.count()
@@ -977,16 +985,19 @@ def operator_remove_artifact_from_circulation(request, artifact_id: int):
 
         artifact.status = Artifact.STATUS_REVOKED
         artifact.raw_uri = ""
-        artifact.save(update_fields=["status", "raw_uri"])
+        artifact.stack_position = 0
+        artifact.save(update_fields=["status", "raw_uri", "stack_position"])
+        compact_stack_after_position(artifact.deployment_kind, removed_position)
 
     record_steward_action(
         action="artifact.removed_from_circulation",
         actor=request_operator_label(request),
-        detail=f"artifact {artifact.id} removed from circulation",
+        detail=f"artifact {artifact.id} removed from stack position {removed_position or '?'}",
         payload={
             "artifact_id": artifact.id,
             "deployment_kind": artifact.deployment_kind,
             "deleted_derivatives": deleted_derivatives,
+            "removed_stack_position": removed_position,
         },
     )
 
@@ -995,6 +1006,7 @@ def operator_remove_artifact_from_circulation(request, artifact_id: int):
         "artifact_id": artifact.id,
         "status": Artifact.STATUS_REVOKED,
         "deleted_derivatives": deleted_derivatives,
+        "removed_stack_position": removed_position,
     })
 
 

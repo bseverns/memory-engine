@@ -50,6 +50,7 @@ class Artifact(models.Model):
     deployment_kind = models.CharField(max_length=32, default="memory")
     topic_tag = models.CharField(max_length=64, blank=True, default="")
     lifecycle_status = models.CharField(max_length=32, blank=True, default="")
+    stack_position = models.PositiveIntegerField(default=0)
 
     wear = models.FloatField(default=0.0)  # 0..1
     play_count = models.IntegerField(default=0)
@@ -75,6 +76,7 @@ class Artifact(models.Model):
                 name="artifact_pool_cool_idx",
             ),
             models.Index(fields=["deployment_kind", "status", "expires_at"], name="artifact_deploy_idx"),
+            models.Index(fields=["deployment_kind", "status", "stack_position"], name="artifact_stack_idx"),
         ]
 
 class Derivative(models.Model):

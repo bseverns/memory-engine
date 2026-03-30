@@ -74,8 +74,8 @@ async function mockOperatorDashboardFeeds(page, {
         artifacts,
         operator_actions: {
           remove_from_circulation: {
-            label: "Remove from circulation",
-            description: "Emergency steward action.",
+            label: "Remove from stack",
+            description: "Emergency steward action that closes the stack gap.",
           },
         },
         editable_fields: {
@@ -325,6 +325,7 @@ test.describe("visual stack walkthrough", () => {
       artifacts: [
         {
           id: 41,
+          stack_position: 1,
           created_at: "2026-03-20T18:00:00Z",
           last_access_at: "2026-03-20T18:10:00Z",
           duration_ms: 3200,
@@ -353,7 +354,7 @@ test.describe("visual stack walkthrough", () => {
     await signIntoOps(page);
     await expect(page.getByRole("heading", { name: "Bring-up and recovery first" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Play output tone" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Remove from circulation" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Remove from stack" })).toBeVisible();
     await saveScreenshot(page, "ops-stewardship.png");
   });
 });

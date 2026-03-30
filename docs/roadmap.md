@@ -72,7 +72,8 @@ this file is the longer memory of what changed, when, and why it mattered.
 
 ### Chapter 11: Add the narrow emergency lever
 - Public use clarified an asymmetry: the machine was better at participant revocation than at fast discretionary steward intervention.
-- This pass adds a small audited “remove from circulation” action in `/ops/` for recent artifacts in the active deployment, without expanding into a broad moderation console.
+- This pass adds a small audited “remove from stack” action in `/ops/` for recent artifacts in the active deployment, without expanding into a broad moderation console.
+- The operator stack now compacts itself when a memory is removed, so stewardship feels like tending one living pile instead of punching holes into a list.
 - It also adds the shortest drill card so a non-author steward can recover kiosk, room, and operator posture under time pressure.
 
 ## Landed So Far
@@ -129,7 +130,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Operator-only live monitor utility on `/ops/` for local output-tone and live mic verification without touching the archive
 - Stronger focus and reboot recovery guidance for unattended kiosk HID use
 - Sharper `/ops/` hierarchy so live controls, routing ritual, and recovery notes stay ahead of passive summary panels
-- Narrow steward-side “remove from circulation” action for recent artifacts, with audit logging and no wider moderation sprawl
+- Narrow steward-side “remove from stack” action for recent artifacts, with audit logging, automatic stack compaction, and no wider moderation sprawl
 - One-page operator drill card for ninety-second recovery and opening checks
 
 

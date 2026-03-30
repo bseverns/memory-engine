@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.db import transaction
 
+from .artifact_stack import compact_stack_after_position
 from .models import Artifact, Derivative
 from .ops import (
     record_beat_heartbeat,
@@ -214,6 +215,7 @@ def expire_raw() -> None:
         now = timezone.now()
         qs = Artifact.objects.filter(status=Artifact.STATUS_ACTIVE)
         for art in qs.iterator():
+            removed_position = 0
             retention = art.consent.json.get("retention", {}) if art.consent_id else {}
             raw_ttl_hours = int(retention.get("raw_ttl_hours") or 0)
             raw_expired = raw_ttl_hours <= 0 or (art.created_at + timedelta(hours=raw_ttl_hours)) < now
@@ -231,12 +233,17 @@ def expire_raw() -> None:
             ).exists()
 
             if art.expires_at and art.expires_at < now:
+                removed_position = int(art.stack_position or 0)
                 art.status = Artifact.STATUS_EXPIRED
                 art.raw_uri = ""
+                art.stack_position = 0
             elif not art.raw_uri and not essence_exists:
+                removed_position = int(art.stack_position or 0)
                 art.status = Artifact.STATUS_EXPIRED
+                art.stack_position = 0
 
-            art.save(update_fields=["status", "raw_uri"])
+            art.save(update_fields=["status", "raw_uri", "stack_position"])
+            compact_stack_after_position(art.deployment_kind, removed_position)
 
         # Ephemeral safety: clean up any EPHEMERAL older than 10 minutes
         cutoff = now - timedelta(minutes=10)
@@ -249,7 +256,8 @@ def expire_raw() -> None:
                     pass
             art.status = Artifact.STATUS_REVOKED
             art.raw_uri = ""
-            art.save(update_fields=["status", "raw_uri"])
+            art.stack_position = 0
+            art.save(update_fields=["status", "raw_uri", "stack_position"])
     except Exception as exc:
         record_task_failure("expire_raw", exc)
         raise
