@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta
 
+from django.test import override_settings
 from django.utils import timezone
 
 from .base import EngineTestCase
-from ..pool import artifact_playback_window, pool_weight
+from ..pool import artifact_playback_window, pool_weight, select_pool_artifact
 
 
 class PoolBehaviorTests(EngineTestCase):
@@ -192,6 +193,70 @@ class PoolBehaviorTests(EngineTestCase):
 
         self.assertGreater(unresolved_weight, answered_weight)
 
+    def test_pool_weight_question_boosts_recent_topic_cluster(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        clustered = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/clustered-question.wav",
+            deployment_kind="question",
+            topic_tag="entry_gate",
+            lifecycle_status="open",
+            created_at=now - timedelta(hours=18),
+            last_access_at=now - timedelta(hours=5),
+        )
+        unrelated = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/unrelated-question.wav",
+            deployment_kind="question",
+            topic_tag="maintenance",
+            lifecycle_status="open",
+            created_at=now - timedelta(hours=18),
+            last_access_at=now - timedelta(hours=5),
+        )
+
+        clustered_weight = pool_weight(
+            clustered,
+            now,
+            cooldown_seconds=90,
+            recent_topics=["entry_gate"],
+            deployment_code="question",
+        )
+        unrelated_weight = pool_weight(
+            unrelated,
+            now,
+            cooldown_seconds=90,
+            recent_topics=["entry_gate"],
+            deployment_code="question",
+        )
+
+        self.assertGreater(clustered_weight, unrelated_weight)
+
+    def test_pool_weight_repair_prefers_recent_shorter_notes(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        recent_short = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/repair-short.wav",
+            deployment_kind="repair",
+            duration_ms=7000,
+            created_at=now - timedelta(hours=12),
+            last_access_at=now - timedelta(hours=8),
+        )
+        old_dense = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/repair-dense.wav",
+            deployment_kind="repair",
+            duration_ms=26000,
+            created_at=now - timedelta(days=20),
+            last_access_at=now - timedelta(days=7),
+        )
+
+        recent_weight = pool_weight(recent_short, now, cooldown_seconds=90, deployment_code="repair")
+        old_weight = pool_weight(old_dense, now, cooldown_seconds=90, deployment_code="repair")
+
+        self.assertGreater(recent_weight, old_weight)
+
     def test_pool_weight_oracle_penalizes_brand_new_material(self):
         now = timezone.now()
         consent = self.make_consent("ROOM")
@@ -212,3 +277,48 @@ class PoolBehaviorTests(EngineTestCase):
         old_weight = pool_weight(old_absent, now, cooldown_seconds=90, deployment_code="oracle")
 
         self.assertGreater(old_weight, new_weight)
+
+    def test_select_pool_artifact_for_question_falls_back_to_same_deployment_before_memory(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        question_artifact = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/question-only.wav",
+            deployment_kind="question",
+            lifecycle_status="open",
+            created_at=now - timedelta(hours=24),
+        )
+        self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/memory-other.wav",
+            deployment_kind="memory",
+            created_at=now - timedelta(hours=24),
+        )
+
+        selected, _ = select_pool_artifact(
+            now,
+            excluded_ids={question_artifact.id},
+            deployment_code="question",
+        )
+
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected.id, question_artifact.id)
+
+    @override_settings(ENGINE_DEPLOYMENT="question")
+    def test_pool_next_returns_question_metadata_for_room_loop_clustering(self):
+        artifact = self.make_active_artifact(
+            raw_uri="raw/question-meta.wav",
+            deployment_kind="question",
+            topic_tag="entry_gate",
+            lifecycle_status="open",
+            created_at=timezone.now() - timedelta(hours=12),
+        )
+
+        response = self.client.get("/api/v1/pool/next?recent_topics=entry_gate")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["artifact_id"], artifact.id)
+        self.assertEqual(payload["deployment_kind"], "question")
+        self.assertEqual(payload["topic_tag"], "entry_gate")
+        self.assertEqual(payload["lifecycle_status"], "open")

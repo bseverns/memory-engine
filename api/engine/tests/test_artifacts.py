@@ -62,6 +62,28 @@ class ArtifactBehaviorTests(EngineTestCase):
         self.assertEqual(artifact.lifecycle_status, "open")
         put_bytes_mock.assert_called_once()
 
+    @override_settings(ENGINE_DEPLOYMENT="repair")
+    @patch("engine.api_views.put_bytes")
+    def test_room_save_accepts_category_and_status_aliases_for_lightweight_metadata(self, put_bytes_mock):
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=2.0), content_type="audio/wav")
+
+        response = self.client.post(
+            "/api/v1/artifacts/audio",
+            {
+                "file": upload,
+                "consent_mode": "ROOM",
+                "category": "projector",
+                "status": "pending",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        artifact = Artifact.objects.get()
+        self.assertEqual(artifact.deployment_kind, "repair")
+        self.assertEqual(artifact.topic_tag, "projector")
+        self.assertEqual(artifact.lifecycle_status, "pending")
+        put_bytes_mock.assert_called_once()
+
     @patch("engine.api_views.put_bytes")
     def test_room_save_stores_memory_color_profile_separately_from_raw_audio(self, put_bytes_mock):
         upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=2.4), content_type="audio/wav")
@@ -240,6 +262,20 @@ class ArtifactBehaviorTests(EngineTestCase):
         response = self.client.get(f"/api/v1/media/raw/{artifact.id}")
 
         self.assertEqual(response.status_code, 404)
+
+    def test_pool_heard_applies_lighter_wear_for_question_artifacts(self):
+        artifact = self.make_active_artifact(
+            raw_uri="raw/question-heard.wav",
+            deployment_kind="question",
+            wear=0.1,
+        )
+        ack_url = f"/api/v1/pool/heard/{build_media_token(purpose=PURPOSE_POOL_HEARD, artifact_id=artifact.id, nonce='question-nonce')}"
+
+        response = self.client.post(ack_url)
+
+        self.assertEqual(response.status_code, 200)
+        artifact.refresh_from_db()
+        self.assertAlmostEqual(artifact.wear, 0.10225, places=5)
 
     @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {
         "public_ingest": "2/min",

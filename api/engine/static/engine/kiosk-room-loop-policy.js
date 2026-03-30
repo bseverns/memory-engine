@@ -1,4 +1,21 @@
 (function initMemoryEngineRoomLoopPolicy(global) {
+  function deploymentProfile(config = {}, loopConfig = {}) {
+    const active = loopConfig.policy?.activeDeployment;
+    if (active && active.code) {
+      return active;
+    }
+    const code = String(config.engineDeployment || "memory").trim().toLowerCase() || "memory";
+    const profiles = loopConfig.policy?.deploymentProfiles || {};
+    return profiles[code] || profiles.memory || {
+      code: "memory",
+      antiRepetitionWindow: Number(config.roomAntiRepetitionWindowSize || 12),
+      cueGapMultiplier: 1.0,
+      pauseGapMultiplier: 1.0,
+      toneGainMultiplier: 1.0,
+      overlapChanceMultiplier: 1.0,
+    };
+  }
+
   function historyPolicy(loopConfig = {}) {
     return loopConfig.policy?.history || {};
   }
@@ -38,8 +55,9 @@
   }
 
   function antiRepetitionWindowSize(config) {
-    const configured = Number(config.roomAntiRepetitionWindowSize || 0);
-    return Math.max(0, Math.min(50, Number.isFinite(configured) ? Math.floor(configured) : 0));
+    const loopConfig = config.roomLoopConfig || {};
+    const deploymentConfigured = Number(deploymentProfile(config, loopConfig).antiRepetitionWindow || config.roomAntiRepetitionWindowSize || 0);
+    return Math.max(0, Math.min(50, Number.isFinite(deploymentConfigured) ? Math.floor(deploymentConfigured) : 0));
   }
 
   function loadPersistentLoopWindow(config, storageKey) {
@@ -180,6 +198,7 @@
   }
 
   function adaptiveGapMultiplier(config, loopConfig, intensity, poolSize, movement, pauseGap) {
+    const deployment = deploymentProfile(config, loopConfig);
     const scarcity = scarcityProfile(config, loopConfig, poolSize);
     let archiveMultiplier = 1.0;
     if (poolSize > 0) {
@@ -189,6 +208,7 @@
     return (
       movement.gapMultiplier
       * intensity.cueGapMultiplier
+      * Number(pauseGap ? (deployment.pauseGapMultiplier || 1.0) : (deployment.cueGapMultiplier || 1.0))
       * archiveMultiplier
       * (pauseGap ? intensity.pauseGapMultiplier : 1.0)
       * (pauseGap ? scarcity.pauseMultiplier : scarcity.gapMultiplier)
@@ -196,8 +216,9 @@
   }
 
   function roomToneLevelFor(config, loopConfig, intensity, baseLevel, poolSize) {
+    const deployment = deploymentProfile(config, loopConfig);
     const scarcity = scarcityProfile(config, loopConfig, poolSize);
-    return baseLevel * intensity.roomToneMultiplier * scarcity.toneMultiplier;
+    return baseLevel * intensity.roomToneMultiplier * scarcity.toneMultiplier * Number(deployment.toneGainMultiplier || 1.0);
   }
 
   function surfaceOverlayMultiplier(loopConfig, overlayName, fieldName, fallback = 1.0) {
@@ -232,5 +253,6 @@
     scarcityProfile,
     sleep,
     surfaceOverlayMultiplier,
+    deploymentProfile,
   };
 }(typeof window !== "undefined" ? window : globalThis));

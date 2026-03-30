@@ -13,6 +13,7 @@
       <h1>Room Memory Status</h1>
       <p class="sub">This page shows whether the node is healthy enough to operate, what the room currently holds, and when the last refresh happened.</p>
       <p class="hint">Active deployment: <strong>{{ engine_deployment.label }}</strong> ({{ engine_deployment.code }}). {{ engine_deployment.ops_note }} Policy key: <code>{{ engine_deployment.playback_policy_key }}</code>.</p>
+      <p class="hint">Room behavior: {{ engine_deployment.behavior_summary }} Afterlife: {{ engine_deployment.afterlife_summary }} Tuning source: {{ engine_deployment.tuning_source }}</p>
     </header>
 
     <section class="panel dashboard-panel">

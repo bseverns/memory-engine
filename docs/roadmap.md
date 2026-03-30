@@ -57,6 +57,16 @@
 - Docs that define Memory Engine as the default deployment of a broader local-first artifact engine (opening, not rebrand)
 - Playback policy framing that separates shared room-loop infrastructure from deployment-level behavior intent
 - Responsiveness ladder documented as a cross-deployment requirement (immediate acknowledgement, near-immediate reflection, ambient afterlife)
+- Real behavioral distinction for the first four deployed temperaments:
+  - `memory` remains the canonical weathered baseline
+  - `question` now favors unresolved recurrence and topic clustering
+  - `repair` now favors recent practical return and higher clarity
+  - `oracle` now uses sparser, more ceremonial resurfacing
+- Lightweight deployment metadata use made real in playback:
+  - `lifecycle_status` now drives `question` recurrence
+  - `topic_tag` now supports loose `question` and `repair` clustering
+  - ingest accepts `topic` / `category` and `status` aliases without schema sprawl
+- Deployment-specific wear and room-loop posture are now active rather than documented only
 
 ### Audience playback
 - Weighted pool selection with cooldown to reduce obvious repetition
@@ -93,6 +103,11 @@
 - Steward-tunable movement presets so one installation can feel meditative while another feels more active
 - Code comments around playback selection, scene composition, room tone, and wear processing
 - `README.md` audience-experience notes describing the intended listening effect
+- Deployment-aware room-loop posture layered into the shared surface:
+  - `question` uses shorter anti-repetition and quicker unresolved return
+  - `repair` uses shorter gaps, lower tone bed, lower overlap, and lighter wear
+  - `oracle` uses longer gaps, lower overlap, and stronger rarity
+- Deployment-aware pool selection now stays within the active deployment when that deployment has playable material, instead of blending by accident
 
 ## Still Open Now
 
@@ -109,14 +124,15 @@
 - Add deployment-aware playback policy presets visible in operator status exports
 - Add deployment-aware retention/export presets for archival handoff bundles
 - Add installation-specific room identities that can be combined with deployment kind (e.g., `repair` + `shared_lab`)
+- Add a safe operator-facing way to mark questions `answered` / `resolved` and repairs `fixed` / `obsolete`
 
 ### User / speaker
 - Add optional headphone or monitor-check mode for setup and microphone testing
 
 ### Audience / room effect
 - Push beyond metadata-derived mood shaping into a room state that responds to context
-  - learn from time-of-day or room activity patterns
-  - explore whether semantic or transcript-aware grouping is worth the complexity
+- Learn from time-of-day or room activity patterns without losing inspectability
+- Decide whether semantic or transcript-aware grouping is worth the complexity later
 
 ### Operator / stewardship
 - Add one-command firewall / restart-on-boot setup for a specific server OS target
@@ -133,7 +149,11 @@
 ### Audience / room effect
 - Add audience-presence or ambient-volume sensing so the room can react to actual occupancy
 - Add installation-specific and deployment-specific "personalities" that package movement, tone, gap, and wear behavior together
-- Add deployment-specific playback policies (recurrence, recency, rarity, clustering) on top of the shared room loop
+- Extend the now-real deployment-specific playback policies instead of keeping them as stubs:
+  - fuller `question` chorus / thread behavior
+  - fuller `repair` workbench / bench-notebook behavior
+  - deeper `oracle` ceremony controls
+  - first substantive behavior for `prompt` and `witness`
 - Add shared-pool or federated-pool options for multi-room installations
 - Add richer visual layers such as projected fossils, spectrogram drift, or low-light companion displays
 - Add semantic or transcript-aware grouping if metadata-only composition plateaus
@@ -145,7 +165,7 @@
 - Add structured export bundles with manifests, checksums, and import instructions for archival handoff
 - Add multi-node stewardship tooling if more than one installation is deployed
 - Add role-based steward access if the installation grows beyond one trusted operator
-- Add deployment-aware operator controls so stewardship UI can expose mode-specific tuning safely
+- Add deployment-aware operator controls so stewardship UI can expose mode-specific tuning safely, without turning `/ops/` into a giant behavior console
 - Add long-term retention policy controls that can differ by consent mode, artifact type, or installation
 - Add artifact-type-aware export posture so handoff bundles can preserve deployment semantics
 - Add a documented disaster-recovery rehearsal flow rather than only backup and restore commands

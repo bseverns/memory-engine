@@ -16,6 +16,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from .consent import consent_manifest, default_node_from_env, hash_token, make_revocation_token
+from .deployment_policy import deployment_room_loop_policy, playback_profile, wear_increment_multiplier
 from .ingest_validation import UploadValidationError, validate_wav_upload
 from .media_access import (
     PURPOSE_EPHEMERAL_AUDIO,
@@ -200,8 +201,15 @@ def create_audio_artifact(request):
         return Response({"error": memory_color_validation_error_message()}, status=400)
 
     active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
-    topic_tag = parse_topic_tag(request.data.get("topic_tag"))
-    lifecycle_status = parse_lifecycle_status(request.data.get("lifecycle_status"))
+    topic_tag = parse_topic_tag(
+        request.data.get("topic_tag")
+        or request.data.get("topic")
+        or request.data.get("category")
+    )
+    lifecycle_status = parse_lifecycle_status(
+        request.data.get("lifecycle_status")
+        or request.data.get("status")
+    )
 
     upload = request.data.get("file")
     if not upload:
@@ -282,8 +290,15 @@ def create_ephemeral_audio(request):
         return Response({"error": memory_color_validation_error_message()}, status=400)
 
     active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
-    topic_tag = parse_topic_tag(request.data.get("topic_tag"))
-    lifecycle_status = parse_lifecycle_status(request.data.get("lifecycle_status"))
+    topic_tag = parse_topic_tag(
+        request.data.get("topic_tag")
+        or request.data.get("topic")
+        or request.data.get("category")
+    )
+    lifecycle_status = parse_lifecycle_status(
+        request.data.get("lifecycle_status")
+        or request.data.get("status")
+    )
 
     upload = request.data.get("file")
     if not upload:
@@ -452,6 +467,13 @@ def pool_next(request):
             chunk for chunk in (piece.strip() for piece in raw_recent_densities.split(",")[:6])
             if chunk in {"light", "medium", "dense"}
         ]
+    recent_topics = []
+    raw_recent_topics = (request.query_params.get("recent_topics") or "").strip().lower()
+    if raw_recent_topics:
+        recent_topics = [
+            chunk for chunk in (piece.strip() for piece in raw_recent_topics.split(",")[:4])
+            if chunk
+        ]
     segment_variant = (request.query_params.get("segment_variant") or "").strip()[:120]
 
     artifact, selected_lane = select_pool_artifact(
@@ -461,6 +483,7 @@ def pool_next(request):
         requested_mood,
         excluded_ids=excluded_ids,
         recent_densities=recent_densities,
+        recent_topics=recent_topics,
         deployment_code=active_deployment.code,
     )
     if not artifact:
@@ -497,6 +520,9 @@ def pool_next(request):
         "wear": artifact.wear,
         "featured_return": featured_return,
         "play_count": artifact.play_count,
+        "deployment_kind": artifact.deployment_kind,
+        "topic_tag": artifact.topic_tag,
+        "lifecycle_status": artifact.lifecycle_status,
         "pool_size": playable_count,
         "playback_ack_url": media_playback_heard_url(playback_ack_token),
         "audio_url": media_raw_url(
@@ -530,7 +556,11 @@ def pool_heard(request, access_token: str):
             if artifact.status == Artifact.STATUS_REVOKED:
                 return Response({"ok": True, "ignored": True})
             artifact.play_count += 1
-            artifact.wear = min(1.0, artifact.wear + float(settings.WEAR_EPSILON_PER_PLAY))
+            artifact.wear = min(
+                1.0,
+                artifact.wear
+                + (float(settings.WEAR_EPSILON_PER_PLAY) * wear_increment_multiplier(artifact.deployment_kind)),
+            )
             artifact.last_access_at = timezone.now()
             artifact.save(update_fields=["play_count", "wear", "last_access_at"])
             AccessEvent.objects.create(artifact=artifact, context="room", action="heard")
@@ -618,6 +648,7 @@ def node_status(request):
     warnings.extend(pool_warnings(active, lane_counts, mood_counts, playable_count))
 
     active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+    deployment_profile = playback_profile(active_deployment.code)
 
     return Response({
         "ok": ok,
@@ -627,6 +658,10 @@ def node_status(request):
             "description": active_deployment.short_description,
             "participant_noun": active_deployment.participant_noun,
             "playback_policy_key": active_deployment.playback_policy_key,
+            "behavior_summary": deployment_profile.behavior_summary,
+            "afterlife_summary": deployment_profile.afterlife_summary,
+            "tuning_source": deployment_profile.tuning_source,
+            "room_loop_policy": deployment_room_loop_policy(active_deployment.code),
         },
         "components": components,
         "operator_state": operator_state,

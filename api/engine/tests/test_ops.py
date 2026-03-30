@@ -273,6 +273,8 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["deployment"]["code"], "memory")
         self.assertEqual(response.json()["deployment"]["playback_policy_key"], "memory_default")
+        self.assertIn("Weathered room-memory", response.json()["deployment"]["behavior_summary"])
+        self.assertIn("room loop", response.json()["deployment"]["tuning_source"])
 
     @patch("engine.api_views.health_component_status")
     def test_node_status_reports_empty_pool_warning(self, health_mock):

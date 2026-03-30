@@ -27,22 +27,22 @@ DEPLOYMENT_SPECS: tuple[DeploymentSpec, ...] = (
     DeploymentSpec(
         code="memory",
         label="Memory Engine",
-        short_description="Room-memory default with weathering and temporal depth.",
+        short_description="Room-memory default with weathering, temporal depth, and composed return.",
         participant_noun="memory",
         framing_noun="offering",
         copy_catalog_key="memory",
         playback_policy_key="memory_default",
-        ops_note="Reflective room-memory posture with patina and gradual return.",
+        ops_note="Reflective room-memory posture with patina, lane oscillation, and gradual return.",
     ),
     DeploymentSpec(
         code="question",
         label="Question Engine",
-        short_description="Inquiry-forward capture where unresolved returns can recur.",
+        short_description="Inquiry-forward capture where open questions recur sooner and can cluster loosely.",
         participant_noun="question",
         framing_noun="inquiry offering",
         copy_catalog_key="question",
         playback_policy_key="question_recurrence",
-        ops_note="Favors unresolved recurrence and thematic resurfacing.",
+        ops_note="Favors unresolved recurrence, lighter wear, and thematic resurfacing.",
     ),
     DeploymentSpec(
         code="prompt",
@@ -57,12 +57,12 @@ DEPLOYMENT_SPECS: tuple[DeploymentSpec, ...] = (
     DeploymentSpec(
         code="repair",
         label="Repair Engine",
-        short_description="Practical capture tuned for useful resurfacing and recency.",
+        short_description="Practical capture tuned for useful resurfacing, recency, and clarity.",
         participant_noun="repair note",
         framing_noun="repair offering",
         copy_catalog_key="repair",
         playback_policy_key="repair_recency",
-        ops_note="Biases toward recent, useful, less-repetitive return patterns.",
+        ops_note="Biases toward recent, useful return patterns with gentler wear and shorter gaps.",
     ),
     DeploymentSpec(
         code="witness",
@@ -77,12 +77,12 @@ DEPLOYMENT_SPECS: tuple[DeploymentSpec, ...] = (
     DeploymentSpec(
         code="oracle",
         label="Oracle Engine",
-        short_description="Ceremonial sparse resurfacing with rarity-forward timing.",
+        short_description="Ceremonial sparse resurfacing with rarity-forward timing and event-like return.",
         participant_noun="oracle fragment",
         framing_noun="oracle offering",
         copy_catalog_key="oracle",
         playback_policy_key="oracle_rare",
-        ops_note="Prioritizes rarity, longer gaps, and meaningful reappearance.",
+        ops_note="Prioritizes rarity, longer gaps, lighter wear, and meaningful reappearance.",
     ),
 )
 

@@ -215,13 +215,15 @@
       .map(([mood, count]) => `${mood} ${count}`)
       .join(" · ");
     const deployment = payload.deployment || {};
+    const behaviorSummary = deployment.behavior_summary || deployment.description || "room-memory default posture";
+    const tuningSource = deployment.tuning_source ? ` · ${deployment.tuning_source}` : "";
 
     return [
       {
         tagName: "article",
         className: "component-card ready",
         title: "Active deployment",
-        detail: `${deployment.label || "Memory Engine"} (${deployment.code || "memory"}) · ${deployment.description || "room-memory default posture"}`,
+        detail: `${deployment.label || "Memory Engine"} (${deployment.code || "memory"}) · ${behaviorSummary}${tuningSource}`,
       },
       {
         tagName: "article",

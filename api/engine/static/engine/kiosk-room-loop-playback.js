@@ -1,5 +1,6 @@
 (function initMemoryEngineRoomLoopPlayback(global) {
   const {
+    deploymentProfile,
     quietHoursActive,
     recentArtifactIdsForExclusion,
     sleep,
@@ -13,14 +14,17 @@
 
   function overlapAllowedForCue({ cue, poolSize, config, loopConfig, quieterModeEnabled }) {
     const overlapConfig = loopConfig.overlap || {};
+    const deployment = deploymentProfile(config, loopConfig);
     const quietHoursChanceMultiplier = Number(overlapConfig.quietHoursChanceMultiplier || 0.45);
     const quieterModeChanceMultiplier = Number(overlapConfig.quieterModeChanceMultiplier || 0.45);
+    const deploymentChanceMultiplier = Number(deployment.overlapChanceMultiplier || 1.0);
+    const baseChance = Number(config.roomOverlapChance || 0) * deploymentChanceMultiplier;
     if (poolSize < Number(config.roomOverlapMinPoolSize || 0)) {
       return false;
     }
     if (quieterModeEnabled() || quietHoursActive(config)) {
       const overlayMultiplier = quieterModeEnabled() ? quieterModeChanceMultiplier : quietHoursChanceMultiplier;
-      return Math.random() < (Number(config.roomOverlapChance || 0) * overlayMultiplier);
+      return Math.random() < (baseChance * overlayMultiplier);
     }
     if (cue.density === "dense") {
       return false;
@@ -29,7 +33,7 @@
     if (densityLimit === "light" && cue.density !== "light") {
       return false;
     }
-    return Math.random() < Number(config.roomOverlapChance || 0);
+    return Math.random() < baseChance;
   }
 
   function randomDelayBetween(min, max) {
@@ -45,6 +49,7 @@
     segmentVariant = "",
     excludeIds = [],
     recentDensities = [],
+    recentTopics = [],
   }) {
     const params = new URLSearchParams({
       context: "kiosk",
@@ -58,6 +63,9 @@
     }
     if (recentDensities.length) {
       params.set("recent_densities", recentDensities.join(","));
+    }
+    if (recentTopics.length) {
+      params.set("recent_topics", recentTopics.join(","));
     }
     return params;
   }
@@ -80,6 +88,7 @@
     primaryArtifactId,
     cue,
     recentDensities,
+    recentTopics,
     currentMoodBias,
   }) {
     const excludedIds = recentArtifactIdsForExclusion(config, persistentLoopWindow);
@@ -91,6 +100,7 @@
       segmentVariant: `layer:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
       excludeIds: combinedExclusions,
       recentDensities,
+      recentTopics,
     });
     const payload = result.payload;
     if (!payload || Number(payload.artifact_id) === Number(primaryArtifactId)) {

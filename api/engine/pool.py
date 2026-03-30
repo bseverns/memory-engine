@@ -7,7 +7,13 @@ from django.db.models import Q
 
 from memory_engine.deployments import deployment_spec
 
-from .deployment_policy import weight_adjustment
+from .deployment_policy import (
+    UNRESOLVED_LIFECYCLE_STATUSES,
+    pool_candidate_limit,
+    pool_cooldown_seconds,
+    playback_profile,
+    weight_adjustment,
+)
 from .models import Artifact, Derivative
 
 
@@ -100,17 +106,6 @@ def artifact_absence_hours(artifact: Artifact, now) -> float:
     return artifact_age_hours(artifact, now)
 
 
-def deployment_weight_adjustment(artifact: Artifact, now, deployment_code: str) -> float:
-    """Small deployment-level weighting hook."""
-
-    return weight_adjustment(
-        deployment_code=deployment_code,
-        age_hours=artifact_age_hours(artifact, now),
-        absence_hours=artifact_absence_hours(artifact, now),
-        lifecycle_status=str(getattr(artifact, "lifecycle_status", "") or ""),
-    )
-
-
 def artifact_is_featured_return(artifact: Artifact, now) -> bool:
     return bool(
         artifact_age_hours(artifact, now) >= settings.POOL_FEATURED_RETURN_MIN_AGE_HOURS
@@ -153,6 +148,7 @@ def pool_weight(
     cooldown_seconds: int,
     preferred_mood: str = "any",
     recent_densities: list[str] | None = None,
+    recent_topics: list[str] | None = None,
     deployment_code: str = "memory",
 ) -> float:
     seconds_since_access = cooldown_seconds * 4
@@ -174,6 +170,8 @@ def pool_weight(
     else:
         age_factor = 0.92
 
+    lane = artifact_lane(artifact, now)
+    density = artifact_density(artifact)
     mood = artifact_mood(artifact, now)
     mood_factor = 1.0
     if preferred_mood != "any":
@@ -192,9 +190,25 @@ def pool_weight(
         else:
             mood_factor = 0.88
 
-    featured_return_factor = float(settings.POOL_FEATURED_RETURN_BOOST) if artifact_is_featured_return(artifact, now) else 1.0
+    featured_return_factor = (
+        float(settings.POOL_FEATURED_RETURN_BOOST)
+        * playback_profile(deployment_code).featured_return_multiplier
+        if artifact_is_featured_return(artifact, now)
+        else 1.0
+    )
     density_factor = density_balance_factor(artifact, now, recent_densities)
-    deployment_factor = deployment_weight_adjustment(artifact, now, deployment_code)
+    deployment_factor = weight_adjustment(
+        deployment_code=deployment_code,
+        age_hours=age_hours,
+        absence_hours=artifact_absence_hours(artifact, now),
+        lifecycle_status=str(getattr(artifact, "lifecycle_status", "") or ""),
+        topic_tag=str(getattr(artifact, "topic_tag", "") or ""),
+        recent_topics=recent_topics or [],
+        duration_ms=int(getattr(artifact, "duration_ms", 0) or 0),
+        lane=lane,
+        density=density,
+        mood=mood,
+    )
 
     return max(
         0.1,
@@ -252,38 +266,51 @@ def select_pool_artifact(
     preferred_mood: str = "any",
     excluded_ids: set[int] | None = None,
     recent_densities: list[str] | None = None,
+    recent_topics: list[str] | None = None,
     deployment_code: str = "memory",
 ):
-    cooldown_seconds = max(1, int(settings.POOL_PLAY_COOLDOWN_SECONDS))
+    cooldown_seconds = pool_cooldown_seconds(int(settings.POOL_PLAY_COOLDOWN_SECONDS), deployment_code)
     cooldown_threshold = now - timedelta(seconds=cooldown_seconds)
-    candidate_limit = max(5, int(settings.POOL_CANDIDATE_LIMIT))
+    candidate_limit = pool_candidate_limit(int(settings.POOL_CANDIDATE_LIMIT), deployment_code)
 
     deployment = deployment_spec(deployment_code)
     base_qs = playable_artifact_queryset(now).filter(deployment_kind=deployment.code)
+    deployment_has_playable = base_qs.exists()
     preferred_base_qs = base_qs
     if excluded_ids:
         preferred_base_qs = preferred_base_qs.exclude(id__in=excluded_ids)
 
-    cooldown_qs = preferred_base_qs.filter(
-        Q(last_access_at__isnull=True) | Q(last_access_at__lt=cooldown_threshold)
+    cooldown_qs = preferred_base_qs.filter(Q(last_access_at__isnull=True) | Q(last_access_at__lt=cooldown_threshold))
+    candidates = select_candidates_for_deployment(
+        cooldown_qs=cooldown_qs,
+        preferred_base_qs=preferred_base_qs,
+        deployment_code=deployment.code,
+        now=now,
+        candidate_limit=candidate_limit,
+        recent_topics=recent_topics,
     )
-    candidates = list(cooldown_qs.order_by("play_count", "wear", "-created_at")[:candidate_limit])
-    if not candidates:
-        candidates = list(preferred_base_qs.order_by("last_access_at", "play_count", "wear", "-created_at")[:candidate_limit])
     if not candidates and excluded_ids:
-        cooldown_qs = base_qs.filter(
-            Q(last_access_at__isnull=True) | Q(last_access_at__lt=cooldown_threshold)
+        cooldown_qs = base_qs.filter(Q(last_access_at__isnull=True) | Q(last_access_at__lt=cooldown_threshold))
+        candidates = select_candidates_for_deployment(
+            cooldown_qs=cooldown_qs,
+            preferred_base_qs=base_qs,
+            deployment_code=deployment.code,
+            now=now,
+            candidate_limit=candidate_limit,
+            recent_topics=recent_topics,
         )
-        candidates = list(cooldown_qs.order_by("play_count", "wear", "-created_at")[:candidate_limit])
-        if not candidates:
-            candidates = list(base_qs.order_by("last_access_at", "play_count", "wear", "-created_at")[:candidate_limit])
-    if not candidates and deployment.code != "memory":
+    if not candidates and deployment.code != "memory" and not deployment_has_playable:
         base_qs = playable_artifact_queryset(now)
         preferred_base_qs = base_qs.exclude(id__in=excluded_ids) if excluded_ids else base_qs
         cooldown_qs = preferred_base_qs.filter(Q(last_access_at__isnull=True) | Q(last_access_at__lt=cooldown_threshold))
-        candidates = list(cooldown_qs.order_by("play_count", "wear", "-created_at")[:candidate_limit])
-        if not candidates:
-            candidates = list(preferred_base_qs.order_by("last_access_at", "play_count", "wear", "-created_at")[:candidate_limit])
+        candidates = select_candidates_for_deployment(
+            cooldown_qs=cooldown_qs,
+            preferred_base_qs=preferred_base_qs,
+            deployment_code="memory",
+            now=now,
+            candidate_limit=candidate_limit,
+            recent_topics=recent_topics,
+        )
 
     if not candidates:
         return None, None
@@ -310,9 +337,71 @@ def select_pool_artifact(
             cooldown_seconds,
             preferred_mood,
             recent_densities=recent_densities,
+            recent_topics=recent_topics,
             deployment_code=deployment.code,
         )
         for artifact in candidates
     ]
     selected = random.choices(candidates, weights=weights, k=1)[0]
     return selected, artifact_lane(selected, now)
+
+
+def unresolved_queryset(queryset):
+    return queryset.filter(lifecycle_status__in=tuple(UNRESOLVED_LIFECYCLE_STATUSES))
+
+
+def topic_cluster_queryset(queryset, recent_topics: list[str] | None):
+    topics = [str(topic or "").strip().lower() for topic in (recent_topics or []) if str(topic or "").strip()]
+    if not topics:
+        return queryset.none()
+    topic_query = Q()
+    for topic in topics[:3]:
+        topic_query |= Q(topic_tag__iexact=topic)
+    return queryset.filter(topic_query)
+
+
+def select_candidates_for_deployment(*, cooldown_qs, preferred_base_qs, deployment_code: str, now, candidate_limit: int, recent_topics: list[str] | None = None):
+    code = deployment_spec(deployment_code).code
+    recent_topics = [str(topic or "").strip().lower() for topic in (recent_topics or []) if str(topic or "").strip()]
+    batches = []
+
+    if code == "question":
+        batches.extend([
+            topic_cluster_queryset(unresolved_queryset(cooldown_qs), recent_topics).order_by("-created_at", "play_count", "wear"),
+            unresolved_queryset(cooldown_qs).order_by("-created_at", "play_count", "wear"),
+            topic_cluster_queryset(preferred_base_qs, recent_topics).order_by("last_access_at", "-created_at", "play_count", "wear"),
+            preferred_base_qs.order_by("last_access_at", "-created_at", "play_count", "wear"),
+        ])
+    elif code == "repair":
+        recent_threshold = now - timedelta(days=14)
+        recent_cooldown_qs = cooldown_qs.filter(created_at__gte=recent_threshold)
+        recent_base_qs = preferred_base_qs.filter(created_at__gte=recent_threshold)
+        batches.extend([
+            topic_cluster_queryset(recent_cooldown_qs, recent_topics).order_by("-created_at", "play_count", "wear"),
+            recent_cooldown_qs.order_by("-created_at", "play_count", "wear"),
+            topic_cluster_queryset(cooldown_qs, recent_topics).order_by("-created_at", "play_count", "wear"),
+            recent_base_qs.order_by("-created_at", "last_access_at", "play_count", "wear"),
+            preferred_base_qs.order_by("-created_at", "last_access_at", "play_count", "wear"),
+        ])
+    elif code == "oracle":
+        oracle_threshold = now - timedelta(hours=12)
+        absent_threshold = now - timedelta(hours=72)
+        aged_cooldown_qs = cooldown_qs.filter(created_at__lt=oracle_threshold)
+        absent_cooldown_qs = aged_cooldown_qs.filter(Q(last_access_at__isnull=True) | Q(last_access_at__lt=absent_threshold))
+        aged_base_qs = preferred_base_qs.filter(created_at__lt=oracle_threshold)
+        batches.extend([
+            absent_cooldown_qs.order_by("last_access_at", "created_at", "play_count", "wear"),
+            aged_cooldown_qs.order_by("last_access_at", "created_at", "play_count", "wear"),
+            aged_base_qs.order_by("last_access_at", "created_at", "play_count", "wear"),
+        ])
+    else:
+        batches.extend([
+            cooldown_qs.order_by("play_count", "wear", "-created_at"),
+            preferred_base_qs.order_by("last_access_at", "play_count", "wear", "-created_at"),
+        ])
+
+    for queryset in batches:
+        candidates = list(queryset[:candidate_limit])
+        if candidates:
+            return candidates
+    return []

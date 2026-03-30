@@ -5,6 +5,7 @@ from memory_engine.deployments import DEFAULT_ENGINE_DEPLOYMENT, available_engin
 from memory_engine.installation_profiles import installation_profile_default
 
 from .base import EngineTestCase, default_runtime_config, validate_runtime_settings
+from ..deployment_policy import playback_profile
 
 
 class RuntimeConfigValidationTests(EngineTestCase):
@@ -78,6 +79,10 @@ class RuntimeConfigValidationTests(EngineTestCase):
             validate_runtime_settings(config)
 
         self.assertIn("ENGINE_DEPLOYMENT", str(ctx.exception))
+
+    def test_playback_profile_falls_back_to_memory_for_unknown_deployment(self):
+        profile = playback_profile("mystery")
+        self.assertEqual(profile.code, "memory")
 
     def test_runtime_config_validation_rejects_invalid_operator_allowlist_entry(self):
         config = default_runtime_config(OPS_ALLOWED_NETWORKS=["not-a-cidr"])

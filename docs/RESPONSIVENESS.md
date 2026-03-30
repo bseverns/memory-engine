@@ -48,3 +48,10 @@ Even when tone changes (`question` urgency, `repair` utility, `oracle` ceremony)
 3. ambient afterlife over time
 
 No deployment gets to skip step 1.
+
+Current deployment-specific step-3 differences:
+
+- `memory`: weathering, featured return, fresh-to-worn oscillation
+- `question`: quicker unresolved return, topic clustering, lighter wear
+- `repair`: stronger recency/usefulness bias, shorter gaps, clearer audio
+- `oracle`: sparse recurrence, longer pauses, event-like resurfacing

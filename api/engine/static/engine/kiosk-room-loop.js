@@ -73,6 +73,20 @@
         fadeSeconds: 1.25,
       },
       policy: {
+        activeDeployment: {
+          code: "memory",
+          behaviorSummary: "Weathered room-memory with fresh-to-worn oscillation and featured returns.",
+          afterlifeSummary: "Patina builds gradually; older absent material can feel newly arrived again.",
+          tuningSource: "Shared pool weighting + default room loop movement and wear.",
+          antiRepetitionWindow: 12,
+          cueGapMultiplier: 1.0,
+          pauseGapMultiplier: 1.0,
+          toneGainMultiplier: 1.0,
+          overlapChanceMultiplier: 1.0,
+          wearMultiplier: 1.0,
+          featuredReturnMultiplier: 1.0,
+          topicClusterBoost: 1.0,
+        },
         history: {
           densityWindow: 4,
           sceneWindow: 3,
@@ -112,6 +126,8 @@
     const fallback = {
       roomIntensityProfile: "balanced",
       roomMovementPreset: "balanced",
+      engineDeployment: "memory",
+      engineDeploymentParticipantNoun: "memory",
       roomDaypartEnabled: true,
       roomDaypartName: "",
       roomDaypartLabel: "",
@@ -169,6 +185,7 @@
     const roomMovements = loopConfig.movements || fallbackConfig.movements;
     const roomTone = loopConfig.tone || fallbackConfig.tone;
     const toneEngine = createToneEngine({ globalObject: global, config, roomTone });
+    const deploymentNoun = String(config.engineDeploymentParticipantNoun || "memory");
     let surfaceState = {
       intake_paused: false,
       playback_paused: false,
@@ -341,8 +358,17 @@
         lane: payload.lane || "any",
         density: payload.density || "medium",
         mood: payload.mood || "suspended",
+        topic: payload.topic_tag || "",
+        lifecycleStatus: payload.lifecycle_status || "",
       });
       loopHistory = loopHistory.slice(-loopHistoryWindowSize(loopConfig));
+    }
+
+    function recentLoopTopics() {
+      return loopHistory
+        .map((item) => String(item.topic || "").trim().toLowerCase())
+        .filter((topic) => Boolean(topic))
+        .slice(-3);
     }
 
     async function start() {
@@ -418,6 +444,7 @@
           const mood = cue.mood || "any";
           const excludedIds = recentArtifactIdsForExclusion(config, persistentLoopWindow);
           const recentDensities = recentDensityWindow(loopHistory, loopConfig);
+          const recentTopics = recentLoopTopics();
           const primaryResult = await fetchPoolPayload({
             lane,
             density,
@@ -425,10 +452,11 @@
             segmentVariant: `${movement.name}:${scene.name}:${loopMovementIndex}:${loopMovementProgress}:${loopSceneCueIndex}`,
             excludeIds: excludedIds,
             recentDensities,
+            recentTopics,
           });
           if (primaryResult.hold) {
             loopKnownPoolSize = 0;
-            setStatus(`No ${mood} ${density} memory available in ${roomPostureLabel(profiles)} / ${movement.name}. Scarcity mode is holding the room tone.`);
+            setStatus(`No ${mood} ${density} ${deploymentNoun} available in ${roomPostureLabel(profiles)} / ${movement.name}. Scarcity mode is holding the room tone.`);
             toneEngine.setRoomToneLevel(applySurfaceToneMultiplier(roomToneLevelFor(config, loopConfig, roomIntensity, roomTone.sparseGain, loopKnownPoolSize)), 1.8);
             await sleep(Math.round(1500 * applySurfaceGapMultiplier(adaptiveGapMultiplier(config, loopConfig, roomIntensity, loopKnownPoolSize, movement, true))));
             continue;
@@ -444,7 +472,7 @@
           loopKnownPoolSize = Number(payload.pool_size || 0);
           rememberLoopPayload(payload, scene, movement);
           persistentLoopWindow = rememberPersistentArtifactId(config, PERSISTENT_LOOP_WINDOW_KEY, persistentLoopWindow, payload.artifact_id);
-          const laneLabel = payload.lane ? `${payload.lane} ${payload.density || "memory"} memory` : "memory";
+          const laneLabel = payload.lane ? `${payload.lane} ${payload.density || "room"} ${deploymentNoun}` : deploymentNoun;
           const featuredLabel = payload.featured_return ? " / featured return" : "";
           const scarcityLabel = scarcityProfile(config, loopConfig, loopKnownPoolSize).label;
           let layerPayload = null;
@@ -461,6 +489,7 @@
               cue,
               primaryArtifactId: payload.artifact_id,
               recentDensities,
+              recentTopics,
               currentMoodBias: currentMoodBias(),
             });
             if (layerPayload) {

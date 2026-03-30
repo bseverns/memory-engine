@@ -4,6 +4,7 @@ from django.shortcuts import render
 
 from memory_engine.deployments import deployment_catalog_payload, deployment_spec
 
+from .deployment_policy import deployment_room_loop_policy, playback_profile, room_loop_config_for_deployment
 from .media_access import PURPOSE_SURFACE_FOSSILS, build_surface_token, surface_fossils_url
 from .memory_color import memory_color_catalog_payload
 from .operator_auth import (
@@ -24,6 +25,7 @@ from .steward import steward_state_payload
 
 def room_surface_config():
     active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+    deployment_profile = playback_profile(active_deployment.code)
     schedule = room_schedule_snapshot(
         intensity_profile=settings.ROOM_INTENSITY_PROFILE,
         movement_preset=settings.ROOM_MOVEMENT_PRESET,
@@ -43,6 +45,8 @@ def room_surface_config():
         "engineDeploymentLabel": active_deployment.label,
         "engineDeploymentParticipantNoun": active_deployment.participant_noun,
         "engineDeploymentPlaybackPolicyKey": active_deployment.playback_policy_key,
+        "engineDeploymentBehaviorSummary": deployment_profile.behavior_summary,
+        "engineDeploymentAfterlifeSummary": deployment_profile.afterlife_summary,
         "engineDeploymentCatalog": deployment_catalog_payload(),
         "kioskLanguageCode": str(getattr(settings, "KIOSK_DEFAULT_LANGUAGE_CODE", "en")),
         "kioskMaxRecordingSeconds": int(getattr(settings, "KIOSK_DEFAULT_MAX_RECORDING_SECONDS", 120)),
@@ -65,7 +69,7 @@ def room_surface_config():
         "roomScarcityEnabled": bool(settings.ROOM_SCARCITY_ENABLED),
         "roomScarcityLowThreshold": int(settings.ROOM_SCARCITY_LOW_THRESHOLD),
         "roomScarcitySevereThreshold": int(settings.ROOM_SCARCITY_SEVERE_THRESHOLD),
-        "roomAntiRepetitionWindowSize": int(settings.ROOM_ANTI_REPETITION_WINDOW_SIZE),
+        "roomAntiRepetitionWindowSize": deployment_profile.anti_repetition_window,
         "roomOverlapChance": float(settings.ROOM_OVERLAP_CHANCE),
         "roomOverlapMinPoolSize": int(settings.ROOM_OVERLAP_MIN_POOL_SIZE),
         "roomOverlapMaxLayers": int(settings.ROOM_OVERLAP_MAX_LAYERS),
@@ -81,7 +85,7 @@ def room_surface_config():
         "browserTestMode": bool(getattr(settings, "BROWSER_TEST_MODE", False)),
         "memoryColorCatalog": memory_color_catalog_payload(),
         "operatorState": steward_state_payload(),
-        "roomLoopConfig": ROOM_LOOP_CONFIG,
+        "roomLoopConfig": room_loop_config_for_deployment(ROOM_LOOP_CONFIG, active_deployment.code),
     }
 
 
@@ -136,6 +140,7 @@ def operator_dashboard_view(request):
         }, status=503 if not operator_secret_configured() else 200)
 
     active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+    deployment_profile = playback_profile(active_deployment.code)
     return render(request, "engine/operator_dashboard.html", {
         "operator_state": steward_state_payload(),
         "engine_deployment": {
@@ -144,6 +149,10 @@ def operator_dashboard_view(request):
             "description": active_deployment.short_description,
             "ops_note": active_deployment.ops_note,
             "playback_policy_key": active_deployment.playback_policy_key,
+            "behavior_summary": deployment_profile.behavior_summary,
+            "afterlife_summary": deployment_profile.afterlife_summary,
+            "tuning_source": deployment_profile.tuning_source,
+            "room_loop_policy": deployment_room_loop_policy(active_deployment.code),
         },
     })
 
