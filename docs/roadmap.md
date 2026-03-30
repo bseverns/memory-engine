@@ -103,6 +103,13 @@
 
 ## Next
 
+### Multi-deployment follow-through
+- Add deployment-specific intake cards so stewards can tune prompts without touching code
+- Add lightweight deployment-aware metadata editing in `/ops/` (topic + lifecycle only)
+- Add deployment-aware playback policy presets visible in operator status exports
+- Add deployment-aware retention/export presets for archival handoff bundles
+- Add installation-specific room identities that can be combined with deployment kind (e.g., `repair` + `shared_lab`)
+
 ### User / speaker
 - Add optional headphone or monitor-check mode for setup and microphone testing
 

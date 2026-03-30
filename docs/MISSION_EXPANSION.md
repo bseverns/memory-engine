@@ -14,6 +14,20 @@ The opening in this pass is architectural and editorial: we now name the shared 
 
 ## What becomes configurable
 
+## Deployment catalog shape (explicit)
+
+Each deployment entry carries:
+
+- machine key (`memory`, `question`, `prompt`, `repair`, `witness`, `oracle`)
+- label and short description
+- participant/framing nouns
+- copy catalog reference
+- playback policy reference
+- ops-facing note
+
+This keeps extension work concrete: no plugin loaders, no abstract platform shell, just inspectable in-repo configuration.
+
+
 Deployment kind (`ENGINE_DEPLOYMENT`) is now a first-pass config primitive.
 
 Planned supported values:

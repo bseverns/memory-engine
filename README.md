@@ -14,6 +14,30 @@ This repo now opens one layer wider: **Memory Engine is still the default deploy
 - A participant can now choose a first-pass memory color (`Clear`, `Warm`, `Radio`, `Dream`) during review; the dry WAV stays unchanged in storage and the color choice is stored separately on the artifact for playback
 - Those memory-color profiles now come from one shared catalog used by Django, the kiosk review UI, and `/ops/`, so the profile list and first-pass tuning stay aligned across storage, playback, and operator visibility. Audio behavior stays bounded through a small topology dispatch layer rather than arbitrary DSP graphs, so a new profile can often be added by editing the catalog if it reuses an existing topology. `Dream` is seeded from the source audio so preview and later playback stay materially aligned.
 
+
+## Deployment family (explicit in this pass)
+
+Memory Engine is still the default and production-safe baseline.
+
+This pass makes six deployment kinds explicit and runnable through one shared local-first artifact engine:
+
+- `memory` (default)
+- `question`
+- `prompt`
+- `repair`
+- `witness`
+- `oracle`
+
+Set deployment kind with:
+
+```env
+ENGINE_DEPLOYMENT=memory
+```
+
+If unset, startup defaults to `memory`. If set to an unknown value, startup fails fast during config validation so operators see the mistake immediately.
+
+Practical intent: same routes and steward posture, different intake framing, copy, metadata expectations, and playback weighting.
+
 ## Quick start
 1) Install Docker + Docker Compose.
 2) Copy env:

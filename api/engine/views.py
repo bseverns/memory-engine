@@ -2,7 +2,7 @@ from django.conf import settings
 from django.shortcuts import redirect
 from django.shortcuts import render
 
-from memory_engine.deployments import DEPLOYMENT_SPECS, deployment_spec
+from memory_engine.deployments import deployment_catalog_payload, deployment_spec
 
 from .media_access import PURPOSE_SURFACE_FOSSILS, build_surface_token, surface_fossils_url
 from .memory_color import memory_color_catalog_payload
@@ -41,10 +41,9 @@ def room_surface_config():
     return {
         "engineDeployment": active_deployment.code,
         "engineDeploymentLabel": active_deployment.label,
-        "engineDeploymentCatalog": [
-            {"code": spec.code, "label": spec.label, "description": spec.short_description}
-            for spec in DEPLOYMENT_SPECS
-        ],
+        "engineDeploymentParticipantNoun": active_deployment.participant_noun,
+        "engineDeploymentPlaybackPolicyKey": active_deployment.playback_policy_key,
+        "engineDeploymentCatalog": deployment_catalog_payload(),
         "kioskLanguageCode": str(getattr(settings, "KIOSK_DEFAULT_LANGUAGE_CODE", "en")),
         "kioskMaxRecordingSeconds": int(getattr(settings, "KIOSK_DEFAULT_MAX_RECORDING_SECONDS", 120)),
         "roomIntensityProfile": schedule["intensityProfile"],
@@ -143,6 +142,8 @@ def operator_dashboard_view(request):
             "code": active_deployment.code,
             "label": active_deployment.label,
             "description": active_deployment.short_description,
+            "ops_note": active_deployment.ops_note,
+            "playback_policy_key": active_deployment.playback_policy_key,
         },
     })
 

@@ -221,7 +221,7 @@
         tagName: "article",
         className: "component-card ready",
         title: "Active deployment",
-        detail: `${deployment.label || "Memory Engine"} (${deployment.code || "memory"})`,
+        detail: `${deployment.label || "Memory Engine"} (${deployment.code || "memory"}) · ${deployment.description || "room-memory default posture"}`,
       },
       {
         tagName: "article",

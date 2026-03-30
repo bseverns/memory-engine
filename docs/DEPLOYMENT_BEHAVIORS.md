@@ -1,53 +1,38 @@
 # Deployment Behaviors and Afterlife Posture
 
-This note defines playback/afterlife behavior as a **deployment concern**.
+This repo runs one local-first artifact/offering engine with explicit deployment kinds.
+Memory Engine stays canonical. Other modes branch through copy + metadata + policy seams.
 
-Memory Engine already implements substantial real behavior. Future sibling deployments should branch from the same loop and stewardship machinery, not fork into separate stacks.
+## Deployment quick map
 
-## Already real in Memory Engine
+| Deployment | Participant ask | Useful metadata | Room resurfacing posture | Afterlife stance | Responsiveness emphasis |
+|---|---|---|---|---|---|
+| `memory` | Offer a room memory | memory color, tone, duration | weathering, patina, temporal depth | layered local residue and worn return | reflective but immediate |
+| `question` | Ask what is unresolved | topic tag, lifecycle (`open`/`answered`) | recurrence + unresolved return | unresolved items keep coming back | clear acknowledgement of inquiry |
+| `prompt` | Offer a prompt response | topic tag, session cue | catalytic rotation + variety | keeps the cycle moving, avoids stagnation | fast iteration loops |
+| `repair` | Record practical repair notes | topic tag, lifecycle, recency | recency/usefulness bias | practical resurfacing near active workflows | utility-first feedback |
+| `witness` | Record a careful witness note | topic tag, context marker | contextual pacing, documentary clarity | less churn, more trace continuity | calm but explicit confirmation |
+| `oracle` | Offer a sparse oracle fragment | lifecycle + rarity framing | rare, ceremonial timing | sparse but meaningful recurrence | immediate acknowledgment, delayed return |
 
-Current system behavior already includes:
+## Already real in code
 
-- wear/decay dynamics across repeated playback
-- fresh/mid/worn lane balancing
-- cooldown + anti-repetition controls
-- movement and daypart pacing
-- scarcity and quiet-hours posture
-- fossil/residue afterlife for non-room-full retention
+- Deployment catalog with copy/policy references: `api/memory_engine/deployments.py`
+- Deployment-aware kiosk copy selection: `api/engine/static/engine/kiosk-copy.js`
+- Deployment-aware playback weight hook: `api/engine/deployment_policy.py`
+- Deployment metadata on artifacts: `deployment_kind`, `topic_tag`, `lifecycle_status`
 
-## Behavior sketches for sibling deployments (not fully implemented yet)
+## Playback hook posture (small and intentional)
 
-### Memory Engine (`memory`)
-- Weathering, patina, temporal depth.
-- Return logic that rewards age and absence.
+Current deployment policies are weighting adjustments, not a second engine:
 
-### Question Engine (`question`)
-- Recurrence and unresolved return.
-- Clustering around question-like artifacts.
-- "Haunting" behavior where unresolved offerings reappear.
+- `memory`: baseline lane/mood behavior
+- `question`: unresolved lifecycle gets a return boost
+- `prompt`: keeps rotation lively; very old material cools
+- `repair`: strong recency bias for practical usefulness
+- `witness`: suppresses hyper-recency spikes; favors settled clarity
+- `oracle`: favors older absent artifacts; penalizes brand-new ones
 
-### Repair Engine (`repair`)
-- Practical resurfacing with recency bias.
-- Utility-forward playback windows.
-- Faster re-cue cycles for actionable offerings.
+## Rule for future contributors
 
-### Oracle Engine (`oracle`)
-- Rarity and ceremonial timing.
-- Prompt-like resurfacing events.
-- Sparse but high-signal reappearance.
-
-### Prompt / Witness (planned)
-- Prompt: authored cadence and response waves.
-- Witness: trace-preserving replay with stewardship-aware pacing.
-
-## Where future policy hooks should live
-
-- `api/memory_engine/deployments.py` for deployment catalog and labels
-- kiosk copy selection via deployment-aware lookup in `kiosk-copy.js`
-- playback policy branching at room loop policy/composer boundaries (`room_composer.py`, room loop policy JS)
-- operator labels and eventual deployment-specific controls in `/ops/`
-- retention/export policy branching in steward and reporting layers
-
-## Rule of thumb
-
-If a behavior change can be represented as policy, copy, metadata, or weighting, keep it inside this engine family. Only split systems if the runtime or trust boundary fundamentally changes.
+If a change can be expressed as metadata, copy, or weighting, keep it inside this shared engine.
+Only split systems when runtime boundaries or trust boundaries genuinely diverge.

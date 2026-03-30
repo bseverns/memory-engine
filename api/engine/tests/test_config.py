@@ -1,6 +1,7 @@
+from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 
-from memory_engine.deployments import DEFAULT_ENGINE_DEPLOYMENT, available_engine_deployments
+from memory_engine.deployments import DEFAULT_ENGINE_DEPLOYMENT, available_engine_deployments, deployment_catalog_payload
 from memory_engine.installation_profiles import installation_profile_default
 
 from .base import EngineTestCase, default_runtime_config, validate_runtime_settings
@@ -9,6 +10,10 @@ from .base import EngineTestCase, default_runtime_config, validate_runtime_setti
 class RuntimeConfigValidationTests(EngineTestCase):
     def test_runtime_config_validation_accepts_default_test_like_values(self):
         validate_runtime_settings(default_runtime_config())
+
+    def test_runtime_config_validation_accepts_all_supported_engine_deployments(self):
+        for deployment in available_engine_deployments():
+            validate_runtime_settings(default_runtime_config(ENGINE_DEPLOYMENT=deployment))
 
     def test_runtime_config_validation_rejects_inverted_thresholds(self):
         config = default_runtime_config(
@@ -132,6 +137,10 @@ class RuntimeConfigValidationTests(EngineTestCase):
             available_engine_deployments(),
             ("memory", "question", "prompt", "repair", "witness", "oracle"),
         )
+        catalog = deployment_catalog_payload()
+        self.assertEqual(len(catalog), 6)
+        self.assertTrue(all(item.get("copyCatalogKey") for item in catalog))
+        self.assertTrue(all(item.get("playbackPolicyKey") for item in catalog))
 
     def test_installation_profile_defaults_return_expected_values(self):
         self.assertEqual(
@@ -148,3 +157,9 @@ class RuntimeConfigValidationTests(EngineTestCase):
             installation_profile_default("custom", "ROOM_TONE_PROFILE", "soft_air"),
             "soft_air",
         )
+
+    def test_env_example_mentions_engine_deployment_and_supported_modes(self):
+        env_example = Path(__file__).resolve().parents[3] / ".env.example"
+        payload = env_example.read_text(encoding="utf-8")
+        self.assertIn("ENGINE_DEPLOYMENT=memory", payload)
+        self.assertIn("memory, question, prompt, repair, witness, oracle", payload)

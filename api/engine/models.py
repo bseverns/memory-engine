@@ -46,6 +46,11 @@ class Artifact(models.Model):
     effect_profile = models.CharField(max_length=32, blank=True, default="")
     effect_metadata = models.JSONField(default=dict, blank=True)
 
+    # Deployment-aware metadata. Defaults preserve Memory Engine behavior.
+    deployment_kind = models.CharField(max_length=32, default="memory")
+    topic_tag = models.CharField(max_length=64, blank=True, default="")
+    lifecycle_status = models.CharField(max_length=32, blank=True, default="")
+
     wear = models.FloatField(default=0.0)  # 0..1
     play_count = models.IntegerField(default=0)
     last_access_at = models.DateTimeField(null=True, blank=True)
@@ -69,6 +74,7 @@ class Artifact(models.Model):
                 fields=["status", "expires_at", "last_access_at", "play_count", "wear", "-created_at"],
                 name="artifact_pool_cool_idx",
             ),
+            models.Index(fields=["deployment_kind", "status", "expires_at"], name="artifact_deploy_idx"),
         ]
 
 class Derivative(models.Model):

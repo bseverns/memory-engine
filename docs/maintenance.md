@@ -98,7 +98,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
 - Django also validates runtime config relationships at startup now, so bad threshold ordering or insecure origin posture fails fast before the stack enters service.
 - `INSTALLATION_PROFILE` can provide a named starting posture for room behavior and kiosk defaults. Explicit env vars still override profile defaults.
-- `ENGINE_DEPLOYMENT` declares the active deployment kind (`memory` default; planned: `question`, `prompt`, `repair`, `witness`, `oracle`) so `/ops/` and participant framing can branch safely without changing routes.
+- `ENGINE_DEPLOYMENT` declares the active deployment kind (`memory` default; also `question`, `prompt`, `repair`, `witness`, `oracle`) so `/ops/`, participant framing, artifact metadata, and playback weighting can branch safely without changing routes.
 - Public write paths are also guarded by server-side WAV validation and two-layer DRF throttling: a kiosk-friendly client limit plus a broader IP abuse ceiling. If you tune those limits, update `INGEST_MAX_UPLOAD_BYTES`, `INGEST_MAX_DURATION_SECONDS`, `PUBLIC_INGEST_RATE`, `PUBLIC_INGEST_IP_RATE`, `PUBLIC_REVOKE_RATE`, and `PUBLIC_REVOKE_IP_RATE` together.
 - `/ops/` now shows those configured budgets plus recent throttle hits, and `/kiosk/` shows a soft warning when the current station is nearing its remaining ingest budget.
 - Leave `DJANGO_TRUST_X_FORWARDED_FOR=0` unless your reverse proxy strips and rewrites forwarded headers correctly. If you turn it on, throttling and steward network allowlists will trust that header.

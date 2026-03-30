@@ -38,3 +38,13 @@ Current examples:
 - Keep the acknowledgement chain local and robust under weak network conditions.
 - Add deployment-specific behavior by adjusting policy/copy first, not by delaying baseline feedback.
 - Treat responsiveness as part of trust: participants need to know they were heard before any long-tail behavior occurs.
+
+## Cross-deployment rule
+
+Even when tone changes (`question` urgency, `repair` utility, `oracle` ceremony), the ladder does not change:
+
+1. immediate local acknowledgment
+2. near-immediate reflection
+3. ambient afterlife over time
+
+No deployment gets to skip step 1.

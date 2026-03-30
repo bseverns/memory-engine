@@ -6,7 +6,8 @@ class ArtifactSerializer(serializers.ModelSerializer):
         model = Artifact
         fields = [
             "id","kind","status","created_at","expires_at",
-            "wear","play_count","duration_ms","effect_profile","effect_metadata"
+            "wear","play_count","duration_ms","effect_profile","effect_metadata",
+            "deployment_kind","topic_tag","lifecycle_status"
         ]
 
 class DerivativeSerializer(serializers.ModelSerializer):

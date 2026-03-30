@@ -19,15 +19,19 @@ test("deployment copy defaults to memory pack", () => {
 
   assert.equal(deploymentPack.heroTitle, base.heroTitle);
   assert.equal(copy.normalizeDeployment(""), "memory");
+  assert.equal(deploymentPack.deploymentLabel, "Memory Engine");
 });
 
-test("question and repair deployment overrides are available as placeholders", () => {
+test("all six deployment packs are available with mode copy", () => {
   const copy = loadCopyApi();
-  const question = copy.getDeploymentPack("en", "question");
-  const repair = copy.getDeploymentPack("en", "repair");
+  const modes = ["memory", "question", "prompt", "repair", "witness", "oracle"];
 
-  assert.match(question.heroTitle, /Question/i);
-  assert.match(question.btnChooseMemoryMode, /question mode/i);
-  assert.match(repair.heroTitle, /Repair/i);
-  assert.match(repair.btnChooseMemoryMode, /repair mode/i);
+  for (const deployment of modes) {
+    const pack = copy.getDeploymentPack("en", deployment);
+    assert.ok(pack.heroTitle);
+    assert.ok(pack.btnChooseMemoryMode);
+    assert.ok(pack.modes.ROOM.name);
+    assert.ok(pack.modes.FOSSIL.name);
+    assert.ok(pack.modes.NOSAVE.name);
+  }
 });
