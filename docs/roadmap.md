@@ -70,6 +70,11 @@ this file is the longer memory of what changed, when, and why it mattered.
 - This pass begins to rebalance that by pushing quick actions, start-of-day ritual, and recovery notes above the slower archive summaries.
 - The hosting story also narrowed: for now the reference appliance image is `Ubuntu Server 24.04.4 LTS`, not a moving Ubuntu target.
 
+### Chapter 11: Add the narrow emergency lever
+- Public use clarified an asymmetry: the machine was better at participant revocation than at fast discretionary steward intervention.
+- This pass adds a small audited “remove from circulation” action in `/ops/` for recent artifacts in the active deployment, without expanding into a broad moderation console.
+- It also adds the shortest drill card so a non-author steward can recover kiosk, room, and operator posture under time pressure.
+
 ## Landed So Far
 
 ### Operator / deployment
@@ -124,6 +129,8 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Operator-only live monitor utility on `/ops/` for local output-tone and live mic verification without touching the archive
 - Stronger focus and reboot recovery guidance for unattended kiosk HID use
 - Sharper `/ops/` hierarchy so live controls, routing ritual, and recovery notes stay ahead of passive summary panels
+- Narrow steward-side “remove from circulation” action for recent artifacts, with audit logging and no wider moderation sprawl
+- One-page operator drill card for ninety-second recovery and opening checks
 
 
 ### Mission opening: deployment family groundwork
@@ -255,7 +262,13 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Continue documentation passes:
   - quick-reference tables for common failure modes by service
   - more explicit env-var grouping by subsystem and risk level
-  - one-page operator drill cards for intake, playback, storage, and restore incidents
+  - expand the first operator drill card into storage and restore incident variants
+
+### Interaction watch
+- Keep watching the prominence of the memory-color review step
+  - the feature is conceptually strong
+  - the risk is decision dilation immediately after recording
+  - if public hesitation rises, reduce emphasis before removing the feature
 
 ## Bucket Checkpoint
 

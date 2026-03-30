@@ -12,6 +12,7 @@ If you need full architecture detail, use [how-the-stack-works.md](./how-the-sta
 If you need deployment temperament detail, use [DEPLOYMENT_BEHAVIORS.md](./DEPLOYMENT_BEHAVIORS.md).
 If you need the shortest explicit browser/API boundary rules, use [surface-contract.md](./surface-contract.md).
 If you need the current hardware trigger path for `/kiosk/`, use [HANDS_FREE_CONTROLS.md](./HANDS_FREE_CONTROLS.md).
+If you need the shortest non-author recovery ritual, use [OPERATOR_DRILL_CARD.md](./OPERATOR_DRILL_CARD.md).
 
 Reference host image right now:
 

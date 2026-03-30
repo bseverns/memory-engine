@@ -10,6 +10,7 @@ If you need the shortest possible orientation:
 
 - first-glance system map and "which knob matters where": [docs/AT_A_GLANCE.md](docs/AT_A_GLANCE.md)
 - deploy, backup, restore, and troubleshooting commands: [docs/maintenance.md](docs/maintenance.md)
+- ninety-second non-author recovery ritual: [docs/OPERATOR_DRILL_CARD.md](docs/OPERATOR_DRILL_CARD.md)
 - full architecture and request/data flow: [docs/how-the-stack-works.md](docs/how-the-stack-works.md)
 - deployment temperament and playback differences: [docs/DEPLOYMENT_BEHAVIORS.md](docs/DEPLOYMENT_BEHAVIORS.md)
 
@@ -308,6 +309,7 @@ More captured states:
 - Playback info lightbox: ![Playback info lightbox](docs/screenshots/room-playback-info.png)
 - Quieter listening mode: ![Room playback quieter mode](docs/screenshots/room-playback-quieter.png)
 - Live operator controls: ![Operator dashboard live controls](docs/screenshots/ops-controls-live.png)
+- Operator stewardship and emergency controls: ![Operator dashboard stewardship](docs/screenshots/ops-stewardship.png)
 - Degraded operator state: ![Operator dashboard degraded state](docs/screenshots/ops-degraded.png)
 
 Longer operator notes live in `docs/maintenance.md`.

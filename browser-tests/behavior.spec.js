@@ -359,6 +359,89 @@ test.describe("browser behavior contracts", () => {
     await expect(page.locator("#opsAudioCheckStatus")).toContainText("released the microphone");
   });
 
+  test("operator can remove a recent artifact from circulation without opening a broader moderation surface", async ({ page }) => {
+    await mockHealthyOpsStatus(page);
+    await page.route("**/api/v1/operator/controls", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          operator_state: {
+            intake_paused: false,
+            playback_paused: false,
+            quieter_mode: false,
+            mood_bias: "",
+            kiosk_language_code: "",
+            kiosk_accessibility_mode: "",
+            kiosk_force_reduced_motion: false,
+            kiosk_max_recording_seconds: 120,
+          },
+          recent_actions: [],
+        }),
+      });
+    });
+    let artifactCalls = 0;
+    await page.route("**/api/v1/operator/artifacts", async (route) => {
+      artifactCalls += 1;
+      const artifacts = artifactCalls === 1 ? [{
+        id: 41,
+        created_at: "2026-03-30T18:00:00Z",
+        last_access_at: "2026-03-30T18:10:00Z",
+        duration_ms: 3200,
+        play_count: 2,
+        wear: 0.08,
+        deployment_kind: "question",
+        topic_tag: "entry_gate",
+        lifecycle_status: "open",
+        lane: "fresh",
+        density: "light",
+        mood: "clear",
+        age_hours: 1.4,
+        absence_hours: 0.4,
+      }] : [];
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          deployment: { code: "question", label: "Question Engine" },
+          artifacts,
+          operator_actions: {
+            remove_from_circulation: {
+              label: "Remove from circulation",
+              description: "Emergency steward action.",
+            },
+          },
+          editable_fields: {
+            topic_tag: {
+              label: "Topic / category",
+              placeholder: "entry_gate",
+            },
+            lifecycle_status: {
+              label: "Status",
+              input_mode: "select",
+              allow_blank: true,
+              suggestions: ["open", "pending", "answered", "resolved"],
+            },
+          },
+        }),
+      });
+    });
+    await page.route("**/api/v1/operator/artifacts/41/remove", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          artifact_id: 41,
+          status: "REVOKED",
+          deleted_derivatives: 1,
+        }),
+      });
+    });
+
+    await signIntoOps(page);
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Remove from circulation" }).click();
+    await expect(page.locator("#opsArtifactMetadata")).toContainText("No recent artifacts in this deployment");
+  });
+
   test("steward controls propagate to kiosk and room without reload-specific hacks", async ({ page }) => {
     await mockHealthyOpsStatus(page);
     await mockSpectrograms(page.context());

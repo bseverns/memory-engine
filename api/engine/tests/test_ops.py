@@ -505,6 +505,7 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertEqual(payload["editable_fields"]["lifecycle_status"]["suggestions"][0], "open")
         self.assertEqual(payload["editable_fields"]["lifecycle_status"]["input_mode"], "select")
         self.assertTrue(payload["editable_fields"]["lifecycle_status"]["allow_blank"])
+        self.assertIn("remove_from_circulation", payload["operator_actions"])
 
     @override_settings(ENGINE_DEPLOYMENT="repair")
     def test_operator_update_artifact_metadata_updates_topic_and_status(self):
@@ -549,6 +550,59 @@ class OperatorBehaviorTests(EngineTestCase):
         response = self.client.post(
             f"/api/v1/operator/artifacts/{artifact.id}/metadata",
             data={"topic_tag": "entry_gate", "lifecycle_status": "open"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    @patch("engine.api_views.delete_key")
+    @override_settings(ENGINE_DEPLOYMENT="question")
+    def test_operator_can_remove_recent_artifact_from_circulation_with_audit(self, delete_key_mock):
+        self.login_operator()
+        artifact = self.make_active_artifact(
+            raw_uri="raw/question.wav",
+            deployment_kind="question",
+            topic_tag="entry_gate",
+            lifecycle_status="open",
+        )
+        Derivative.objects.create(
+            artifact=artifact,
+            kind=Derivative.KIND_SPECTROGRAM_PNG,
+            uri="derivatives/question.png",
+        )
+
+        response = self.client.post(
+            f"/api/v1/operator/artifacts/{artifact.id}/remove",
+            data={},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        artifact.refresh_from_db()
+        self.assertEqual(artifact.status, artifact.STATUS_REVOKED)
+        self.assertEqual(artifact.raw_uri, "")
+        self.assertFalse(Derivative.objects.filter(artifact=artifact).exists())
+        self.assertEqual(response.json()["status"], artifact.STATUS_REVOKED)
+        self.assertEqual(response.json()["deleted_derivatives"], 1)
+        delete_key_mock.assert_any_call("raw/question.wav")
+        delete_key_mock.assert_any_call("derivatives/question.png")
+        audit = StewardAction.objects.filter(action="artifact.removed_from_circulation").latest("created_at")
+        self.assertEqual(audit.payload["artifact_id"], artifact.id)
+        self.assertEqual(audit.payload["deployment_kind"], "question")
+
+    @override_settings(ENGINE_DEPLOYMENT="question")
+    def test_operator_remove_artifact_rejects_other_deployment_artifact(self):
+        self.login_operator()
+        artifact = self.make_active_artifact(
+            raw_uri="raw/repair.wav",
+            deployment_kind="repair",
+            topic_tag="projector",
+            lifecycle_status="pending",
+        )
+
+        response = self.client.post(
+            f"/api/v1/operator/artifacts/{artifact.id}/remove",
+            data={},
             content_type="application/json",
         )
 

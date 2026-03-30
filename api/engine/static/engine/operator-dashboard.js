@@ -733,7 +733,7 @@
     dom.opsRefreshed.textContent = "Last refresh failed";
   }
 
-  function renderArtifactMetadata(doc, dom, payload, saveArtifactMetadata) {
+  function renderArtifactMetadata(doc, dom, payload, saveArtifactMetadata, removeArtifactFromCirculation) {
     if (!dom.opsArtifactMetadata) return;
 
     const artifacts = Array.isArray(payload?.artifacts) ? payload.artifacts : [];
@@ -808,13 +808,18 @@
       saveButton.type = "button";
       saveButton.className = "btn secondary";
       saveButton.textContent = "Save metadata";
+      const removeButton = doc.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "btn secondary";
+      removeButton.textContent = "Remove from circulation";
       const status = doc.createElement("span");
       status.className = "ops-artifact-editor-status";
       status.textContent = "Ready";
-      actions.append(saveButton, status);
+      actions.append(saveButton, removeButton, status);
 
       saveButton.addEventListener("click", async () => {
         saveButton.disabled = true;
+        removeButton.disabled = true;
         status.textContent = "Saving…";
         try {
           const updated = await saveArtifactMetadata(artifact.id, {
@@ -835,6 +840,32 @@
           status.textContent = error.message || "Save failed";
         } finally {
           saveButton.disabled = false;
+          removeButton.disabled = false;
+        }
+      });
+
+      removeButton.addEventListener("click", async () => {
+        const confirmed = globalObjectRef.confirm(
+          `Remove artifact ${artifact.id} from circulation now? This pulls it out of playback immediately.`,
+        );
+        if (!confirmed) {
+          return;
+        }
+        saveButton.disabled = true;
+        removeButton.disabled = true;
+        status.textContent = "Removing…";
+        try {
+          await removeArtifactFromCirculation(artifact.id);
+          status.textContent = "Removed from circulation";
+          card.classList.remove("ready");
+          card.classList.add("broken");
+          card.querySelectorAll("input, select, button").forEach((el) => {
+            el.disabled = true;
+          });
+        } catch (error) {
+          status.textContent = error.message || "Removal failed";
+          saveButton.disabled = false;
+          removeButton.disabled = false;
         }
       });
 
@@ -908,10 +939,25 @@
       return payload.artifact || {};
     }
 
+    async function removeArtifactFromCirculation(artifactId) {
+      const payload = await fetchJson(fetchImpl, `/api/v1/operator/artifacts/${artifactId}/remove`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": readCookie(doc, "csrftoken"),
+        },
+        body: JSON.stringify({}),
+      });
+      await refreshStatus();
+      await refreshControls();
+      await refreshArtifacts();
+      return payload;
+    }
+
     async function refreshArtifacts() {
       try {
         const payload = await fetchJson(fetchImpl, "/api/v1/operator/artifacts", { cache: "no-store" });
-        renderArtifactMetadata(doc, dom, payload, saveArtifactMetadata);
+        renderArtifactMetadata(doc, dom, payload, saveArtifactMetadata, removeArtifactFromCirculation);
       } catch (error) {
         if (dom.opsArtifactMetadataStatus) {
           dom.opsArtifactMetadataStatus.textContent = error.message || "Artifact metadata refresh failed.";

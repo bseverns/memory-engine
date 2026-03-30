@@ -59,6 +59,12 @@ Review the current hands-free trigger path for `/kiosk/`:
 open docs/HANDS_FREE_CONTROLS.md
 ```
 
+Open the short recovery card for a non-author steward:
+
+```bash
+open docs/OPERATOR_DRILL_CARD.md
+```
+
 See service state and backend readiness:
 
 ```bash
@@ -116,6 +122,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `/api/v1/operator/artifact-summary` gives stewards the same artifact posture snapshot as a direct JSON download from `/ops/`.
 - `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
 - `docs/HANDS_FREE_CONTROLS.md` documents the current Leonardo-based kiosk button path that reuses the browser shortcut contract instead of adding a new host control layer.
+- `docs/OPERATOR_DRILL_CARD.md` is the shortest recovery ritual for kiosk, room, operator, and emergency archive removal when time is tight.
 - Django also validates runtime config relationships at startup now, so bad threshold ordering or insecure origin posture fails fast before the stack enters service.
 - `INSTALLATION_PROFILE` can provide a named starting posture for room behavior and kiosk defaults. Explicit env vars still override profile defaults.
 - `ENGINE_DEPLOYMENT` declares the active deployment kind (`memory` default; also `question`, `prompt`, `repair`, `witness`, `oracle`) so `/ops/`, participant framing, artifact metadata, and playback weighting can branch safely without changing routes.

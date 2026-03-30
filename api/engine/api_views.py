@@ -863,6 +863,12 @@ def operator_recent_artifacts(request):
             "label": active_deployment.label,
         },
         "artifacts": [serialize_operator_artifact(artifact, now) for artifact in artifacts],
+        "operator_actions": {
+            "remove_from_circulation": {
+                "label": "Remove from circulation",
+                "description": "Emergency steward action. Pulls this artifact out of playback immediately and records an audit event.",
+            },
+        },
         "editable_fields": {
             "topic_tag": {
                 "label": "Topic / category",
@@ -932,6 +938,63 @@ def operator_update_artifact_metadata(request, artifact_id: int):
     return Response({
         "artifact": serialize_operator_artifact(artifact, timezone.now()),
         "changed_fields": changed_fields,
+    })
+
+
+@api_view(["POST"])
+@parser_classes([JSONParser])
+def operator_remove_artifact_from_circulation(request, artifact_id: int):
+    if not operator_session_active(request):
+        return operator_api_denied()
+
+    active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+    with transaction.atomic():
+        try:
+            artifact = Artifact.objects.select_for_update().get(
+                id=int(artifact_id),
+                deployment_kind=active_deployment.code,
+            )
+        except Artifact.DoesNotExist:
+            return Response({"error": "artifact not found in active deployment"}, status=404)
+
+        if artifact.status != Artifact.STATUS_ACTIVE:
+            return Response({"error": "artifact is not active"}, status=409)
+
+        derivative_queryset = Derivative.objects.filter(artifact=artifact)
+        deleted_derivatives = derivative_queryset.count()
+        for derivative in derivative_queryset:
+            try:
+                delete_key(derivative.uri)
+            except Exception:
+                pass
+            derivative.delete()
+
+        if artifact.raw_uri:
+            try:
+                delete_key(artifact.raw_uri)
+            except Exception:
+                pass
+
+        artifact.status = Artifact.STATUS_REVOKED
+        artifact.raw_uri = ""
+        artifact.save(update_fields=["status", "raw_uri"])
+
+    record_steward_action(
+        action="artifact.removed_from_circulation",
+        actor=request_operator_label(request),
+        detail=f"artifact {artifact.id} removed from circulation",
+        payload={
+            "artifact_id": artifact.id,
+            "deployment_kind": artifact.deployment_kind,
+            "deleted_derivatives": deleted_derivatives,
+        },
+    )
+
+    return Response({
+        "ok": True,
+        "artifact_id": artifact.id,
+        "status": Artifact.STATUS_REVOKED,
+        "deleted_derivatives": deleted_derivatives,
     })
 
 
