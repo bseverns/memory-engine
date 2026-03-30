@@ -261,6 +261,53 @@
     };
   }
 
+  async function playMonitorCheckTone() {
+    const AudioContextCtor = global.AudioContext || global.webkitAudioContext;
+    if (!AudioContextCtor) {
+      throw new Error("This browser cannot play the monitor check tone.");
+    }
+
+    const ctx = new AudioContextCtor();
+    try {
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = 0.0001;
+      masterGain.connect(ctx.destination);
+
+      const firstOsc = ctx.createOscillator();
+      firstOsc.type = "sine";
+      firstOsc.frequency.value = 523.25;
+      firstOsc.connect(masterGain);
+
+      const secondOsc = ctx.createOscillator();
+      secondOsc.type = "sine";
+      secondOsc.frequency.value = 659.25;
+      secondOsc.connect(masterGain);
+
+      const startAt = ctx.currentTime + 0.02;
+      firstOsc.start(startAt);
+      firstOsc.stop(startAt + 0.34);
+      secondOsc.start(startAt + 0.44);
+      secondOsc.stop(startAt + 0.78);
+
+      masterGain.gain.exponentialRampToValueAtTime(0.06, startAt + 0.02);
+      masterGain.gain.exponentialRampToValueAtTime(0.018, startAt + 0.34);
+      masterGain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.4);
+      masterGain.gain.exponentialRampToValueAtTime(0.06, startAt + 0.46);
+      masterGain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.8);
+
+      await new Promise((resolve) => {
+        secondOsc.onended = resolve;
+      });
+      masterGain.disconnect();
+    } finally {
+      await ctx.close();
+    }
+  }
+
   function memoryColorSeedForBuffer(buffer, profile) {
     const normalized = normalizeMemoryColorProfile(profile);
     let hash = hashStringToSeed(`${normalized}:${buffer.numberOfChannels}:${buffer.length}:${buffer.sampleRate}`);
@@ -647,6 +694,7 @@
     mergeBuffers,
     normalizeMemoryColorProfile,
     memoryColorSeedForBuffer,
+    playMonitorCheckTone,
     playUrlWithLightChain,
     processRecordingSamples,
     renderMemoryColorPreviewBlob,

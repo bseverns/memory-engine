@@ -380,8 +380,11 @@ Caddy will then be able to obtain a public certificate automatically, assuming p
 - Keyboard support is built in for kiosk deployments:
   - `Space` or `Enter` advances the primary action for the current state
   - `1`, `2`, `3` choose the memory mode after recording
-  - `Esc` resets the session, or cancels the current take while recording
+- `M` opens or closes a built-in monitor check
+- `Esc` resets the session, or cancels the current take while recording
 - A first hands-free hardware path now exists through an Arduino Leonardo acting as a USB keyboard button. See [docs/HANDS_FREE_CONTROLS.md](./docs/HANDS_FREE_CONTROLS.md).
+- `/kiosk/` now also includes a small monitor-check state so stewards can verify speakers, headphones, or monitor output before inviting the next person to record.
+- Saved-take receipts now also explain, in participant-facing language, how to ask a steward on this node to revoke a recording later using the receipt code.
 - Recorded takes now get light silence trimming, peak normalization, and short fades before upload.
 
 ## Raspberry Pi / Piper kit posture

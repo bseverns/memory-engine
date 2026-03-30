@@ -1,6 +1,6 @@
 (function initMemoryEngineKioskView(global) {
   function flowStateToStepIndex(state, FLOW) {
-    if ([FLOW.IDLE, FLOW.ARMING, FLOW.ARMED, FLOW.ERROR].includes(state)) return 0;
+    if ([FLOW.IDLE, FLOW.MONITOR, FLOW.ARMING, FLOW.ARMED, FLOW.ERROR].includes(state)) return 0;
     if ([FLOW.COUNTDOWN, FLOW.RECORDING].includes(state)) return 1;
     if ([FLOW.REVIEW, FLOW.SUBMITTING].includes(state)) return 2;
     return 3;
@@ -259,16 +259,22 @@
     const copy = ctx.currentCopy();
     let primaryLabel = copy.btnArm;
     let primaryDisabled = false;
-    let secondaryLabel = copy.btnStartOver;
-    let secondaryDisabled = true;
+    let secondaryLabel = copy.btnMonitorCheck;
+    let secondaryDisabled = false;
     let nextPrimaryAction = ctx.actions.armMicrophone;
-    let nextSecondaryAction = ctx.actions.startFreshSession;
+    let nextSecondaryAction = ctx.actions.openMonitorCheck;
 
     if (ctx.flowState === ctx.FLOW.ARMING) {
       primaryLabel = copy.btnArming;
       primaryDisabled = true;
       secondaryLabel = copy.btnPleaseWait;
       secondaryDisabled = true;
+    } else if (ctx.flowState === ctx.FLOW.MONITOR) {
+      primaryLabel = copy.btnPlayMonitorCheck;
+      nextPrimaryAction = ctx.actions.runMonitorCheck;
+      secondaryLabel = copy.btnReturnToMic;
+      nextSecondaryAction = ctx.actions.closeMonitorCheck;
+      secondaryDisabled = false;
     } else if (ctx.flowState === ctx.FLOW.ARMED) {
       primaryLabel = copy.btnStartRecording;
       nextPrimaryAction = ctx.actions.startRecording;
@@ -385,6 +391,16 @@
       ctx.shortcutHint.textContent = copy.shortcutArm;
       ctx.meterText.textContent = copy.meterWaitingMic;
       setMicCheckStatus(ctx, copy.micCheckUnavailable, "quiet");
+      setMeterLevel(ctx, 0);
+    } else if (ctx.flowState === ctx.FLOW.MONITOR) {
+      ctx.stageBadge.textContent = copy.badgeMonitor;
+      ctx.stageTitle.textContent = copy.stageMonitorTitle;
+      ctx.stageCopy.textContent = copy.stageMonitorCopy;
+      ctx.micStatus.textContent = copy.micMonitor;
+      ctx.recStatus.textContent = copy.recMonitor;
+      ctx.shortcutHint.textContent = copy.shortcutMonitorPlay;
+      ctx.meterText.textContent = copy.meterMonitor;
+      setMicCheckStatus(ctx, copy.micCheckMonitor, "good");
       setMeterLevel(ctx, 0);
     } else if (ctx.flowState === ctx.FLOW.ARMING) {
       ctx.stageBadge.textContent = copy.badgeArming;

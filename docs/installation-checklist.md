@@ -53,6 +53,7 @@ assigned the right URL and role.
 - In Chromium site settings, confirm the same microphone is selected for the kiosk URL.
 - Confirm the playback device is the intended speaker or audio interface, not HDMI or an internal monitor speaker by accident.
 - Open `/kiosk/`, arm the microphone, and watch the meter while speaking at normal distance.
+- Open `/kiosk/`, run the monitor check, and confirm the short test tone reaches the intended output path before you start recording tests.
 - Make one test recording and confirm the preview plays through the intended output device.
 - Open `/room/` and confirm ambient playback is audible at the intended room level.
 - If the input level is too low, fix gain or microphone placement in the OS or hardware before changing app code.
@@ -77,6 +78,7 @@ assigned the right URL and role.
 - Confirm there are no unexpected pool warnings before public use.
 - Test one full participant flow: arm, record, review, choose a mode, receive a receipt if applicable.
 - If you are using the Leonardo path, test one short press and one long press at `/kiosk/` during the acceptance pass.
+- If you wired the optional Leonardo buttons, test `1`, `2`, `3`, and `M` during the same pass.
 - Test one playback-only cycle: confirm `/room/` starts or can be resumed with one tap after boot.
 - Test one restart cycle: reboot or restart both browser clients and confirm the recorder returns to `/kiosk/` while the listening surface returns to `/room/`.
 

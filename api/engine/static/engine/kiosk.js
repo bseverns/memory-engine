@@ -7,6 +7,7 @@
 
 const FLOW = {
   IDLE: "idle",
+  MONITOR: "monitor",
   ARMING: "arming",
   ARMED: "armed",
   COUNTDOWN: "countdown",
@@ -142,6 +143,7 @@ const {
   encodeWavMono16,
   mergeBuffers,
   playUrlWithLightChain,
+  playMonitorCheckTone,
   processRecordingSamples,
   renderMemoryColorPreviewBlob,
 } = window.MemoryEngineKioskAudio;
@@ -391,8 +393,11 @@ function buildViewContext() {
       chooseOriginalPreview,
       cancelCountdown,
       cancelCurrentTake,
+      closeMonitorCheck,
       disarmToIdle,
+      openMonitorCheck,
       recordAgain,
+      runMonitorCheck,
       selectEffectProfile,
       startFreshSession,
       startRecording,
@@ -881,6 +886,8 @@ async function submitSave(mode) {
   setReceiptHtml(`
     <div><strong>${copy.receiptCodeLabel}</strong><span class="token">${payload.revocation_token}</span></div>
     <div class="muted">${copy.receiptCodeHelp}</div>
+    <div class="muted">${copy.receiptGuideLine}</div>
+    <div class="muted">${copy.receiptLocalOnlyLine}</div>
     <div class="muted">${formatCopy(copy.receiptExpiryLabel, { date: localizedDateTime(payload.artifact.expires_at) })}</div>
   `);
 }
@@ -916,6 +923,21 @@ async function disarmToIdle() {
   await teardownMicrophone();
   clearTakeData();
   setFlowState(FLOW.IDLE, { errorMessage: "" });
+}
+
+async function openMonitorCheck() {
+  countdownToken += 1;
+  await teardownMicrophone();
+  clearTakeData();
+  setFlowState(FLOW.MONITOR, { errorMessage: "" });
+}
+
+function closeMonitorCheck() {
+  setFlowState(FLOW.IDLE, { errorMessage: "" });
+}
+
+async function runMonitorCheck() {
+  await playMonitorCheckTone();
 }
 
 async function startFreshSession() {
@@ -1048,8 +1070,6 @@ document.addEventListener("focusin", noteReviewActivity, true);
 
 document.addEventListener("keydown", (event) => {
   noteReviewActivity();
-  if (shouldIgnoreShortcut(event.target)) return;
-
   // Keep kiosk shortcuts stable. They now serve both ordinary keyboard fallback
   // and the Leonardo HID button path documented in docs/HANDS_FREE_CONTROLS.md.
   if (event.code === "Escape") {
@@ -1063,6 +1083,18 @@ document.addEventListener("keydown", (event) => {
     }
     return;
   }
+
+  if (event.code === "KeyM" && [FLOW.IDLE, FLOW.MONITOR, FLOW.ARMED, FLOW.ERROR].includes(flowState)) {
+    event.preventDefault();
+    if (flowState === FLOW.MONITOR) {
+      runAction(closeMonitorCheck);
+    } else {
+      runAction(openMonitorCheck);
+    }
+    return;
+  }
+
+  if (shouldIgnoreShortcut(event.target)) return;
 
   if (flowState === FLOW.REVIEW && !quietTakeNeedsDecision && ["Digit1", "Digit2", "Digit3", "Numpad1", "Numpad2", "Numpad3"].includes(event.code)) {
     event.preventDefault();
@@ -1184,6 +1216,15 @@ if (kioskConfig.browserTestMode) {
     },
     async submitCurrentTake() {
       await submitCurrentTake();
+    },
+    async openMonitorCheck() {
+      await openMonitorCheck();
+    },
+    async runMonitorCheck() {
+      await runMonitorCheck();
+    },
+    currentFlowState() {
+      return flowState;
     },
   };
 }

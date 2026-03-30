@@ -56,6 +56,8 @@ this file is the longer memory of what changed, when, and why it mattered.
 ### Chapter 8: Start the hands-free path without widening the stack
 - The first hardware control path now begins with an Arduino Leonardo acting as a plain USB keyboard trigger for `/kiosk/`.
 - That choice is intentionally conservative: it reuses the kiosk's existing shortcut contract instead of adding a serial bridge, browser plugin, or custom operator path.
+- A small browser-side monitor check now sits beside that path, so input setup and output verification both stay inside the same kiosk ritual.
+- Participant handoff is also getting more explicit: the receipt now explains, in plain language, how to ask a steward on this node to revoke a saved recording later.
 - This is only the beginning of the input bucket, but it is the right kind of beginning: inspectable, local, and appliance-friendly.
 
 ## Landed So Far
@@ -107,6 +109,8 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Reduced-motion handling for the countdown and kiosk transitions
 - Steward-configurable max recording duration instead of keeping it browser-only
 - First Leonardo-based hands-free trigger path for `/kiosk/`, reusing the existing keyboard shortcut model with no host-side bridge
+- Built-in monitor/headphone check on `/kiosk/`, plus optional Leonardo buttons for `1`, `2`, `3`, and monitor-check toggle
+- Clearer participant-facing receipt guidance for later revocation on the same node
 
 
 ### Mission opening: deployment family groundwork
@@ -210,7 +214,6 @@ this file is the longer memory of what changed, when, and why it mattered.
 
 ### User / speaker
 - Expand the hands-free control path beyond the first Leonardo button
-  - mode-selection buttons or pedal mappings for `1`, `2`, `3`
   - footswitch enclosure posture
   - browser-focus/reboot recovery notes for unattended HID use
 
@@ -224,7 +227,9 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Add a safe operator-facing way to mark questions `answered` / `resolved` and repairs `fixed` / `obsolete`
 
 ### User / speaker
-- Add optional headphone or monitor-check mode for setup and microphone testing
+- Deepen the new monitor/headphone check beyond the current short tone
+  - optional voice sample or spoken prompt
+  - clearer output-device/focus troubleshooting notes for install day
 
 ### Audience / room effect
 - Push beyond metadata-derived mood shaping into a room state that responds to context
@@ -243,7 +248,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 Open buckets now look like this:
 
 - Input and participation:
-  first hands-free Leonardo path has landed; headphone/monitor check, richer hands-free input, revocation guidance, and alternate kiosk layouts remain
+  first hands-free Leonardo path has landed; monitor check and basic participant revocation guidance are now in place, while richer hands-free input, alternate layouts, and stronger participant self-service still remain
 - Deployment follow-through:
   the deployment family is behaviorally real, but intake cards, operator-safe state changes, and deployment-aware export posture remain
 - Room intelligence:

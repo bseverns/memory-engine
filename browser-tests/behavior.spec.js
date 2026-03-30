@@ -185,6 +185,46 @@ test.describe("browser behavior contracts", () => {
     }
   });
 
+  test("kiosk monitor check opens from the idle state and closes cleanly", async ({ page }) => {
+    await mockHealthyOpsStatus(page);
+    await page.goto("/kiosk/");
+
+    await expect(page.getByRole("button", { name: "Monitor check" })).toBeVisible();
+    await page.getByRole("button", { name: "Monitor check" }).click();
+    await expect(page.getByText("Check the listening path before anyone speaks.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Play check tone" })).toBeVisible();
+
+    await page.keyboard.press("KeyM");
+    await expect(page.getByText("When you are ready, wake the microphone.")).toBeVisible();
+  });
+
+  test("saved take receipt explains how to revoke through a steward on this node", async ({ page }) => {
+    await mockHealthyOpsStatus(page);
+    await page.route("**/api/v1/artifacts/audio", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          revocation_token: "NODE-KEEP-1234",
+          artifact: {
+            expires_at: "2026-04-02T12:00:00Z",
+          },
+        }),
+      });
+    });
+
+    await page.goto("/kiosk/");
+    await page.evaluate(async () => {
+      await window.MemoryEngineKioskTest.seedReviewTake({ effectProfile: "clear", seconds: 1.4 });
+      await window.MemoryEngineKioskTest.selectMode("ROOM");
+      await window.MemoryEngineKioskTest.submitCurrentTake();
+    });
+
+    await expect(page.locator("#receiptPanel")).toBeVisible();
+    await expect(page.locator("#receipt")).toContainText("NODE-KEEP-1234");
+    await expect(page.locator("#receipt")).toContainText("tell a steward on this node");
+    await expect(page.locator("#receipt")).toContainText("only works on this node's network");
+  });
+
   test("steward controls propagate to kiosk and room without reload-specific hacks", async ({ page }) => {
     await mockHealthyOpsStatus(page);
     await mockSpectrograms(page.context());
