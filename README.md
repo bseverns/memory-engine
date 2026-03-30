@@ -112,6 +112,7 @@ The compose stack is set up for a reverse proxy in front of Django:
 - Django runs behind it via `gunicorn`
 - static files are served through Django/WhiteNoise
 - MinIO is no longer exposed publicly by default
+- MinIO server and `mc` helper images are now pinned to fixed release tags by default instead of `latest`
 - `/healthz` exposes narrow API/dependency health for container health checks
 - `/readyz` exposes broader cluster readiness, including worker/beat heartbeat state
 
