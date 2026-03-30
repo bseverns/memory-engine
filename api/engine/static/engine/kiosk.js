@@ -161,6 +161,7 @@ function readKioskConfig() {
 const kioskConfig = readKioskConfig();
 const DEFAULT_LANGUAGE_CODE = String(kioskConfig.kioskLanguageCode || "en");
 const DEFAULT_MAX_RECORDING_SECONDS = Number(kioskConfig.kioskMaxRecordingSeconds || 120);
+const ENGINE_DEPLOYMENT = String(kioskConfig.engineDeployment || "memory");
 
 function buildMemoryChoiceButton(profile) {
   const choice = document.createElement("button");
@@ -209,7 +210,7 @@ function currentLanguageCode() {
 }
 
 function currentCopy() {
-  return kioskCopyApi.getPack(currentLanguageCode());
+  return kioskCopyApi.getDeploymentPack(currentLanguageCode(), ENGINE_DEPLOYMENT);
 }
 
 function formatCopy(template, values = {}) {

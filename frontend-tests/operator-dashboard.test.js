@@ -89,12 +89,14 @@ test("artifactSummaryCards summarize totals, lanes, and dominant moods", () => {
     },
   });
 
-  assert.equal(cards.length, 3);
-  assert.equal(cards[0].title, "Archive totals");
-  assert.match(cards[0].detail, /12 active/);
-  assert.equal(cards[1].title, "Lane balance");
-  assert.match(cards[1].detail, /fresh 3/);
-  assert.equal(cards[2].title, "Dominant moods");
-  assert.match(cards[2].detail, /hushed 4/);
-  assert.match(cards[2].detail, /weathered 3/);
+  assert.equal(cards.length, 4);
+  assert.equal(cards[0].title, "Active deployment");
+  assert.match(cards[0].detail, /memory/i);
+  assert.equal(cards[1].title, "Archive totals");
+  assert.match(cards[1].detail, /12 active/);
+  assert.equal(cards[2].title, "Lane balance");
+  assert.match(cards[2].detail, /fresh 3/);
+  assert.equal(cards[3].title, "Dominant moods");
+  assert.match(cards[3].detail, /hushed 4/);
+  assert.match(cards[3].detail, /weathered 3/);
 });

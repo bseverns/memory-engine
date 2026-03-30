@@ -4,6 +4,7 @@ import ipaddress
 
 from django.core.exceptions import ImproperlyConfigured
 
+from .deployments import available_engine_deployments
 from .installation_profiles import available_installation_profiles
 
 
@@ -58,6 +59,7 @@ def validate_runtime_settings(settings_obj) -> None:
     room_tone_source_url = str(getattr(settings_obj, "ROOM_TONE_SOURCE_URL", "") or "").strip()
     kiosk_default_language_code = str(getattr(settings_obj, "KIOSK_DEFAULT_LANGUAGE_CODE", "en") or "").strip().lower()
     installation_profile = str(getattr(settings_obj, "INSTALLATION_PROFILE", "custom") or "").strip().lower()
+    engine_deployment = str(getattr(settings_obj, "ENGINE_DEPLOYMENT", "memory") or "").strip().lower()
     ops_session_binding_mode = str(getattr(settings_obj, "OPS_SESSION_BINDING_MODE", "user_agent") or "").strip().lower()
     ops_login_lockout_scope = str(getattr(settings_obj, "OPS_LOGIN_LOCKOUT_SCOPE", "ip_user_agent") or "").strip().lower()
     if room_tone_source_mode not in {"synthetic", "site_ambience"}:
@@ -128,6 +130,9 @@ def validate_runtime_settings(settings_obj) -> None:
     if installation_profile not in set(available_installation_profiles()):
         joined_profiles = ", ".join(available_installation_profiles())
         errors.append(f"INSTALLATION_PROFILE must be one of: {joined_profiles}.")
+    if engine_deployment not in set(available_engine_deployments()):
+        joined_deployments = ", ".join(available_engine_deployments())
+        errors.append(f"ENGINE_DEPLOYMENT must be one of: {joined_deployments}.")
     if ops_session_binding_mode not in {"strict", "user_agent", "none"}:
         errors.append("OPS_SESSION_BINDING_MODE must be 'strict', 'user_agent', or 'none'.")
     if ops_login_lockout_scope not in {"ip", "ip_user_agent"}:

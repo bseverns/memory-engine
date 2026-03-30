@@ -265,6 +265,14 @@ class OperatorBehaviorTests(EngineTestCase):
 
         self.assertEqual(response.status_code, 204)
 
+    def test_node_status_reports_active_engine_deployment(self):
+        self.login_operator()
+
+        response = self.client.get("/api/v1/node/status")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["deployment"]["code"], "memory")
+
     @patch("engine.api_views.health_component_status")
     def test_node_status_reports_empty_pool_warning(self, health_mock):
         health_mock.return_value = (

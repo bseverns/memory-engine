@@ -1,5 +1,6 @@
 from django.core.exceptions import ImproperlyConfigured
 
+from memory_engine.deployments import DEFAULT_ENGINE_DEPLOYMENT, available_engine_deployments
 from memory_engine.installation_profiles import installation_profile_default
 
 from .base import EngineTestCase, default_runtime_config, validate_runtime_settings
@@ -65,6 +66,14 @@ class RuntimeConfigValidationTests(EngineTestCase):
 
         self.assertIn("INSTALLATION_PROFILE", str(ctx.exception))
 
+    def test_runtime_config_validation_rejects_unknown_engine_deployment(self):
+        config = default_runtime_config(ENGINE_DEPLOYMENT="mystery")
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("ENGINE_DEPLOYMENT", str(ctx.exception))
+
     def test_runtime_config_validation_rejects_invalid_operator_allowlist_entry(self):
         config = default_runtime_config(OPS_ALLOWED_NETWORKS=["not-a-cidr"])
 
@@ -115,6 +124,14 @@ class RuntimeConfigValidationTests(EngineTestCase):
             validate_runtime_settings(config)
 
         self.assertIn("OPS_LOGIN_LOCKOUT_SCOPE", str(ctx.exception))
+
+
+    def test_engine_deployment_catalog_includes_planned_modes(self):
+        self.assertEqual(DEFAULT_ENGINE_DEPLOYMENT, "memory")
+        self.assertEqual(
+            available_engine_deployments(),
+            ("memory", "question", "prompt", "repair", "witness", "oracle"),
+        )
 
     def test_installation_profile_defaults_return_expected_values(self):
         self.assertEqual(

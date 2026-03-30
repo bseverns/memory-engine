@@ -2,6 +2,8 @@
 
 Local-first “room memory” appliance: record a short sound offering, choose consent, receive a revoke code, and let the room replay contributions with **very light decay per access**. Nodes are offline/local-first by design.
 
+This repo now opens one layer wider: **Memory Engine is still the default deployment**, but it is treated as a memory-first deployment of a broader local-first artifact engine. This is an expansion, not a rebrand. The current runtime, routes, and operator flow stay intact while the config and docs now name future sibling deployments (`question`, `prompt`, `repair`, `witness`, `oracle`) that can be realized mostly through copy, metadata framing, and playback policy.
+
 ## What you get
 - Django + DRF API (Artifacts, Pool playback, Revocation, Node status)
 - Postgres for metadata
@@ -231,6 +233,14 @@ For common installs, you can also start from a named behavior preset:
 INSTALLATION_PROFILE=shared_lab
 ```
 
+And you can declare the active deployment kind (default stays `memory`):
+
+```env
+ENGINE_DEPLOYMENT=memory
+```
+
+Planned deployment kinds: `memory`, `question`, `prompt`, `repair`, `witness`, `oracle`.
+
 Available profiles:
 - `custom`: no bundled behavior overrides
 - `quiet_gallery`: quieter pacing and softer overnight posture
@@ -426,3 +436,9 @@ confirms room and ops alignment.
 - Policy editor UI (Decay Policy DSL)
 - Export bundles (fossils + anonymized stats) to USB
 - Federation (fossil-only sync between nodes)
+
+
+## Mission expansion notes
+- `docs/MISSION_EXPANSION.md` — first-pass framing for Memory Engine + sibling deployments on one local-first artifact engine.
+- `docs/DEPLOYMENT_BEHAVIORS.md` — playback/afterlife behavior by deployment.
+- `docs/RESPONSIVENESS.md` — feedback ladder (immediate, near-immediate, ambient afterlife).

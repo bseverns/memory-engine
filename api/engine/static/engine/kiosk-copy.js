@@ -426,6 +426,39 @@
     },
   };
 
+
+
+  const DEPLOYMENT_OVERRIDES = {
+    memory: {},
+    question: {
+      en: {
+        heroTitle: "Room Questions",
+        heroSub: "A quiet place to leave a question for this room. Record once, review once, then let it circulate.",
+        stageIdleTitle: "When you are ready, wake the question microphone.",
+        stageReviewTitle: "Listen back, then choose what follows this question.",
+        btnChooseMemoryMode: "Choose a question mode",
+        shortcutModeChoice: "Press 1, 2, or 3 to choose a question mode",
+        processingNoteQuiet: "Take captured. The input stayed very quiet, so please keep or retake it before choosing a question mode.",
+      },
+    },
+    repair: {
+      en: {
+        heroTitle: "Room Repair",
+        heroSub: "A practical station for recording what needs fixing, restoring, or keeping in working memory.",
+        stageIdleTitle: "When you are ready, wake the repair microphone.",
+        stageReviewTitle: "Listen back, then choose how this repair note should be handled.",
+        btnChooseMemoryMode: "Choose a repair mode",
+        shortcutModeChoice: "Press 1, 2, or 3 to choose a repair mode",
+        processingNoteQuiet: "Take captured. The input stayed very quiet, so please keep or retake it before choosing a repair mode.",
+      },
+    },
+  };
+
+  function normalizeDeployment(value) {
+    const code = String(value || "").trim().toLowerCase();
+    return Object.prototype.hasOwnProperty.call(DEPLOYMENT_OVERRIDES, code) ? code : "memory";
+  }
+
   function normalizeLanguageCode(value) {
     const code = String(value || "").trim().toLowerCase();
     return Object.prototype.hasOwnProperty.call(PACKS, code) ? code : "";
@@ -437,6 +470,15 @@
 
   function getPack(code) {
     return PACKS[resolveLanguageCode(code, "en")] || PACKS.en;
+  }
+
+  function getDeploymentPack(code, deployment) {
+    const languageCode = resolveLanguageCode(code, "en");
+    const base = getPack(languageCode);
+    const deploymentCode = normalizeDeployment(deployment);
+    const deploymentPack = DEPLOYMENT_OVERRIDES[deploymentCode] || {};
+    const override = deploymentPack[languageCode] || deploymentPack.en || {};
+    return { ...base, ...override };
   }
 
   function formatMessage(template, values = {}) {
@@ -452,6 +494,8 @@
     PACKS,
     formatMessage,
     getPack,
+    getDeploymentPack,
+    normalizeDeployment,
     normalizeLanguageCode,
     resolveLanguageCode,
   };

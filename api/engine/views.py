@@ -2,6 +2,8 @@ from django.conf import settings
 from django.shortcuts import redirect
 from django.shortcuts import render
 
+from memory_engine.deployments import DEPLOYMENT_SPECS, deployment_spec
+
 from .media_access import PURPOSE_SURFACE_FOSSILS, build_surface_token, surface_fossils_url
 from .memory_color import memory_color_catalog_payload
 from .operator_auth import (
@@ -21,6 +23,7 @@ from .steward import steward_state_payload
 
 
 def room_surface_config():
+    active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
     schedule = room_schedule_snapshot(
         intensity_profile=settings.ROOM_INTENSITY_PROFILE,
         movement_preset=settings.ROOM_MOVEMENT_PRESET,
@@ -36,6 +39,12 @@ def room_surface_config():
         tone_source_url=settings.ROOM_TONE_SOURCE_URL,
     )
     return {
+        "engineDeployment": active_deployment.code,
+        "engineDeploymentLabel": active_deployment.label,
+        "engineDeploymentCatalog": [
+            {"code": spec.code, "label": spec.label, "description": spec.short_description}
+            for spec in DEPLOYMENT_SPECS
+        ],
         "kioskLanguageCode": str(getattr(settings, "KIOSK_DEFAULT_LANGUAGE_CODE", "en")),
         "kioskMaxRecordingSeconds": int(getattr(settings, "KIOSK_DEFAULT_MAX_RECORDING_SECONDS", 120)),
         "roomIntensityProfile": schedule["intensityProfile"],
@@ -127,8 +136,14 @@ def operator_dashboard_view(request):
             "allowlist_enabled": allowlist_enabled,
         }, status=503 if not operator_secret_configured() else 200)
 
+    active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
     return render(request, "engine/operator_dashboard.html", {
         "operator_state": steward_state_payload(),
+        "engine_deployment": {
+            "code": active_deployment.code,
+            "label": active_deployment.label,
+            "description": active_deployment.short_description,
+        },
     })
 
 

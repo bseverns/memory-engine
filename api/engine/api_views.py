@@ -3,6 +3,8 @@ import secrets
 from datetime import timedelta
 
 from django.conf import settings
+
+from memory_engine.deployments import deployment_spec
 from django.core.cache import cache
 from django.db import transaction
 from django.http import FileResponse, Http404
@@ -591,8 +593,15 @@ def node_status(request):
         })
     warnings.extend(pool_warnings(active, lane_counts, mood_counts, playable_count))
 
+    active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+
     return Response({
         "ok": ok,
+        "deployment": {
+            "code": active_deployment.code,
+            "label": active_deployment.label,
+            "description": active_deployment.short_description,
+        },
         "components": components,
         "operator_state": operator_state,
         "active": active,
