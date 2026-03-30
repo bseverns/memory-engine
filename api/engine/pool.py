@@ -5,6 +5,9 @@ from datetime import timedelta
 from django.conf import settings
 from django.db.models import Q
 
+from memory_engine.deployments import deployment_spec
+
+from .deployment_policy import weight_adjustment
 from .models import Artifact, Derivative
 
 
@@ -97,6 +100,17 @@ def artifact_absence_hours(artifact: Artifact, now) -> float:
     return artifact_age_hours(artifact, now)
 
 
+def deployment_weight_adjustment(artifact: Artifact, now, deployment_code: str) -> float:
+    """Small deployment-level weighting hook."""
+
+    return weight_adjustment(
+        deployment_code=deployment_code,
+        age_hours=artifact_age_hours(artifact, now),
+        absence_hours=artifact_absence_hours(artifact, now),
+        lifecycle_status=str(getattr(artifact, "lifecycle_status", "") or ""),
+    )
+
+
 def artifact_is_featured_return(artifact: Artifact, now) -> bool:
     return bool(
         artifact_age_hours(artifact, now) >= settings.POOL_FEATURED_RETURN_MIN_AGE_HOURS
@@ -139,6 +153,7 @@ def pool_weight(
     cooldown_seconds: int,
     preferred_mood: str = "any",
     recent_densities: list[str] | None = None,
+    deployment_code: str = "memory",
 ) -> float:
     seconds_since_access = cooldown_seconds * 4
     if artifact.last_access_at:
@@ -179,8 +194,12 @@ def pool_weight(
 
     featured_return_factor = float(settings.POOL_FEATURED_RETURN_BOOST) if artifact_is_featured_return(artifact, now) else 1.0
     density_factor = density_balance_factor(artifact, now, recent_densities)
+    deployment_factor = deployment_weight_adjustment(artifact, now, deployment_code)
 
-    return max(0.1, cooldown_factor * rarity_factor * wear_factor * age_factor * mood_factor * featured_return_factor * density_factor)
+    return max(
+        0.1,
+        cooldown_factor * rarity_factor * wear_factor * age_factor * mood_factor * featured_return_factor * density_factor * deployment_factor,
+    )
 
 
 def artifact_lane(artifact: Artifact, now) -> str:
@@ -233,12 +252,14 @@ def select_pool_artifact(
     preferred_mood: str = "any",
     excluded_ids: set[int] | None = None,
     recent_densities: list[str] | None = None,
+    deployment_code: str = "memory",
 ):
     cooldown_seconds = max(1, int(settings.POOL_PLAY_COOLDOWN_SECONDS))
     cooldown_threshold = now - timedelta(seconds=cooldown_seconds)
     candidate_limit = max(5, int(settings.POOL_CANDIDATE_LIMIT))
 
-    base_qs = playable_artifact_queryset(now)
+    deployment = deployment_spec(deployment_code)
+    base_qs = playable_artifact_queryset(now).filter(deployment_kind=deployment.code)
     preferred_base_qs = base_qs
     if excluded_ids:
         preferred_base_qs = preferred_base_qs.exclude(id__in=excluded_ids)
@@ -256,6 +277,14 @@ def select_pool_artifact(
         candidates = list(cooldown_qs.order_by("play_count", "wear", "-created_at")[:candidate_limit])
         if not candidates:
             candidates = list(base_qs.order_by("last_access_at", "play_count", "wear", "-created_at")[:candidate_limit])
+    if not candidates and deployment.code != "memory":
+        base_qs = playable_artifact_queryset(now)
+        preferred_base_qs = base_qs.exclude(id__in=excluded_ids) if excluded_ids else base_qs
+        cooldown_qs = preferred_base_qs.filter(Q(last_access_at__isnull=True) | Q(last_access_at__lt=cooldown_threshold))
+        candidates = list(cooldown_qs.order_by("play_count", "wear", "-created_at")[:candidate_limit])
+        if not candidates:
+            candidates = list(preferred_base_qs.order_by("last_access_at", "play_count", "wear", "-created_at")[:candidate_limit])
+
     if not candidates:
         return None, None
 
@@ -281,6 +310,7 @@ def select_pool_artifact(
             cooldown_seconds,
             preferred_mood,
             recent_densities=recent_densities,
+            deployment_code=deployment.code,
         )
         for artifact in candidates
     ]

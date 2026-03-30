@@ -49,6 +49,15 @@
 - Reduced-motion handling for the countdown and kiosk transitions
 - Steward-configurable max recording duration instead of keeping it browser-only
 
+
+### Mission opening: deployment family groundwork
+- First-pass deployment-kind config (`ENGINE_DEPLOYMENT`) with `memory` as explicit default and planned sibling kinds (`question`, `prompt`, `repair`, `witness`, `oracle`)
+- Deployment-aware participant copy seams so memory-specific rhetoric can be overridden without rewriting the kiosk flow
+- Deployment-aware operator posture so `/ops/` can show active deployment now and gain mode-specific tuning later
+- Docs that define Memory Engine as the default deployment of a broader local-first artifact engine (opening, not rebrand)
+- Playback policy framing that separates shared room-loop infrastructure from deployment-level behavior intent
+- Responsiveness ladder documented as a cross-deployment requirement (immediate acknowledgement, near-immediate reflection, ambient afterlife)
+
 ### Audience playback
 - Weighted pool selection with cooldown to reduce obvious repetition
 - Selection weighting that also accounts for age and recentness, so the room favors settled material without locking into the oldest memories
@@ -94,6 +103,13 @@
 
 ## Next
 
+### Multi-deployment follow-through
+- Add deployment-specific intake cards so stewards can tune prompts without touching code
+- Add lightweight deployment-aware metadata editing in `/ops/` (topic + lifecycle only)
+- Add deployment-aware playback policy presets visible in operator status exports
+- Add deployment-aware retention/export presets for archival handoff bundles
+- Add installation-specific room identities that can be combined with deployment kind (e.g., `repair` + `shared_lab`)
+
 ### User / speaker
 - Add optional headphone or monitor-check mode for setup and microphone testing
 
@@ -110,12 +126,14 @@
 ### User / speaker
 - Add participant-facing revocation guidance that can be shown without exposing full steward controls
 - Add installation-specific speaker prompts or writing prompts that can shift the emotional tone of the room
+- Add deployment-specific prompt packs so `memory`, `question`, and `repair` can diverge without branching app logic
 - Add optional steward-authored session themes that influence idle copy and submission framing
 - Add alternate kiosk layouts for seated booths, standing kiosks, and wall-mounted enclosures
 
 ### Audience / room effect
 - Add audience-presence or ambient-volume sensing so the room can react to actual occupancy
-- Add installation-specific "personalities" that package movement, tone, gap, and wear behavior together
+- Add installation-specific and deployment-specific "personalities" that package movement, tone, gap, and wear behavior together
+- Add deployment-specific playback policies (recurrence, recency, rarity, clustering) on top of the shared room loop
 - Add shared-pool or federated-pool options for multi-room installations
 - Add richer visual layers such as projected fossils, spectrogram drift, or low-light companion displays
 - Add semantic or transcript-aware grouping if metadata-only composition plateaus
@@ -127,7 +145,9 @@
 - Add structured export bundles with manifests, checksums, and import instructions for archival handoff
 - Add multi-node stewardship tooling if more than one installation is deployed
 - Add role-based steward access if the installation grows beyond one trusted operator
-- Add long-term retention policy controls that can differ by consent mode or installation
+- Add deployment-aware operator controls so stewardship UI can expose mode-specific tuning safely
+- Add long-term retention policy controls that can differ by consent mode, artifact type, or installation
+- Add artifact-type-aware export posture so handoff bundles can preserve deployment semantics
 - Add a documented disaster-recovery rehearsal flow rather than only backup and restore commands
 - Add a fuller external-storage migration story for moving beyond MinIO if scale or policy changes
 

@@ -25,6 +25,7 @@ def artifact_summary_payload(*, now=None) -> dict:
         "gathering": 0,
     }
     memory_color_counts = {profile: 0 for profile in MEMORY_COLOR_PROFILE_ORDER}
+    deployment_counts: dict[str, int] = {}
 
     for artifact in playable_artifacts:
         lane_counts[artifact_lane(artifact, current_time)] += 1
@@ -35,6 +36,8 @@ def artifact_summary_payload(*, now=None) -> dict:
         ) or DEFAULT_MEMORY_COLOR_PROFILE
         memory_color_counts.setdefault(effect_profile, 0)
         memory_color_counts[effect_profile] += 1
+        deployment_code = str(getattr(artifact, "deployment_kind", "memory") or "memory").strip().lower() or "memory"
+        deployment_counts[deployment_code] = deployment_counts.get(deployment_code, 0) + 1
 
     return {
         "generated_at": current_time,
@@ -48,5 +51,6 @@ def artifact_summary_payload(*, now=None) -> dict:
             "counts": memory_color_counts,
             "catalog": memory_color_catalog_payload(),
         },
+        "deployments": deployment_counts,
         "retention": retention_summary(now=current_time),
     }

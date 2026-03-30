@@ -5,6 +5,7 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 
 from .config_validation import validate_runtime_settings
+from .deployments import DEFAULT_ENGINE_DEPLOYMENT, normalize_engine_deployment_name
 from .installation_profiles import (
     DEFAULT_INSTALLATION_PROFILE,
     installation_profile_default,
@@ -34,6 +35,10 @@ def env_float(name: str, default: float) -> float:
 
 INSTALLATION_PROFILE = normalize_installation_profile_name(
     os.getenv("INSTALLATION_PROFILE", DEFAULT_INSTALLATION_PROFILE),
+)
+
+ENGINE_DEPLOYMENT = normalize_engine_deployment_name(
+    os.getenv("ENGINE_DEPLOYMENT", DEFAULT_ENGINE_DEPLOYMENT),
 )
 
 

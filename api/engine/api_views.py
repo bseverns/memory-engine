@@ -3,6 +3,8 @@ import secrets
 from datetime import timedelta
 
 from django.conf import settings
+
+from memory_engine.deployments import deployment_spec
 from django.core.cache import cache
 from django.db import transaction
 from django.http import FileResponse, Http404
@@ -107,6 +109,14 @@ def parse_intish(value, fallback: int) -> int:
         return int(fallback)
 
 
+def parse_topic_tag(value) -> str:
+    return str(value or "").strip()[:64]
+
+
+def parse_lifecycle_status(value) -> str:
+    return str(value or "").strip().lower()[:32]
+
+
 def intake_suspended() -> bool:
     state = load_steward_state()
     return bool(state.maintenance_mode or state.intake_paused)
@@ -189,6 +199,10 @@ def create_audio_artifact(request):
     except ValueError:
         return Response({"error": memory_color_validation_error_message()}, status=400)
 
+    active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+    topic_tag = parse_topic_tag(request.data.get("topic_tag"))
+    lifecycle_status = parse_lifecycle_status(request.data.get("lifecycle_status"))
+
     upload = request.data.get("file")
     if not upload:
         return Response({"error": "file required"}, status=400)
@@ -214,6 +228,9 @@ def create_audio_artifact(request):
             raw_sha256=hashlib.sha256(data).hexdigest(),
             effect_profile=effect_profile,
             effect_metadata=memory_color_metadata(effect_profile),
+            deployment_kind=active_deployment.code,
+            topic_tag=topic_tag,
+            lifecycle_status=lifecycle_status,
             expires_at=(
                 timezone.now() + timedelta(days=int(manifest["retention"]["derivative_ttl_days"]))
                 if consent_mode == "FOSSIL"
@@ -264,6 +281,10 @@ def create_ephemeral_audio(request):
     except ValueError:
         return Response({"error": memory_color_validation_error_message()}, status=400)
 
+    active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+    topic_tag = parse_topic_tag(request.data.get("topic_tag"))
+    lifecycle_status = parse_lifecycle_status(request.data.get("lifecycle_status"))
+
     upload = request.data.get("file")
     if not upload:
         return Response({"error": "file required"}, status=400)
@@ -289,6 +310,9 @@ def create_ephemeral_audio(request):
             raw_sha256=hashlib.sha256(data).hexdigest(),
             effect_profile=effect_profile,
             effect_metadata=memory_color_metadata(effect_profile),
+            deployment_kind=active_deployment.code,
+            topic_tag=topic_tag,
+            lifecycle_status=lifecycle_status,
             expires_at=timezone.now() + timedelta(minutes=5),
             duration_ms=validated_upload.duration_ms,
         )
@@ -397,7 +421,8 @@ def pool_next(request):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     now = timezone.now()
-    playable_count = playable_artifact_queryset(now).count()
+    active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+    playable_count = playable_artifact_queryset(now).filter(deployment_kind=active_deployment.code).count()
     requested_lane = (request.query_params.get("lane") or "any").strip().lower()
     if requested_lane not in {"any", "fresh", "mid", "worn"}:
         requested_lane = "any"
@@ -436,6 +461,7 @@ def pool_next(request):
         requested_mood,
         excluded_ids=excluded_ids,
         recent_densities=recent_densities,
+        deployment_code=active_deployment.code,
     )
     if not artifact:
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -591,8 +617,17 @@ def node_status(request):
         })
     warnings.extend(pool_warnings(active, lane_counts, mood_counts, playable_count))
 
+    active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
+
     return Response({
         "ok": ok,
+        "deployment": {
+            "code": active_deployment.code,
+            "label": active_deployment.label,
+            "description": active_deployment.short_description,
+            "participant_noun": active_deployment.participant_noun,
+            "playback_policy_key": active_deployment.playback_policy_key,
+        },
         "components": components,
         "operator_state": operator_state,
         "active": active,

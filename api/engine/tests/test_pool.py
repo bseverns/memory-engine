@@ -168,3 +168,47 @@ class PoolBehaviorTests(EngineTestCase):
         old_weight = pool_weight(merely_old, now, cooldown_seconds=90)
 
         self.assertGreater(return_weight, old_weight)
+
+    def test_pool_weight_question_prefers_unresolved_items(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        unresolved = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/open.wav",
+            lifecycle_status="open",
+            created_at=now - timedelta(hours=20),
+            last_access_at=now - timedelta(hours=5),
+        )
+        answered = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/answered.wav",
+            lifecycle_status="answered",
+            created_at=now - timedelta(hours=20),
+            last_access_at=now - timedelta(hours=5),
+        )
+
+        unresolved_weight = pool_weight(unresolved, now, cooldown_seconds=90, deployment_code="question")
+        answered_weight = pool_weight(answered, now, cooldown_seconds=90, deployment_code="question")
+
+        self.assertGreater(unresolved_weight, answered_weight)
+
+    def test_pool_weight_oracle_penalizes_brand_new_material(self):
+        now = timezone.now()
+        consent = self.make_consent("ROOM")
+        new_item = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/new-oracle.wav",
+            created_at=now - timedelta(hours=1),
+            last_access_at=now - timedelta(hours=1),
+        )
+        old_absent = self.make_active_artifact(
+            consent=consent,
+            raw_uri="raw/old-oracle.wav",
+            created_at=now - timedelta(days=10),
+            last_access_at=now - timedelta(days=7),
+        )
+
+        new_weight = pool_weight(new_item, now, cooldown_seconds=90, deployment_code="oracle")
+        old_weight = pool_weight(old_absent, now, cooldown_seconds=90, deployment_code="oracle")
+
+        self.assertGreater(old_weight, new_weight)

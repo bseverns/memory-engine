@@ -2,6 +2,8 @@
 
 Local-first “room memory” appliance: record a short sound offering, choose consent, receive a revoke code, and let the room replay contributions with **very light decay per access**. Nodes are offline/local-first by design.
 
+This repo now opens one layer wider: **Memory Engine is still the default deployment**, but it is treated as a memory-first deployment of a broader local-first artifact engine. This is an expansion, not a rebrand. The current runtime, routes, and operator flow stay intact while the config and docs now name future sibling deployments (`question`, `prompt`, `repair`, `witness`, `oracle`) that can be realized mostly through copy, metadata framing, and playback policy.
+
 ## What you get
 - Django + DRF API (Artifacts, Pool playback, Revocation, Node status)
 - Postgres for metadata
@@ -11,6 +13,30 @@ Local-first “room memory” appliance: record a short sound offering, choose c
 - “Don’t save” = **play once immediately, then discard**
 - A participant can now choose a first-pass memory color (`Clear`, `Warm`, `Radio`, `Dream`) during review; the dry WAV stays unchanged in storage and the color choice is stored separately on the artifact for playback
 - Those memory-color profiles now come from one shared catalog used by Django, the kiosk review UI, and `/ops/`, so the profile list and first-pass tuning stay aligned across storage, playback, and operator visibility. Audio behavior stays bounded through a small topology dispatch layer rather than arbitrary DSP graphs, so a new profile can often be added by editing the catalog if it reuses an existing topology. `Dream` is seeded from the source audio so preview and later playback stay materially aligned.
+
+
+## Deployment family (explicit in this pass)
+
+Memory Engine is still the default and production-safe baseline.
+
+This pass makes six deployment kinds explicit and runnable through one shared local-first artifact engine:
+
+- `memory` (default)
+- `question`
+- `prompt`
+- `repair`
+- `witness`
+- `oracle`
+
+Set deployment kind with:
+
+```env
+ENGINE_DEPLOYMENT=memory
+```
+
+If unset, startup defaults to `memory`. If set to an unknown value, startup fails fast during config validation so operators see the mistake immediately.
+
+Practical intent: same routes and steward posture, different intake framing, copy, metadata expectations, and playback weighting.
 
 ## Quick start
 1) Install Docker + Docker Compose.
@@ -231,6 +257,14 @@ For common installs, you can also start from a named behavior preset:
 INSTALLATION_PROFILE=shared_lab
 ```
 
+And you can declare the active deployment kind (default stays `memory`):
+
+```env
+ENGINE_DEPLOYMENT=memory
+```
+
+Planned deployment kinds: `memory`, `question`, `prompt`, `repair`, `witness`, `oracle`.
+
 Available profiles:
 - `custom`: no bundled behavior overrides
 - `quiet_gallery`: quieter pacing and softer overnight posture
@@ -426,3 +460,9 @@ confirms room and ops alignment.
 - Policy editor UI (Decay Policy DSL)
 - Export bundles (fossils + anonymized stats) to USB
 - Federation (fossil-only sync between nodes)
+
+
+## Mission expansion notes
+- `docs/MISSION_EXPANSION.md` — first-pass framing for Memory Engine + sibling deployments on one local-first artifact engine.
+- `docs/DEPLOYMENT_BEHAVIORS.md` — playback/afterlife behavior by deployment.
+- `docs/RESPONSIVENESS.md` — feedback ladder (immediate, near-immediate, ambient afterlife).

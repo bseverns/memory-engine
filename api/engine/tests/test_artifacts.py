@@ -40,6 +40,28 @@ class ArtifactBehaviorTests(EngineTestCase):
         self.assertEqual(len(response.json()["revocation_token"]), 10)
         put_bytes_mock.assert_called_once()
 
+    @override_settings(ENGINE_DEPLOYMENT="question")
+    @patch("engine.api_views.put_bytes")
+    def test_room_save_uses_active_engine_deployment_for_artifact_metadata(self, put_bytes_mock):
+        upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=2.0), content_type="audio/wav")
+
+        response = self.client.post(
+            "/api/v1/artifacts/audio",
+            {
+                "file": upload,
+                "consent_mode": "ROOM",
+                "topic_tag": "entry_gate",
+                "lifecycle_status": "open",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        artifact = Artifact.objects.get()
+        self.assertEqual(artifact.deployment_kind, "question")
+        self.assertEqual(artifact.topic_tag, "entry_gate")
+        self.assertEqual(artifact.lifecycle_status, "open")
+        put_bytes_mock.assert_called_once()
+
     @patch("engine.api_views.put_bytes")
     def test_room_save_stores_memory_color_profile_separately_from_raw_audio(self, put_bytes_mock):
         upload = SimpleUploadedFile("audio.wav", make_test_wav_bytes(seconds=2.4), content_type="audio/wav")

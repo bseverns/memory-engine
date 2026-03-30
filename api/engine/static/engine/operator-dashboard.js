@@ -214,8 +214,15 @@
       .slice(0, 3)
       .map(([mood, count]) => `${mood} ${count}`)
       .join(" · ");
+    const deployment = payload.deployment || {};
 
     return [
+      {
+        tagName: "article",
+        className: "component-card ready",
+        title: "Active deployment",
+        detail: `${deployment.label || "Memory Engine"} (${deployment.code || "memory"}) · ${deployment.description || "room-memory default posture"}`,
+      },
       {
         tagName: "article",
         className: "component-card ready",
