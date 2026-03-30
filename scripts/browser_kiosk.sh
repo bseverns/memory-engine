@@ -20,6 +20,12 @@ Examples:
   scripts/browser_kiosk.sh --role kiosk --base-url https://memory.example.com
   scripts/browser_kiosk.sh --role room --base-url https://memory.example.com --print
   scripts/browser_kiosk.sh --url https://memory.example.com/room/
+
+Notes:
+  This script only launches Chromium with a repeatable flag set.
+  For Leonardo or keyboard HID use, the OS still needs auto-login,
+  crash/restore prompts disabled, and the kiosk window returned to
+  the front after reboot.
 EOF
 }
 

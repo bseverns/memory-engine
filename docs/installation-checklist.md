@@ -24,6 +24,15 @@ assigned the right URL and role.
 - If the kiosk relies on keyboard shortcuts for setup or fallback, keep a small keyboard available on site.
 - If you are using the Leonardo hands-free path, upload and wire it before install day and keep a fallback keyboard nearby. See [HANDS_FREE_CONTROLS.md](./HANDS_FREE_CONTROLS.md).
 
+## Reference Host Image
+
+For the current appliance posture, use `Ubuntu Server 24.04.4 LTS` as the
+reference host image.
+
+As of `March 30, 2026`, Ubuntu `26.04 LTS` is still in beta and its final
+release is expected on `April 23, 2026`, so `24.04.4 LTS` is the stable target
+to standardize on for first-run hosting.
+
 ## Network And URL
 
 - Decide whether the kiosk will record through `localhost`, a real `https://` domain, or a trusted internal-TLS IP setup.
@@ -46,6 +55,9 @@ assigned the right URL and role.
 - Verify that the recording browser has persistent permission to use the chosen microphone on `/kiosk/`.
 - On the playback machine, grant or launch with autoplay permission for the site if the browser supports it. In Chromium kiosk installs, a launch flag such as `--autoplay-policy=no-user-gesture-required` is often the practical fix.
 - If you are using a Leonardo button, verify the kiosk window keeps focus after boot. HID input only helps if Chromium is still the active kiosk surface.
+- After boot, press a real keyboard `Space` once at `/kiosk/` before public use. If that fails, the Leonardo is not the first suspect; focus or a restore prompt is.
+- If Chromium reopened with a restore bubble, permission chip, or visible browser chrome, clear that before testing HID again.
+- Prefer launching dedicated clients with `./scripts/browser_kiosk.sh` so the recorder, room, and ops surfaces come back with the expected role-specific flags instead of ad hoc desktop shortcuts.
 
 ## Audio Device Selection
 
@@ -54,6 +66,7 @@ assigned the right URL and role.
 - Confirm the playback device is the intended speaker or audio interface, not HDMI or an internal monitor speaker by accident.
 - Open `/kiosk/`, arm the microphone, and watch the meter while speaking at normal distance.
 - Open `/kiosk/`, run the monitor check, and confirm the short test tone reaches the intended output path before you start recording tests.
+- Open `/ops/`, use `Play output tone`, then `Start live monitor`, and confirm the operator browser can hear the live mic path through headphones or very low speaker level.
 - Make one test recording and confirm the preview plays through the intended output device.
 - Open `/room/` and confirm ambient playback is audible at the intended room level.
 - If the input level is too low, fix gain or microphone placement in the OS or hardware before changing app code.
@@ -65,7 +78,9 @@ assigned the right URL and role.
 - Configure Chromium kiosk mode to launch automatically after login on each dedicated client machine.
 - Ensure the browser launch waits until the network stack and display are ready, or it may open to a blank or unreachable page.
 - On the playback machine, prefer a launch command that preserves autoplay allowance rather than relying on a one-tap manual recovery after every reboot.
+- On the recording machine, prefer a launch path that returns Chromium directly to `/kiosk/` and leaves it frontmost after login. The Leonardo path depends on that focus posture.
 - Reboot once as a real test. Do not consider auto-start complete until the recording machine returns to `/kiosk/` and the playback machine returns to `/room/` without operator intervention.
+- During that reboot test, verify one keyboard shortcut on each surface: `Space` on `/kiosk/`, the playback start/stop buttons on `/room/`, and sign-in plus monitor check access on `/ops/`.
 
 ## Operator Acceptance Pass
 
@@ -76,6 +91,7 @@ assigned the right URL and role.
 - Open `/ops/`, sign in with `OPS_SHARED_SECRET`, and confirm the node reports `ready` or an understood `degraded` state.
 - Confirm there are no critical storage warnings.
 - Confirm there are no unexpected pool warnings before public use.
+- Use the `/ops/` monitor panel to verify the operator browser can still request microphone access and run a short live monitor pass after a fresh boot.
 - Test one full participant flow: arm, record, review, choose a mode, receive a receipt if applicable.
 - If you are using the Leonardo path, test one short press and one long press at `/kiosk/` during the acceptance pass.
 - If you wired the optional Leonardo buttons, test `1`, `2`, `3`, and `M` during the same pass.

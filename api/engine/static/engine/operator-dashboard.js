@@ -5,6 +5,10 @@
   }
   root.MemoryEngineOperatorDashboard = api;
 }(typeof globalThis !== "undefined" ? globalThis : this, () => {
+  const globalObjectRef = typeof globalThis !== "undefined"
+    ? globalThis
+    : (typeof window !== "undefined" ? window : {});
+
   function classifyState(payload) {
     const components = payload.components || {};
     const failedNames = Object.entries(components)
@@ -304,6 +308,234 @@
     return values;
   }
 
+  async function playOperatorMonitorTone(globalObject = globalObjectRef) {
+    const AudioContextCtor = globalObject.AudioContext || globalObject.webkitAudioContext;
+    if (!AudioContextCtor) {
+      throw new Error("This browser cannot play the operator monitor tone.");
+    }
+
+    const ctx = new AudioContextCtor();
+    try {
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = 0.0001;
+      masterGain.connect(ctx.destination);
+
+      const frequencies = [440, 523.25, 659.25];
+      const startAt = ctx.currentTime + 0.02;
+      frequencies.forEach((frequency, index) => {
+        const osc = ctx.createOscillator();
+        osc.type = index === frequencies.length - 1 ? "sine" : "triangle";
+        osc.frequency.value = frequency;
+        osc.connect(masterGain);
+        const noteStart = startAt + (index * 0.34);
+        const noteStop = noteStart + 0.22;
+        osc.start(noteStart);
+        osc.stop(noteStop);
+        if (index === frequencies.length - 1) {
+          osc.onended = () => {
+            try { osc.disconnect(); } catch (error) {}
+          };
+        }
+      });
+
+      masterGain.gain.exponentialRampToValueAtTime(0.055, startAt + 0.02);
+      masterGain.gain.exponentialRampToValueAtTime(0.016, startAt + 0.22);
+      masterGain.gain.exponentialRampToValueAtTime(0.055, startAt + 0.38);
+      masterGain.gain.exponentialRampToValueAtTime(0.016, startAt + 0.58);
+      masterGain.gain.exponentialRampToValueAtTime(0.055, startAt + 0.72);
+      masterGain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.98);
+
+      await new Promise((resolve) => {
+        globalObject.setTimeout(resolve, 1020);
+      });
+      masterGain.disconnect();
+    } finally {
+      await ctx.close();
+    }
+  }
+
+  // Keep the deeper routing check on /ops/ so the public kiosk can stay calm,
+  // tone-based, and participant-safe while stewards still get a real live path test.
+  function createAudioMonitorController({
+    globalObject = globalObjectRef,
+    onLevelChange = () => {},
+  } = {}) {
+    let audioCtx = null;
+    let mediaStream = null;
+    let sourceNode = null;
+    let analyserNode = null;
+    let monitorGainNode = null;
+    let meterData = null;
+    let meterFrame = 0;
+
+    function supportsLiveMonitor() {
+      return Boolean(
+        globalObject.navigator?.mediaDevices?.getUserMedia
+        && (globalObject.AudioContext || globalObject.webkitAudioContext),
+      );
+    }
+
+    function emitLevel(level) {
+      onLevelChange(Math.max(0, Math.min(1, Number(level || 0))));
+    }
+
+    function stopMeterLoop() {
+      if (meterFrame) {
+        globalObject.cancelAnimationFrame(meterFrame);
+        meterFrame = 0;
+      }
+      emitLevel(0);
+    }
+
+    function startMeterLoop() {
+      stopMeterLoop();
+
+      const tick = () => {
+        if (!analyserNode || !meterData) {
+          emitLevel(0);
+          return;
+        }
+
+        analyserNode.getByteTimeDomainData(meterData);
+        let sum = 0;
+        for (let index = 0; index < meterData.length; index += 1) {
+          const normalized = (meterData[index] - 128) / 128;
+          sum += normalized * normalized;
+        }
+        const rms = Math.sqrt(sum / meterData.length);
+        emitLevel(Math.min(1, rms * 4.5));
+        meterFrame = globalObject.requestAnimationFrame(tick);
+      };
+
+      meterFrame = globalObject.requestAnimationFrame(tick);
+    }
+
+    async function start() {
+      if (!supportsLiveMonitor()) {
+        throw new Error("This browser cannot run live operator monitor.");
+      }
+      if (mediaStream && audioCtx) {
+        if (audioCtx.state === "suspended") {
+          await audioCtx.resume();
+        }
+        return;
+      }
+
+      mediaStream = await globalObject.navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+        video: false,
+      });
+
+      const AudioContextCtor = globalObject.AudioContext || globalObject.webkitAudioContext;
+      audioCtx = new AudioContextCtor();
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
+
+      sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+      analyserNode = audioCtx.createAnalyser();
+      analyserNode.fftSize = 1024;
+      analyserNode.smoothingTimeConstant = 0.86;
+      meterData = new Uint8Array(analyserNode.fftSize);
+
+      monitorGainNode = audioCtx.createGain();
+      monitorGainNode.gain.value = 0.9;
+
+      sourceNode.connect(analyserNode);
+      sourceNode.connect(monitorGainNode);
+      monitorGainNode.connect(audioCtx.destination);
+      startMeterLoop();
+    }
+
+    async function stop() {
+      stopMeterLoop();
+      if (sourceNode && analyserNode) {
+        try { sourceNode.disconnect(analyserNode); } catch (error) {}
+      }
+      if (sourceNode && monitorGainNode) {
+        try { sourceNode.disconnect(monitorGainNode); } catch (error) {}
+      }
+      if (analyserNode) {
+        try { analyserNode.disconnect(); } catch (error) {}
+        analyserNode = null;
+      }
+      if (monitorGainNode) {
+        try { monitorGainNode.disconnect(); } catch (error) {}
+        monitorGainNode = null;
+      }
+      if (sourceNode) {
+        try { sourceNode.disconnect(); } catch (error) {}
+        sourceNode = null;
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+        mediaStream = null;
+      }
+      if (audioCtx) {
+        try {
+          await audioCtx.close();
+        } catch (error) {}
+        audioCtx = null;
+      }
+      meterData = null;
+    }
+
+    return {
+      supportsLiveMonitor,
+      isActive() {
+        return Boolean(mediaStream && audioCtx);
+      },
+      playTone() {
+        return playOperatorMonitorTone(globalObject);
+      },
+      start,
+      stop,
+    };
+  }
+
+  function meterLabelForLevel(level) {
+    const numeric = Number(level || 0);
+    if (numeric >= 0.2) return "Signal present";
+    if (numeric >= 0.08) return "Very quiet signal";
+    return "No mic signal yet.";
+  }
+
+  function renderAudioMonitorLevel(dom, level = 0) {
+    if (dom.opsAudioMeterFill) {
+      dom.opsAudioMeterFill.style.width = `${Math.round(Math.max(0, Math.min(1, Number(level || 0))) * 100)}%`;
+    }
+    if (dom.opsAudioMeterLabel) {
+      dom.opsAudioMeterLabel.textContent = meterLabelForLevel(level);
+    }
+  }
+
+  function renderAudioMonitorState(dom, {
+    active = false,
+    stateLabel = active ? "Live" : "Idle",
+    statusText = "",
+  } = {}) {
+    if (dom.opsAudioMonitorStart) {
+      dom.opsAudioMonitorStart.disabled = active;
+    }
+    if (dom.opsAudioMonitorStop) {
+      dom.opsAudioMonitorStop.disabled = !active;
+    }
+    if (dom.opsAudioMonitorState) {
+      dom.opsAudioMonitorState.textContent = stateLabel;
+    }
+    if (dom.opsAudioCheckStatus && statusText) {
+      dom.opsAudioCheckStatus.textContent = statusText;
+    }
+  }
+
   function makeCard(doc, card) {
     const el = doc.createElement(card.tagName || "article");
     el.className = card.className || "";
@@ -392,6 +624,13 @@
       opsRecentActions: doc.getElementById("opsRecentActions"),
       opsArtifactMetadata: doc.getElementById("opsArtifactMetadata"),
       opsArtifactMetadataStatus: doc.getElementById("opsArtifactMetadataStatus"),
+      opsAudioTone: doc.getElementById("opsAudioTone"),
+      opsAudioMonitorStart: doc.getElementById("opsAudioMonitorStart"),
+      opsAudioMonitorStop: doc.getElementById("opsAudioMonitorStop"),
+      opsAudioMonitorState: doc.getElementById("opsAudioMonitorState"),
+      opsAudioMeterFill: doc.getElementById("opsAudioMeterFill"),
+      opsAudioMeterLabel: doc.getElementById("opsAudioMeterLabel"),
+      opsAudioCheckStatus: doc.getElementById("opsAudioCheckStatus"),
     };
   }
 
@@ -617,8 +856,24 @@
   function start({ doc = document, fetchImpl = fetch, intervalMs = 10000 } = {}) {
     const dom = collectDom(doc);
     const initialState = readJsonScript(doc, "ops-operator-state", {});
+    const audioMonitor = createAudioMonitorController({
+      onLevelChange(level) {
+        renderAudioMonitorLevel(dom, level);
+      },
+    });
     renderOperatorState(dom, initialState);
     replaceCardList(doc, dom.opsRecentActions, actionCards([]));
+    renderAudioMonitorLevel(dom, 0);
+    if (!audioMonitor.supportsLiveMonitor()) {
+      renderAudioMonitorState(dom, {
+        active: false,
+        stateLabel: "Unsupported",
+        statusText: "This browser cannot run live operator monitor here. Output tone may still work if Web Audio is available.",
+      });
+      if (dom.opsAudioMonitorStart) {
+        dom.opsAudioMonitorStart.disabled = true;
+      }
+    }
 
     async function refreshStatus() {
       try {
@@ -714,10 +969,76 @@
       });
     }
 
+    if (dom.opsAudioTone) {
+      dom.opsAudioTone.addEventListener("click", async () => {
+        dom.opsAudioTone.disabled = true;
+        renderAudioMonitorState(dom, {
+          active: audioMonitor.isActive(),
+          stateLabel: audioMonitor.isActive() ? "Live" : "Idle",
+          statusText: "Playing output tone through this operator machine.",
+        });
+        try {
+          await audioMonitor.playTone();
+          renderAudioMonitorState(dom, {
+            active: audioMonitor.isActive(),
+            stateLabel: audioMonitor.isActive() ? "Live" : "Idle",
+            statusText: audioMonitor.isActive()
+              ? "Tone complete. Live monitor is still running in this steward browser."
+              : "Tone complete. If you also need the live mic path, start live monitor with headphones on.",
+          });
+        } catch (error) {
+          renderAudioMonitorState(dom, {
+            active: audioMonitor.isActive(),
+            stateLabel: audioMonitor.isActive() ? "Live" : "Idle",
+            statusText: error.message || "Output tone failed.",
+          });
+        } finally {
+          dom.opsAudioTone.disabled = false;
+        }
+      });
+    }
+
+    if (dom.opsAudioMonitorStart) {
+      dom.opsAudioMonitorStart.addEventListener("click", async () => {
+        renderAudioMonitorState(dom, {
+          active: false,
+          stateLabel: "Starting",
+          statusText: "Requesting microphone access for live operator monitor...",
+        });
+        try {
+          await audioMonitor.start();
+          renderAudioMonitorState(dom, {
+            active: true,
+            stateLabel: "Live",
+            statusText: "Live monitor running only in this steward browser. Use closed headphones or very low speaker gain to avoid feedback.",
+          });
+        } catch (error) {
+          renderAudioMonitorLevel(dom, 0);
+          renderAudioMonitorState(dom, {
+            active: false,
+            stateLabel: "Idle",
+            statusText: error.message || "Live monitor failed to start.",
+          });
+        }
+      });
+    }
+
+    if (dom.opsAudioMonitorStop) {
+      dom.opsAudioMonitorStop.addEventListener("click", async () => {
+        await audioMonitor.stop();
+        renderAudioMonitorLevel(dom, 0);
+        renderAudioMonitorState(dom, {
+          active: false,
+          stateLabel: "Idle",
+          statusText: "Live monitor stopped. The operator browser released the microphone.",
+        });
+      });
+    }
+
     void refreshStatus();
     void refreshControls();
     void refreshArtifacts();
-    const intervalId = root.setInterval(() => {
+    const intervalId = globalObjectRef.setInterval(() => {
       void refreshStatus();
       void refreshControls();
       void refreshArtifacts();
@@ -727,7 +1048,8 @@
       refreshStatus,
       refreshControls,
       stop() {
-        root.clearInterval(intervalId);
+        void audioMonitor.stop();
+        globalObjectRef.clearInterval(intervalId);
       },
     };
   }
@@ -736,13 +1058,18 @@
     actionCards,
     classifyState,
     componentCards,
+    createAudioMonitorController,
     renderControlPayload,
+    renderAudioMonitorLevel,
+    renderAudioMonitorState,
     renderError,
     renderPayload,
     artifactMetadataStatusLine,
     artifactSummaryCards,
     lifecycleStatusOptions,
+    meterLabelForLevel,
     memoryColorCards,
+    playOperatorMonitorTone,
     retentionCards,
     start,
     throttleCards,

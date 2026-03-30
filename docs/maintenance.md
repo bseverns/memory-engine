@@ -6,6 +6,14 @@ If you need the 60-second system map before touching anything, read
 [AT_A_GLANCE.md](./AT_A_GLANCE.md) first. It points to the main subsystems,
 their code owners, and the first knobs to check when the node drifts.
 
+Current reference host image:
+
+- `Ubuntu Server 24.04.4 LTS`
+
+As of `March 30, 2026`, Ubuntu `26.04 LTS` is still beta with final release
+expected on `April 23, 2026`, so `24.04.4 LTS` remains the stable hosting base
+for this stack.
+
 ## Operator shortcuts
 
 Bootstrap a new server:
@@ -99,6 +107,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `.github/workflows/check.yml` runs that same `scripts/check.sh` gate in GitHub Actions using a repo-local `.venv`, so CI stays aligned with the local check path.
 - `scripts/doctor.sh` checks `.env`, compose state, narrow API health through `/healthz`, broader cluster readiness through `/readyz`, and browser/TLS constraints that affect recording.
 - `scripts/browser_kiosk.sh` launches Chromium into `/kiosk/`, `/room/`, or `/ops/` with a repeatable kiosk-safe flag set. The `/room/` role adds autoplay-hardening flags automatically.
+- `/ops/` also now includes an operator-only monitor panel for output-tone checks and local live mic play-through. Use that surface, not `/kiosk/`, when you need to verify the real capture path through the current steward machine.
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` and `/readyz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.
 - `scripts/restore.sh` restores one of those snapshots into the current stack and now asks for explicit confirmation plus a fresh pre-restore snapshot by default.
@@ -183,6 +192,7 @@ There are four practical health surfaces:
 - `/ops/` can also be narrowed to trusted IPs or CIDR ranges with `OPS_ALLOWED_NETWORKS`.
 - repeated bad sign-in attempts now lock out temporarily based on `OPS_LOGIN_MAX_ATTEMPTS` and `OPS_LOGIN_LOCKOUT_SECONDS`.
 - `/ops/` also reports retention posture: raw audio still held, raw audio expiring soon, fossils retained, and fossils that now exist only as residue.
+- `/ops/` is also the place to run the deeper monitor check: output tone plus live mic pass-through, both local to the steward browser and never archived.
 - For unattended listening machines, launch Chromium through `./scripts/browser_kiosk.sh --role room --base-url ...` so the browser picks up the autoplay-safe flags instead of relying on a one-tap recovery after every reboot.
 
 Expected healthy services:
@@ -196,6 +206,28 @@ Expected healthy services:
 - `beat`
 
 `minio_init` is expected to complete and exit.
+
+## Browser focus and reboot recovery
+
+If the kiosk machine boots and the Leonardo suddenly appears dead, check browser
+focus before checking firmware or wiring.
+
+The usual failure pattern is:
+
+- the board still sends HID key events
+- Chromium reopened with a restore prompt, permission chip, or browser chrome in front
+- the kiosk surface is no longer the focused target for those key events
+
+Recovery order:
+
+1. Confirm Chromium is frontmost on `/kiosk/`.
+2. Dismiss any restore or permission UI that may have appeared after boot.
+3. Test a real keyboard `Space` or `Escape`.
+4. If the keyboard works, the Leonardo path is almost certainly fine too.
+5. Relaunch via `./scripts/browser_kiosk.sh --role kiosk --base-url ...` if the browser came back in a bad posture.
+
+Do not debug the microcontroller first unless a normal keyboard also fails to
+move the kiosk.
 
 ## Logs
 

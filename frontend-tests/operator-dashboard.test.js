@@ -129,3 +129,18 @@ test("lifecycleStatusOptions preserves blanks, suggestions, and older custom val
 
   assert.deepEqual(options, ["", "pending", "needs_part", "fixed", "obsolete", "escalated"]);
 });
+
+test("meterLabelForLevel distinguishes idle, quiet, and healthy live monitor input", () => {
+  assert.equal(operatorDashboard.meterLabelForLevel(0), "No mic signal yet.");
+  assert.equal(operatorDashboard.meterLabelForLevel(0.1), "Very quiet signal");
+  assert.equal(operatorDashboard.meterLabelForLevel(0.3), "Signal present");
+});
+
+test("createAudioMonitorController reports unsupported when browser audio APIs are absent", () => {
+  const controller = operatorDashboard.createAudioMonitorController({
+    globalObject: {},
+  });
+
+  assert.equal(controller.supportsLiveMonitor(), false);
+  assert.equal(controller.isActive(), false);
+});

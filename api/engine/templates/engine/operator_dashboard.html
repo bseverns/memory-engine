@@ -19,7 +19,44 @@
     <section class="panel dashboard-panel">
       <div class="panel-head">
         <div>
-          <p class="section-kicker">System state</p>
+          <p class="section-kicker">Operator quick actions</p>
+          <h3>Bring-up and recovery first</h3>
+        </div>
+      </div>
+      <p class="stage-copy">These are the first actions to reach for during install day, daily open, or a rough reboot. Keep the living controls and routing checks above the archive summaries.</p>
+      <div class="component-list">
+        <article class="component-card ready">
+          <strong>Start-of-day ritual</strong>
+          <span>1. Open `/ops/` and confirm the state badge below makes sense. 2. Run the output tone. 3. Run live monitor with closed headphones. 4. Open `/kiosk/` and `/room/` before the public arrives.</span>
+        </article>
+        <article class="component-card ready">
+          <strong>Say this during live monitor</strong>
+          <span>"Room Memory check. One quiet line. One normal line. One clap or finger snap." This gives you breath noise, normal voice, and a transient in one pass.</span>
+        </article>
+        <article class="component-card degraded">
+          <strong>If reboot breaks the kiosk button</strong>
+          <span>Check Chromium focus before touching firmware. A restore bubble, permission chip, or browser chrome after boot is more likely than Leonardo drift.</span>
+        </article>
+      </div>
+      <div class="shortcut-row">
+        <a class="btn secondary link-btn" href="/kiosk/">Open kiosk</a>
+        <a class="btn secondary link-btn" href="/room/">Open room playback</a>
+        <a class="btn secondary link-btn" href="/admin/">Open admin</a>
+        <a class="btn secondary link-btn" href="/healthz">Raw health JSON</a>
+        <a class="btn secondary link-btn" href="/readyz">Cluster readiness JSON</a>
+        <a class="btn secondary link-btn" href="/api/v1/node/status">Raw node status</a>
+        <a class="btn secondary link-btn" href="/api/v1/operator/artifact-summary">Download artifact summary</a>
+        <form action="/ops/logout/" method="post" class="inline-form">
+          {% csrf_token %}
+          <button class="btn secondary" type="submit">Log out</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">Live machine posture</p>
           <h3 id="opsStateLabel">Checking...</h3>
         </div>
         <span id="opsStateBadge" class="ops-state degraded">checking</span>
@@ -276,21 +313,44 @@
     <section class="panel dashboard-panel">
       <div class="panel-head">
         <div>
-          <p class="section-kicker">Shortcuts</p>
-          <h3>Operator links</h3>
+          <p class="section-kicker">Operator monitor check</p>
+          <h3>Live mic and output verification</h3>
         </div>
       </div>
+      <p class="stage-copy">This check stays inside the steward browser and never enters the archive. Use closed headphones or very low speaker gain before enabling live monitor to avoid feedback.</p>
       <div class="shortcut-row">
-        <a class="btn secondary link-btn" href="/kiosk/">Open kiosk</a>
-        <a class="btn secondary link-btn" href="/room/">Open room playback</a>
-        <a class="btn secondary link-btn" href="/admin/">Open admin</a>
-        <a class="btn secondary link-btn" href="/api/v1/node/status">Raw node status</a>
-        <a class="btn secondary link-btn" href="/api/v1/operator/artifact-summary">Download artifact summary</a>
-        <form action="/ops/logout/" method="post" class="inline-form">
-          {% csrf_token %}
-          <button class="btn secondary" type="submit">Log out</button>
-        </form>
+        <button id="opsAudioTone" type="button" class="btn secondary">Play output tone</button>
+        <button id="opsAudioMonitorStart" type="button" class="btn secondary">Start live monitor</button>
+        <button id="opsAudioMonitorStop" type="button" class="btn secondary" disabled>Stop monitor</button>
       </div>
+      <div class="status-grid">
+        <article class="status-card">
+          <p class="section-kicker">Live monitor</p>
+          <div id="opsAudioMonitorState" class="status-number ops-status-copy">Idle</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Input meter</p>
+          <div class="ops-audio-meter" aria-hidden="true">
+            <span id="opsAudioMeterFill" class="ops-audio-meter-fill"></span>
+          </div>
+          <p id="opsAudioMeterLabel" class="shortcut">No mic signal yet.</p>
+        </article>
+      </div>
+      <div class="component-list">
+        <article class="component-card ready">
+          <strong>Good routing sounds like</strong>
+          <span>The tone is clean, the live meter moves quickly, the quiet line still registers, and the clap arrives as a clear transient without runaway feedback.</span>
+        </article>
+        <article class="component-card degraded">
+          <strong>If there is no signal</strong>
+          <span>Check browser microphone permission on `/ops/`, confirm the intended USB mic is the OS default, then test with a normal keyboard before assuming the kiosk HID path is related.</span>
+        </article>
+        <article class="component-card degraded">
+          <strong>If there is feedback</strong>
+          <span>Stop monitor first. Then lower speaker gain or switch to headphones. Only return to live monitor after the output path is under control.</span>
+        </article>
+      </div>
+      <p id="opsAudioCheckStatus" class="shortcut">Use the tone first, then start live monitor if you need to hear the actual microphone path on this operator machine.</p>
     </section>
   </div>
 

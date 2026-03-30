@@ -60,6 +60,16 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Participant handoff is also getting more explicit: the receipt now explains, in plain language, how to ask a steward on this node to revoke a saved recording later.
 - This is only the beginning of the input bucket, but it is the right kind of beginning: inspectable, local, and appliance-friendly.
 
+### Chapter 9: Separate public simplicity from steward diagnostics
+- The kiosk monitor check stayed intentionally simple, while `/ops/` gained the deeper local monitor utility: output tone plus live mic play-through in the steward browser.
+- That split matters. It lets the public recording surface stay calm and legible while still giving operators a real tool for routing and reboot checks.
+- The documentation also got more honest about the real Leonardo failure mode: not firmware drift, but Chromium losing focus or coming back from reboot in a bad posture.
+
+### Chapter 10: Give the steward surface its hierarchy back
+- `/ops/` started as an observability wall and then accumulated stewardship, routing, and recovery responsibilities.
+- This pass begins to rebalance that by pushing quick actions, start-of-day ritual, and recovery notes above the slower archive summaries.
+- The hosting story also narrowed: for now the reference appliance image is `Ubuntu Server 24.04.4 LTS`, not a moving Ubuntu target.
+
 ## Landed So Far
 
 ### Operator / deployment
@@ -111,6 +121,9 @@ this file is the longer memory of what changed, when, and why it mattered.
 - First Leonardo-based hands-free trigger path for `/kiosk/`, reusing the existing keyboard shortcut model with no host-side bridge
 - Built-in monitor/headphone check on `/kiosk/`, plus optional Leonardo buttons for `1`, `2`, `3`, and monitor-check toggle
 - Clearer participant-facing receipt guidance for later revocation on the same node
+- Operator-only live monitor utility on `/ops/` for local output-tone and live mic verification without touching the archive
+- Stronger focus and reboot recovery guidance for unattended kiosk HID use
+- Sharper `/ops/` hierarchy so live controls, routing ritual, and recovery notes stay ahead of passive summary panels
 
 
 ### Mission opening: deployment family groundwork
@@ -227,9 +240,9 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Add a safe operator-facing way to mark questions `answered` / `resolved` and repairs `fixed` / `obsolete`
 
 ### User / speaker
-- Deepen the new monitor/headphone check beyond the current short tone
+- Deepen the new monitor/headphone check beyond the current short tone and live play-through
   - optional voice sample or spoken prompt
-  - clearer output-device/focus troubleshooting notes for install day
+  - clearer per-OS launch and recovery notes if one installation image becomes canonical
 
 ### Audience / room effect
 - Push beyond metadata-derived mood shaping into a room state that responds to context
@@ -238,6 +251,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 
 ### Operator / stewardship
 - Add one-command firewall / restart-on-boot setup for a specific server OS target
+- Turn the new Ubuntu reference image into a more explicit appliance recipe for `Ubuntu Server 24.04.4 LTS`
 - Continue documentation passes:
   - quick-reference tables for common failure modes by service
   - more explicit env-var grouping by subsystem and risk level
@@ -248,7 +262,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 Open buckets now look like this:
 
 - Input and participation:
-  first hands-free Leonardo path has landed; monitor check and basic participant revocation guidance are now in place, while richer hands-free input, alternate layouts, and stronger participant self-service still remain
+  first hands-free Leonardo path has landed; kiosk output check, steward live monitor, reboot/focus guidance, and basic participant revocation guidance are now in place, while richer hands-free input, alternate layouts, and stronger participant self-service still remain
 - Deployment follow-through:
   the deployment family is behaviorally real, but intake cards, operator-safe state changes, and deployment-aware export posture remain
 - Room intelligence:

@@ -13,6 +13,14 @@ If you need deployment temperament detail, use [DEPLOYMENT_BEHAVIORS.md](./DEPLO
 If you need the shortest explicit browser/API boundary rules, use [surface-contract.md](./surface-contract.md).
 If you need the current hardware trigger path for `/kiosk/`, use [HANDS_FREE_CONTROLS.md](./HANDS_FREE_CONTROLS.md).
 
+Reference host image right now:
+
+- `Ubuntu Server 24.04.4 LTS`
+
+As of `March 30, 2026`, that is the stable Ubuntu target to standardize on.
+Ubuntu `26.04 LTS` is still beta until its expected final release on
+`April 23, 2026`.
+
 ## Start Here
 
 If you are:
@@ -27,7 +35,7 @@ If you are:
 |---|---|---|---|---|
 | Recording kiosk | Captures audio, guides review, submits artifacts | `api/engine/templates/engine/kiosk.html`, `api/engine/static/engine/kiosk.js`, `api/engine/static/engine/kiosk-copy.js`, `api/engine/api_views.py` | `KIOSK_DEFAULT_MAX_RECORDING_SECONDS`, `INGEST_MAX_DURATION_SECONDS`, `INGEST_MAX_UPLOAD_BYTES`, `ENGINE_DEPLOYMENT` | browser mic permission, `/healthz`, ingest throttles in `/ops/`, `api` logs |
 | Room playback | Chooses artifacts, composes pacing, plays the room loop | `api/engine/views.py`, `api/engine/pool.py`, `api/engine/deployment_policy.py`, `api/engine/static/engine/kiosk-room-loop*.js` | `INSTALLATION_PROFILE`, `ENGINE_DEPLOYMENT`, `ROOM_*`, `POOL_*`, `WEAR_EPSILON_PER_PLAY` | `/readyz`, `/api/v1/pool/next`, `/api/v1/surface/state`, `/ops/` pool warnings |
-| Operator dashboard | Shows health, warnings, controls, recent artifact stewardship | `api/engine/templates/engine/operator_dashboard.html`, `api/engine/static/engine/operator-dashboard.js`, `api/engine/api_views.py`, `api/engine/ops.py`, `api/engine/steward.py` | `OPS_SHARED_SECRET`, `OPS_ALLOWED_NETWORKS`, `OPS_SESSION_BINDING_MODE`, `OPS_LOGIN_*`, `OPS_DISK_*`, `OPS_POOL_*` | `/ops/`, `/api/v1/node/status`, auth settings, `api` logs |
+| Operator dashboard | Shows health, warnings, controls, recent artifact stewardship, and local monitor verification | `api/engine/templates/engine/operator_dashboard.html`, `api/engine/static/engine/operator-dashboard.js`, `api/engine/api_views.py`, `api/engine/ops.py`, `api/engine/steward.py` | `OPS_SHARED_SECRET`, `OPS_ALLOWED_NETWORKS`, `OPS_SESSION_BINDING_MODE`, `OPS_LOGIN_*`, `OPS_DISK_*`, `OPS_POOL_*` | `/ops/`, `/api/v1/node/status`, auth settings, browser mic permission on `/ops/`, `api` logs |
 | Background jobs | Generates derivatives, expires raw audio, keeps fossils and cleanup moving | `api/engine/tasks.py`, `api/engine/ops.py`, Celery worker and beat | `RAW_TTL_HOURS_ROOM`, `RAW_TTL_HOURS_FOSSIL`, `DERIVATIVE_TTL_DAYS_FOSSIL`, `OPS_WORKER_HEARTBEAT_MAX_AGE_SECONDS`, `OPS_BEAT_HEARTBEAT_MAX_AGE_SECONDS` | `/readyz`, worker logs, beat logs, queue depth warnings in `/ops/` |
 | Runtime configuration | Loads env, applies installation/deployment defaults, rejects bad config | `api/memory_engine/settings.py`, `api/memory_engine/installation_profiles.py`, `api/memory_engine/deployments.py`, `api/memory_engine/config_validation.py` | `INSTALLATION_PROFILE`, `ENGINE_DEPLOYMENT`, `CACHE_URL`, `MINIO_*`, `DJANGO_*`, `OPS_*` | startup failure text, `docker compose logs api`, config validation errors |
 | Storage and state | Stores metadata, audio bytes, cache-backed shared state | Postgres, MinIO, Redis, plus `api/engine/storage.py`, `api/engine/models.py`, `api/engine/media_access.py` | `MINIO_*`, `DATABASE_URL`, `CACHE_URL`, `OPS_STORAGE_PATH` | `/healthz`, MinIO reachability, Redis/cache reachability, disk warnings in `/ops/` |
@@ -143,6 +151,12 @@ Likely knobs:
 - `PUBLIC_INGEST_RATE`
 - `PUBLIC_INGEST_IP_RATE`
 
+Practical note:
+
+- if you only need to prove the current machine can hear the live mic path, do
+  that from `/ops/` first. The kiosk monitor check is intentionally just an
+  output tone.
+
 ### The room is silent or nearly silent
 
 Check in this order:
@@ -218,6 +232,25 @@ Likely files:
 
 - `api/engine/ops.py`
 - `api/engine/operator_auth.py`
+
+### Leonardo or kiosk shortcuts stop responding after reboot
+
+Check in this order:
+
+1. confirm Chromium is frontmost on `/kiosk/`
+2. dismiss any restore bubble, permission prompt, or browser chrome that stole focus
+3. test `Space` or `Escape` from a normal keyboard
+4. relaunch with `./scripts/browser_kiosk.sh --role kiosk --base-url ...`
+
+Likely files:
+
+- `scripts/browser_kiosk.sh`
+- `api/engine/static/engine/kiosk.js`
+- `docs/HANDS_FREE_CONTROLS.md`
+
+Likely cause:
+
+- focus loss or bad reboot posture, not HID firmware drift
 - `api/engine/static/engine/operator-dashboard.js`
 
 ### Startup fails before the node comes up

@@ -78,6 +78,105 @@ async function mockPlaybackLoop(page) {
   });
 }
 
+async function mockOperatorAudio(page) {
+  await page.addInitScript(() => {
+    class FakeNode {
+      connect() { return this; }
+      disconnect() {}
+    }
+
+    class FakeGainNode extends FakeNode {
+      constructor() {
+        super();
+        this.gain = {
+          value: 0,
+          setValueAtTime() {},
+          linearRampToValueAtTime() {},
+          exponentialRampToValueAtTime() {},
+        };
+      }
+    }
+
+    class FakeAnalyserNode extends FakeNode {
+      constructor() {
+        super();
+        this.fftSize = 1024;
+        this.smoothingTimeConstant = 0.86;
+      }
+
+      getByteTimeDomainData(buffer) {
+        for (let index = 0; index < buffer.length; index += 1) {
+          buffer[index] = index % 2 === 0 ? 160 : 96;
+        }
+      }
+    }
+
+    class FakeOscillatorNode extends FakeNode {
+      constructor() {
+        super();
+        this.type = "sine";
+        this.frequency = { value: 0 };
+        this.onended = null;
+      }
+
+      start() {}
+
+      stop() {
+        if (typeof this.onended === "function") {
+          setTimeout(() => this.onended(), 0);
+        }
+      }
+    }
+
+    class FakeAudioContext {
+      constructor() {
+        this.state = "running";
+        this.currentTime = 0;
+        this.destination = {};
+      }
+
+      resume() {
+        this.state = "running";
+        return Promise.resolve();
+      }
+
+      createGain() {
+        return new FakeGainNode();
+      }
+
+      createOscillator() {
+        return new FakeOscillatorNode();
+      }
+
+      createMediaStreamSource() {
+        return new FakeNode();
+      }
+
+      createAnalyser() {
+        return new FakeAnalyserNode();
+      }
+
+      close() {
+        return Promise.resolve();
+      }
+    }
+
+    Object.defineProperty(window.navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: async () => ({
+          getTracks() {
+            return [{ stop() {} }];
+          },
+        }),
+      },
+    });
+
+    window.AudioContext = FakeAudioContext;
+    window.webkitAudioContext = FakeAudioContext;
+  });
+}
+
 test.describe("browser behavior contracts", () => {
   test("operator dashboard renders the real node status payload", async ({ page }) => {
     await signIntoOps(page);
@@ -223,6 +322,41 @@ test.describe("browser behavior contracts", () => {
     await expect(page.locator("#receipt")).toContainText("NODE-KEEP-1234");
     await expect(page.locator("#receipt")).toContainText("tell a steward on this node");
     await expect(page.locator("#receipt")).toContainText("only works on this node's network");
+  });
+
+  test("operator monitor check can run a live mic pass-through and stop cleanly", async ({ page }) => {
+    await mockOperatorAudio(page);
+    await mockHealthyOpsStatus(page);
+    await page.route("**/api/v1/operator/controls", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          operator_state: {
+            intake_paused: false,
+            playback_paused: false,
+            quieter_mode: false,
+            mood_bias: "",
+            kiosk_language_code: "",
+            kiosk_accessibility_mode: "",
+            kiosk_force_reduced_motion: false,
+            kiosk_max_recording_seconds: 120,
+          },
+          recent_actions: [],
+        }),
+      });
+    });
+
+    await signIntoOps(page);
+    await expect(page.getByRole("heading", { name: "Bring-up and recovery first" })).toBeVisible();
+    await expect(page.getByText("Room Memory check. One quiet line. One normal line. One clap or finger snap.")).toBeVisible();
+    await page.getByRole("button", { name: "Start live monitor" }).click();
+    await expect(page.locator("#opsAudioMonitorState")).toContainText("Live");
+    await expect(page.locator("#opsAudioCheckStatus")).toContainText("Live monitor running only in this steward browser");
+    await expect(page.locator("#opsAudioMeterLabel")).toContainText("Signal present");
+
+    await page.getByRole("button", { name: "Stop monitor" }).click();
+    await expect(page.locator("#opsAudioMonitorState")).toContainText("Idle");
+    await expect(page.locator("#opsAudioCheckStatus")).toContainText("released the microphone");
   });
 
   test("steward controls propagate to kiosk and room without reload-specific hacks", async ({ page }) => {

@@ -46,6 +46,43 @@ In kiosk terms, that means:
 
 This makes the Leonardo path useful without introducing a second behavior model.
 
+## Focus And Reboot Recovery
+
+The Leonardo path is only as reliable as the browser focus posture on the kiosk
+machine.
+
+The practical failure mode is simple:
+
+- the board still sends `Space`, `Escape`, `1`, `2`, `3`, or `M`
+- but Chromium is no longer the active focused surface
+- so the kiosk appears dead even though the button is fine
+
+Use this recovery posture:
+
+- launch the recorder with `./scripts/browser_kiosk.sh --role kiosk --base-url ...`
+- disable crash-restore, profile-first-run, and session-restore prompts at the OS/browser level
+- after every reboot, verify `/kiosk/` is visibly frontmost and accepts one keyboard `Space`
+- if a restore bubble, permission prompt, or browser chrome has stolen focus, clear that first before debugging the Leonardo
+- keep a fallback USB keyboard nearby so a steward can press `Escape`, reload, or refocus Chromium without opening the enclosure
+
+If Leonardo input suddenly stops during service, assume focus loss before
+assuming firmware failure.
+
+## Operator Monitor Check
+
+The participant-facing monitor check on `/kiosk/` stays intentionally shallow:
+it only plays an output tone.
+
+The deeper check now lives on `/ops/`:
+
+- `Play output tone` confirms the operator machine's current output path
+- `Start live monitor` requests the microphone and plays it through locally in
+  the steward browser
+- this does not save, stream, or archive anything
+
+Use headphones or very low speaker gain before enabling live monitor, or the
+operator machine can feed back immediately.
+
 ## Why Leonardo
 
 The Leonardo presents itself as a native USB HID keyboard.
@@ -82,5 +119,5 @@ If this path proves useful, the next clean extension is not a new API.
 It is one of these:
 
 - a footswitch enclosure using the same HID shortcut model
-- stronger browser focus / reboot recovery notes for unattended HID use
-- a documented browser-launch / focus checklist so kiosk clients recover from reboot more predictably
+- richer operator-side monitor material such as a spoken routing sample
+- a documented browser-launch / focus checklist per OS image so kiosk clients recover from reboot more predictably

@@ -103,6 +103,11 @@
   color:var(--record);
 }
 
+.ops-status-copy{
+  font-size:1.35rem;
+  letter-spacing:-0.02em;
+}
+
 .playback-page{
   align-items:center;
 }
@@ -223,4 +228,22 @@
 
 .inline-form{
   margin:0;
+}
+
+.ops-audio-meter{
+  position:relative;
+  overflow:hidden;
+  min-height:18px;
+  margin-top:14px;
+  border-radius:999px;
+  background:rgba(84,58,28,0.1);
+}
+
+.ops-audio-meter-fill{
+  display:block;
+  min-height:18px;
+  width:0%;
+  border-radius:999px;
+  background:linear-gradient(90deg, rgba(68,129,118,0.82), rgba(201,109,63,0.9));
+  transition:width 120ms ease-out;
 }

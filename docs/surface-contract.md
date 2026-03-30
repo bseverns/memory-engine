@@ -106,12 +106,17 @@ The operator surface may assume:
 - `/api/v1/operator/artifacts` is the source of truth for which lightweight
   metadata fields are editable in the active deployment
 - session-backed auth gates access to operator-only controls
+- operator-local browser audio checks may request microphone access without
+  changing server state, because they are purely steward diagnostics and never
+  enter the archive
 
 The operator surface must not assume:
 
 - that a locally toggled checkbox is authoritative before the API accepts it
 - that public surfaces see unpersisted control changes
 - that health warnings are equivalent to auth or policy state
+- that operator-local monitor checks imply kiosk or room devices share the same
+  audio routing; those checks only validate the current steward machine
 
 ## Settings vs steward state vs pool payloads
 
