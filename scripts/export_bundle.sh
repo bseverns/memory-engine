@@ -19,7 +19,7 @@ Usage:
 
 Behavior:
   - packages one backup snapshot into exports/
-  - writes a bundle manifest and file checksums
+  - writes a bundle manifest, checksums, and import instructions
   - produces a .tgz that can be moved off-machine
 EOF
 }
@@ -68,28 +68,79 @@ if [ -f "${BACKUP_DIR}/manifest.txt" ]; then
   cp "${BACKUP_DIR}/manifest.txt" "${BUNDLE_DIR}/source-manifest.txt"
 fi
 
-COMPOSE_BIN=$(detect_compose_bin)
-if compose_service_running "api"; then
+if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+  COMPOSE_BIN="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE_BIN="docker-compose"
+else
+  COMPOSE_BIN=""
+fi
+
+if [ -n "${COMPOSE_BIN}" ] && compose_service_running "api"; then
   run_compose exec -T api python manage.py artifact_summary > "${BUNDLE_DIR}/artifact-summary.json" 2>/dev/null || true
 fi
 
 GIT_HEAD=$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || printf '%s' "unknown")
 
+cat > "${BUNDLE_DIR}/IMPORT-INSTRUCTIONS.txt" <<EOF
+Memory Engine export bundle
+===========================
+
+This bundle can be unpacked and restored as a backup directory because it
+contains the same required core files:
+
+- postgres.sql.gz
+- minio-data.tgz
+
+Recommended handoff steps:
+
+1. Unpack the archive:
+   tar -xzf $(basename "${ARCHIVE_PATH}")
+
+2. Change into the unpacked bundle directory:
+   cd $(basename "${BUNDLE_DIR}")
+
+3. Verify checksums before import:
+   sha256sum -c CHECKSUMS.txt
+
+   If this machine does not have sha256sum, use:
+   shasum -a 256 -c CHECKSUMS.txt
+
+4. On the destination node, restore from the unpacked bundle directory:
+   ./scripts/restore.sh --from /absolute/path/to/$(basename "${BUNDLE_DIR}")
+
+Notes:
+
+- source-manifest.txt is copied from the original backup when available.
+- artifact-summary.json is included only when the API container was reachable at export time.
+- bundle-manifest.txt records the source backup path and git revision from the exporting node.
+EOF
+
 cat > "${BUNDLE_DIR}/bundle-manifest.txt" <<EOF
+bundle_format_version=1
 created_at=${STAMP}
 source_backup_dir=${BACKUP_DIR}
 source_git_head=${GIT_HEAD}
 postgres_dump=postgres.sql.gz
 minio_archive=minio-data.tgz
+import_instructions=IMPORT-INSTRUCTIONS.txt
 artifact_summary=$( [ -f "${BUNDLE_DIR}/artifact-summary.json" ] && printf '%s' "artifact-summary.json" || printf '%s' "not-included" )
+source_manifest=$( [ -f "${BUNDLE_DIR}/source-manifest.txt" ] && printf '%s' "source-manifest.txt" || printf '%s' "not-included" )
 EOF
 
 (
   cd "${BUNDLE_DIR}"
+  CHECKSUM_TARGETS="postgres.sql.gz minio-data.tgz bundle-manifest.txt IMPORT-INSTRUCTIONS.txt"
+  if [ -f source-manifest.txt ]; then
+    CHECKSUM_TARGETS="${CHECKSUM_TARGETS} source-manifest.txt"
+  fi
+  if [ -f artifact-summary.json ]; then
+    CHECKSUM_TARGETS="${CHECKSUM_TARGETS} artifact-summary.json"
+  fi
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum postgres.sql.gz minio-data.tgz bundle-manifest.txt > CHECKSUMS.txt
+    sha256sum ${CHECKSUM_TARGETS} > CHECKSUMS.txt
   else
-    shasum -a 256 postgres.sql.gz minio-data.tgz bundle-manifest.txt > CHECKSUMS.txt
+    shasum -a 256 ${CHECKSUM_TARGETS} > CHECKSUMS.txt
   fi
 )
 

@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "test:frontend": "node --test frontend-tests/*.test.js",
+    "test:frontend:coverage": "node --test --experimental-test-coverage --test-coverage-lines=50 --test-coverage-branches=50 --test-coverage-functions=45 frontend-tests/*.test.js",
+    "test:browser:check": "playwright test browser-tests/check.spec.js --project=chromium",
     "test:browser": "playwright test",
     "test:browser:release": "playwright test browser-tests/release-smoke.spec.js",
     "screenshots": "playwright test browser-tests/visual.spec.js --project=chromium"

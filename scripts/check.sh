@@ -27,14 +27,25 @@ find api/engine/static -type f -name '*.js' | sort | while IFS= read -r script_p
   node --check "${script_path}"
 done
 
-info "Running frontend smoke tests"
-node --test frontend-tests/*.test.js
+rm -rf test-results/coverage
+mkdir -p test-results/coverage/node-v8
+
+info "Running frontend tests with coverage thresholds"
+NODE_V8_COVERAGE=test-results/coverage/node-v8 npm run test:frontend:coverage
 
 info "Checking Python syntax"
 "${PYTHON_BIN}" -m py_compile $(find api -type f -name '*.py' | sort)
 
-info "Running Django behavior tests"
-"${PYTHON_BIN}" api/manage.py test --settings memory_engine.settings_test
+info "Running Django behavior tests with coverage"
+COVERAGE_FILE=test-results/coverage/.coverage "${PYTHON_BIN}" -m coverage run api/manage.py test --settings memory_engine.settings_test
+COVERAGE_FILE=test-results/coverage/.coverage "${PYTHON_BIN}" -m coverage report
+COVERAGE_FILE=test-results/coverage/.coverage "${PYTHON_BIN}" -m coverage json -o test-results/coverage/python-coverage.json
+COVERAGE_FILE=test-results/coverage/.coverage "${PYTHON_BIN}" -m coverage xml -o test-results/coverage/python-coverage.xml
+COVERAGE_FILE=test-results/coverage/.coverage "${PYTHON_BIN}" -m coverage html -d test-results/coverage/python-html
+"${PYTHON_BIN}" scripts/check_python_coverage.py test-results/coverage/python-coverage.json --lines 80 --branches 60
+
+info "Running browser check subset"
+npm run test:browser:check
 
 info "Checking shell script syntax"
 sh -n scripts/*.sh api/entrypoint.sh

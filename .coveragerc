@@ -1,0 +1,16 @@
+[run]
+branch = True
+source =
+    engine
+    memory_engine
+omit =
+    */tests/*
+    */migrations/*
+    */settings_browser.py
+    */wsgi.py
+    */management/commands/*
+
+[report]
+show_missing = True
+skip_empty = True
+

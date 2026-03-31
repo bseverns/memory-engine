@@ -46,6 +46,29 @@ In kiosk terms, that means:
 
 This makes the Leonardo path useful without introducing a second behavior model.
 
+## Footswitch Enclosure Posture
+
+The same sketch also supports the simplest next enclosure shape: a normally-open
+momentary footswitch wired into the Leonardo as the primary trigger.
+
+Use this posture:
+
+- keep the existing sketch; do not create a second footswitch firmware branch
+- use a normally-open momentary switch, not a latching pedal
+- wire the switch as the same two-wire closure the panel button uses: signal to
+  pin `2`, return to `GND`
+- if the enclosure uses an external jack, keep that jack dedicated to the same
+  simple switch closure instead of adding LEDs or active electronics
+- keep long-press `Escape` behavior intact so a steward can still cancel or
+  reset without opening the case
+- treat optional mode-selection buttons as steward-side controls, not floor
+  controls, unless the installation has a clear reason to expose them
+- strain-relief the cable and keep the enclosure heavy enough that it does not
+  slide during repeated use
+
+In practical terms, the footswitch is not a new control system.
+It is the same HID shortcut path in a different physical posture.
+
 ## Focus And Reboot Recovery
 
 The Leonardo path is only as reliable as the browser focus posture on the kiosk
@@ -118,6 +141,6 @@ The Leonardo relies on the existing browser shortcut model:
 If this path proves useful, the next clean extension is not a new API.
 It is one of these:
 
-- a footswitch enclosure using the same HID shortcut model
 - richer operator-side monitor material such as a spoken routing sample
 - a documented browser-launch / focus checklist per OS image so kiosk clients recover from reboot more predictably
+- alternate enclosure layouts beyond one primary panel button or footswitch

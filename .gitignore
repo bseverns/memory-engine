@@ -12,3 +12,5 @@ artifacts/screenshots/
 .playwright/
 playwright-report/
 test-results/
+.coverage
+.coverage.*

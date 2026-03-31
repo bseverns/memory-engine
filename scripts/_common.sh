@@ -25,6 +25,16 @@ detect_compose_bin() {
   fail "docker compose is not installed on this machine"
 }
 
+compose_bin_available() {
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v docker-compose >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
 run_compose() {
   if [ -z "${COMPOSE_BIN:-}" ]; then
     COMPOSE_BIN=$(detect_compose_bin)
@@ -47,6 +57,10 @@ log_operator_event() {
   action="$1"
   actor="$2"
   detail="$3"
+
+  if [ -z "${COMPOSE_BIN:-}" ] && ! compose_bin_available; then
+    return 0
+  fi
 
   if ! compose_service_running "api"; then
     return 0

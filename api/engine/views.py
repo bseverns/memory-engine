@@ -101,6 +101,12 @@ def playback_view(request):
     })
 
 
+def revocation_view(request):
+    return render(request, "engine/revocation.html", {
+        "token_hint": str(request.GET.get("token", "") or "").strip(),
+    })
+
+
 def operator_dashboard_view(request):
     allowlist_enabled = bool(operator_allowed_networks())
 

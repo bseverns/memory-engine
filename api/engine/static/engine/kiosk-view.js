@@ -10,6 +10,7 @@
     const copy = ctx.currentCopy();
     ctx.document.documentElement.lang = copy.htmlLang;
     ctx.document.title = copy.documentTitle;
+    const promptLines = Array.isArray(copy.promptPackLines) ? copy.promptPackLines : [];
     if (ctx.heroEyebrow) ctx.heroEyebrow.textContent = copy.heroEyebrow;
     if (ctx.heroTitle) ctx.heroTitle.textContent = copy.heroTitle;
     if (ctx.heroSub) ctx.heroSub.textContent = copy.heroSub;
@@ -18,6 +19,16 @@
     if (ctx.remainingLabel) ctx.remainingLabel.textContent = copy.timerRemaining;
     if (ctx.shortcutReset) ctx.shortcutReset.textContent = copy.resetShortcut;
     if (ctx.privacyHint) ctx.privacyHint.textContent = copy.privacyHint;
+    if (ctx.promptPackKicker) ctx.promptPackKicker.textContent = copy.promptPackKicker || "";
+    if (ctx.promptPackTitle) ctx.promptPackTitle.textContent = copy.promptPackTitle || "";
+    if (ctx.promptPackLead) ctx.promptPackLead.textContent = copy.promptPackLead || "";
+    if (ctx.promptPackList) {
+      ctx.promptPackList.replaceChildren(...promptLines.map((line) => {
+        const item = ctx.document.createElement("li");
+        item.textContent = line;
+        return item;
+      }));
+    }
     if (ctx.quietTakeKicker) ctx.quietTakeKicker.textContent = copy.quietTakeKicker;
     if (ctx.quietTakeTitle) ctx.quietTakeTitle.textContent = copy.quietTakeTitle;
     if (ctx.btnQuietKeep) ctx.btnQuietKeep.textContent = copy.quietTakeKeep;
@@ -149,6 +160,14 @@
     ctx.attractSteps.forEach((step, index) => {
       step.classList.toggle("active", index === activeIndex);
     });
+  }
+
+  function updatePromptPackPanel(ctx) {
+    if (!ctx.promptPackPanel) return;
+    const copy = ctx.currentCopy();
+    const promptLines = Array.isArray(copy.promptPackLines) ? copy.promptPackLines : [];
+    const visible = promptLines.length > 0 && [ctx.FLOW.IDLE, ctx.FLOW.MONITOR, ctx.FLOW.ARMING, ctx.FLOW.ARMED, ctx.FLOW.ERROR].includes(ctx.flowState);
+    ctx.promptPackPanel.hidden = !visible;
   }
 
   function updateModePanel(ctx) {
@@ -551,6 +570,7 @@
     updateStage(ctx);
     updateQuietTakePanel(ctx);
     updateReviewTimeoutPanel(ctx);
+    updatePromptPackPanel(ctx);
     updateAttractPanel(ctx);
     updateOperatorNotice(ctx);
     updateBudgetNotice(ctx);
@@ -570,6 +590,7 @@
     updateMemoryColorPanel,
     updateOperatorNotice,
     updateQuietTakePanel,
+    updatePromptPackPanel,
     updateReceiptPanel,
     updateReviewTimeoutPanel,
     updateStage,

@@ -234,7 +234,7 @@ Likely files:
 - `api/engine/ops.py`
 - `api/engine/operator_auth.py`
 
-### Leonardo or kiosk shortcuts stop responding after reboot
+### Leonardo button, footswitch, or kiosk shortcuts stop responding after reboot
 
 Check in this order:
 

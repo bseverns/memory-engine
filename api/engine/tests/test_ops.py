@@ -88,6 +88,14 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Steward sign-in")
 
+    def test_public_revocation_page_is_available_without_operator_auth(self):
+        response = self.client.get("/revoke/?token=node-keep-1234")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Remove a saved recording")
+        self.assertContains(response, "Revocation code")
+        self.assertContains(response, 'value="node-keep-1234"', html=False)
+
     @override_settings(OPS_ALLOWED_NETWORKS=["10.0.0.0/8"])
     def test_operator_dashboard_denies_requests_outside_allowed_networks(self):
         response = self.client.get("/ops/", REMOTE_ADDR="127.0.0.1")

@@ -297,7 +297,7 @@ test.describe("browser behavior contracts", () => {
     await expect(page.getByText("When you are ready, wake the microphone.")).toBeVisible();
   });
 
-  test("saved take receipt explains how to revoke through a steward on this node", async ({ page }) => {
+  test("saved take receipt explains the participant-facing revoke path on this node", async ({ page }) => {
     await mockHealthyOpsStatus(page);
     await page.route("**/api/v1/artifacts/audio", async (route) => {
       await route.fulfill({
@@ -320,8 +320,30 @@ test.describe("browser behavior contracts", () => {
 
     await expect(page.locator("#receiptPanel")).toBeVisible();
     await expect(page.locator("#receipt")).toContainText("NODE-KEEP-1234");
-    await expect(page.locator("#receipt")).toContainText("tell a steward on this node");
+    await expect(page.locator("#receipt")).toContainText("open /revoke/ on this node's network");
     await expect(page.locator("#receipt")).toContainText("only works on this node's network");
+  });
+
+  test("public revocation page submits a receipt code without opening steward controls", async ({ page }) => {
+    let submittedToken = "";
+    await page.route("**/api/v1/revoke", async (route) => {
+      const payload = route.request().postDataJSON();
+      submittedToken = payload.token;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, revoked_artifacts: 1 }),
+      });
+    });
+
+    await page.goto("/revoke/?token=node-keep-1234");
+    await expect(page.getByRole("heading", { name: "Remove a saved recording" })).toBeVisible();
+    await expect(page.getByLabel("Revocation code")).toHaveValue("NODE-KEEP-1234");
+
+    await page.getByRole("button", { name: "Revoke with this code" }).click();
+
+    await expect(page.locator("#revokeStatus")).toContainText("Recording removed");
+    await expect(page.locator("#revokeStatus")).toContainText("removed from this node");
+    expect(submittedToken).toBe("NODE-KEEP-1234");
   });
 
   test("operator monitor check can run a live mic pass-through and stop cleanly", async ({ page }) => {

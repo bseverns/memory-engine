@@ -26,13 +26,13 @@ Please avoid names or identifying details.
 
 - Kept on this device for about 48 hours
 - Played back in the room
-- Can be revoked later with the receipt code
+- Can be revoked later at `/revoke/` on this node with the receipt code
 
 #### Fossil Only
 
 - Raw sound kept only briefly
 - A spectrogram image and low-storage audio residue may remain locally for longer
-- Can be revoked later with the receipt code
+- Can be revoked later at `/revoke/` on this node with the receipt code
 
 #### Don't Save
 

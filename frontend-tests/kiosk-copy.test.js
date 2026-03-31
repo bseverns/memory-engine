@@ -35,3 +35,16 @@ test("all six deployment packs are available with mode copy", () => {
     assert.ok(pack.modes.NOSAVE.name);
   }
 });
+
+test("memory, question, prompt, and repair deployments expose prompt-pack copy", () => {
+  const copy = loadCopyApi();
+
+  for (const deployment of ["memory", "question", "prompt", "repair"]) {
+    const pack = copy.getDeploymentPack("en", deployment);
+    assert.ok(pack.promptPackKicker);
+    assert.ok(pack.promptPackTitle);
+    assert.ok(pack.promptPackLead);
+    assert.equal(Array.isArray(pack.promptPackLines), true);
+    assert.equal(pack.promptPackLines.length, 3);
+  }
+});

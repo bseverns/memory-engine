@@ -88,9 +88,12 @@ this file is the longer memory of what changed, when, and why it mattered.
 - `scripts/deploy.sh` for public-IP-now / domain-later rollout
 - `scripts/backup.sh` and `scripts/restore.sh` for Postgres + MinIO recovery
 - `scripts/export_bundle.sh` for portable archival or migration handoff bundles
+- Export bundles now carry explicit import instructions and broader checksum coverage so the handoff format stays self-describing off-machine
 - `scripts/support_bundle.sh` for remote-friendly support log collection
 - Shared shell helpers to keep operator scripts consistent
 - `scripts/check.sh` and `scripts/status.sh` for quicker maintenance passes
+- Coverage-aware repo gate with Node frontend thresholds and Python line/branch thresholds, plus reports under `test-results/coverage/`
+- Small Playwright browser subset promoted into the default repo gate so kiosk, room, ops, and revoke surfaces get lightweight real-browser coverage on each check pass
 - `scripts/doctor.sh` to check `.env`, compose state, storage reachability, and browser/TLS constraints
 - `docs/maintenance.md` as the steward runbook
 - `docs/installation-checklist.md` for kiosk hardware, browser kiosk mode, audio routing, and auto-start
@@ -125,8 +128,11 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Reduced-motion handling for the countdown and kiosk transitions
 - Steward-configurable max recording duration instead of keeping it browser-only
 - First Leonardo-based hands-free trigger path for `/kiosk/`, reusing the existing keyboard shortcut model with no host-side bridge
+- Documented footswitch enclosure posture for that same Leonardo HID path, so the first hardware seam can live as either a panel button or a floor switch without changing browser behavior
 - Built-in monitor/headphone check on `/kiosk/`, plus optional Leonardo buttons for `1`, `2`, `3`, and monitor-check toggle
 - Clearer participant-facing receipt guidance for later revocation on the same node
+- Public participant-facing `/revoke/` page so receipt codes can remove saved recordings on the local node without exposing steward controls
+- Deployment-owned prompt packs on `/kiosk/` so `memory`, `question`, `prompt`, and `repair` can offer distinct ways to begin without branching the kiosk flow
 - Operator-only live monitor utility on `/ops/` for local output-tone and live mic verification without touching the archive
 - Stronger focus and reboot recovery guidance for unattended kiosk HID use
 - Sharper `/ops/` hierarchy so live controls, routing ritual, and recovery notes stay ahead of passive summary panels
@@ -234,9 +240,9 @@ this file is the longer memory of what changed, when, and why it mattered.
 ## Still Open Now
 
 ### User / speaker
-- Expand the hands-free control path beyond the first Leonardo button
-  - footswitch enclosure posture
-  - browser-focus/reboot recovery notes for unattended HID use
+- Expand hands-free participation beyond the current Leonardo HID path
+  - alternate enclosure layouts beyond the now-documented panel button / footswitch posture
+  - stronger participant self-service beyond the current steward-mediated receipt flow
 
 ## Next
 
@@ -276,7 +282,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 Open buckets now look like this:
 
 - Input and participation:
-  first hands-free Leonardo path has landed; kiosk output check, steward live monitor, reboot/focus guidance, and basic participant revocation guidance are now in place, while richer hands-free input, alternate layouts, and stronger participant self-service still remain
+  first hands-free Leonardo path has landed; kiosk output check, steward live monitor, reboot/focus guidance, documented footswitch enclosure posture, and a basic participant-facing revocation path are now in place, while richer hands-free input, alternate layouts, and stronger participant self-service still remain
 - Deployment follow-through:
   the deployment family is behaviorally real, but intake cards, operator-safe state changes, and deployment-aware export posture remain
 - Room intelligence:
@@ -289,9 +295,7 @@ Open buckets now look like this:
 ## Later
 
 ### User / speaker
-- Add participant-facing revocation guidance that can be shown without exposing full steward controls
 - Add installation-specific speaker prompts or writing prompts that can shift the emotional tone of the room
-- Add deployment-specific prompt packs so `memory`, `question`, and `repair` can diverge without branching app logic
 - Add optional steward-authored session themes that influence idle copy and submission framing
 - Add alternate kiosk layouts for seated booths, standing kiosks, and wall-mounted enclosures
 
@@ -311,7 +315,6 @@ Open buckets now look like this:
 - Add optional performance mode for steward-led events where certain moods or movements can be emphasized live
 
 ### Operator / stewardship
-- Add structured export bundles with manifests, checksums, and import instructions for archival handoff
 - Add multi-node stewardship tooling if more than one installation is deployed
 - Add role-based steward access if the installation grows beyond one trusted operator
 - Add deployment-aware operator controls so stewardship UI can expose mode-specific tuning safely, without turning `/ops/` into a giant behavior console
@@ -327,7 +330,7 @@ Open buckets now look like this:
 - Whether transcripts, embeddings, or other semantic grouping would meaningfully improve scene composition
 - Whether the audience experience should remain audio-only or eventually include light, projection, or fossil visuals
 - Whether multiple kiosks should share a pool or remain strictly room-local
-- Whether revocation should stay steward-mediated or gain a participant-facing path using the receipt code
+- Whether the participant-facing revoke path should remain code-entry only or later gain a shorter printed or linked handoff
 - Whether the room should ever adapt to audience presence sensing, ambient volume, or time since last recording
 - Whether wear should remain global per artifact or vary by room, node, or playback context
 - Whether the system should support installation-specific "personalities" as first-class presets rather than ad hoc tuning

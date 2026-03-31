@@ -65,6 +65,11 @@ const attractPanel = document.getElementById("attractPanel");
 const attractLead = document.getElementById("attractLead");
 const operatorNotice = document.getElementById("operatorNotice");
 const budgetNotice = document.getElementById("budgetNotice");
+const promptPackPanel = document.getElementById("promptPackPanel");
+const promptPackKicker = document.getElementById("promptPackKicker");
+const promptPackTitle = document.getElementById("promptPackTitle");
+const promptPackLead = document.getElementById("promptPackLead");
+const promptPackList = document.getElementById("promptPackList");
 const heroEyebrow = document.getElementById("heroEyebrow");
 const heroTitle = document.getElementById("heroTitle");
 const heroSub = document.getElementById("heroSub");
@@ -351,6 +356,11 @@ function buildViewContext() {
     attractLead,
     operatorNotice,
     budgetNotice,
+    promptPackPanel,
+    promptPackKicker,
+    promptPackTitle,
+    promptPackLead,
+    promptPackList,
     heroEyebrow,
     heroTitle,
     heroSub,

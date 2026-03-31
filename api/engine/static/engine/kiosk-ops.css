@@ -6,6 +6,10 @@
   align-items:center;
 }
 
+.revocation-page{
+  align-items:center;
+}
+
 .operator-login-page .shell{
   min-height:100vh;
   display:flex;
@@ -14,7 +18,19 @@
   max-width:640px;
 }
 
+.revocation-page .shell{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  max-width:680px;
+}
+
 .login-panel{
+  padding:28px;
+}
+
+.revoke-panel{
   padding:28px;
 }
 
@@ -101,6 +117,10 @@
 .ops-login-error{
   margin:16px 0 0;
   color:var(--record);
+}
+
+.revoke-status{
+  margin-top:18px;
 }
 
 .ops-status-copy{

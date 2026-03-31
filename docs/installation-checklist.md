@@ -22,7 +22,7 @@ assigned the right URL and role.
 - Label the microphone and playback cables so a steward can reconnect them after transport or cleaning.
 - If the kiosk is touch-first, verify the enclosure does not force precise taps on small browser chrome.
 - If the kiosk relies on keyboard shortcuts for setup or fallback, keep a small keyboard available on site.
-- If you are using the Leonardo hands-free path, upload and wire it before install day and keep a fallback keyboard nearby. See [HANDS_FREE_CONTROLS.md](./HANDS_FREE_CONTROLS.md).
+- If you are using the Leonardo hands-free path, upload and wire it before install day and keep a fallback keyboard nearby. The same firmware can drive either a panel button or a simple momentary footswitch enclosure. See [HANDS_FREE_CONTROLS.md](./HANDS_FREE_CONTROLS.md).
 
 ## Reference Host Image
 
@@ -54,8 +54,8 @@ to standardize on for first-run hosting.
 - Verify that reloading `/room/` returns to the dedicated playback surface.
 - Verify that the recording browser has persistent permission to use the chosen microphone on `/kiosk/`.
 - On the playback machine, grant or launch with autoplay permission for the site if the browser supports it. In Chromium kiosk installs, a launch flag such as `--autoplay-policy=no-user-gesture-required` is often the practical fix.
-- If you are using a Leonardo button, verify the kiosk window keeps focus after boot. HID input only helps if Chromium is still the active kiosk surface.
-- After boot, press a real keyboard `Space` once at `/kiosk/` before public use. If that fails, the Leonardo is not the first suspect; focus or a restore prompt is.
+- If you are using a Leonardo button or footswitch, verify the kiosk window keeps focus after boot. HID input only helps if Chromium is still the active kiosk surface.
+- After boot, press a real keyboard `Space` once at `/kiosk/` before public use. If that fails, the Leonardo HID path is not the first suspect; focus or a restore prompt is.
 - If Chromium reopened with a restore bubble, permission chip, or visible browser chrome, clear that before testing HID again.
 - Prefer launching dedicated clients with `./scripts/browser_kiosk.sh` so the recorder, room, and ops surfaces come back with the expected role-specific flags instead of ad hoc desktop shortcuts.
 
@@ -93,7 +93,7 @@ to standardize on for first-run hosting.
 - Confirm there are no unexpected pool warnings before public use.
 - Use the `/ops/` monitor panel to verify the operator browser can still request microphone access and run a short live monitor pass after a fresh boot.
 - Test one full participant flow: arm, record, review, choose a mode, receive a receipt if applicable.
-- If you are using the Leonardo path, test one short press and one long press at `/kiosk/` during the acceptance pass.
+- If you are using the Leonardo path, test one short press and one long press at `/kiosk/` during the acceptance pass, whether the trigger is a panel button or footswitch.
 - If you wired the optional Leonardo buttons, test `1`, `2`, `3`, and `M` during the same pass.
 - Test one playback-only cycle: confirm `/room/` starts or can be resumed with one tap after boot.
 - Test one restart cycle: reboot or restart both browser clients and confirm the recorder returns to `/kiosk/` while the listening surface returns to `/room/`.

@@ -400,6 +400,8 @@ audio.
 ## Revocation flow
 
 `POST /api/v1/revoke` is a policy-enforcement endpoint, not just a UI feature.
+The public `/revoke/` page is only a thin participant-facing surface over that
+same local-node policy path.
 
 The flow is:
 

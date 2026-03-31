@@ -23,6 +23,7 @@ Usage: ./scripts/clean_local.sh [--include-screenshots]
 Removes local byproducts that are safe to regenerate:
 - api/.test-cache/
 - test-results/
+- test-results/coverage/
 - playwright-report/
 - .playwright/
 - Python __pycache__/ directories outside .venv and node_modules

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Room Memory — Revoke A Recording</title>
+  <link rel="stylesheet" href="/static/engine/kiosk.css"/>
+</head>
+<body class="revocation-page">
+  <div class="shell revoke-shell">
+    <header class="hero">
+      <p class="eyebrow">Participant revocation</p>
+      <h1>Remove a saved recording</h1>
+      <p class="sub">Enter the receipt code from this node to remove a saved recording without opening steward controls. This only works on this node's network.</p>
+    </header>
+
+    <section class="panel revoke-panel">
+      <form id="revokeForm" class="ops-login-form" novalidate>
+        <label class="ops-login-field" for="token">
+          <span class="section-kicker">Revocation code</span>
+          <input
+            id="token"
+            name="token"
+            type="text"
+            value="{{ token_hint }}"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            aria-describedby="revokeHelp revokeStatus"
+            required
+          />
+        </label>
+        <p id="revokeHelp" class="stage-copy">Use the code exactly as it appears on the receipt. One-time playback items are already discarded and do not need this page.</p>
+        <div class="shortcut-row">
+          <button id="revokeSubmit" type="submit" class="btn">Revoke with this code</button>
+          <span class="shortcut">A steward on this node can still help if the receipt is unclear.</span>
+        </div>
+      </form>
+
+      <section id="revokeStatus" class="component-card revoke-status" hidden aria-live="polite"></section>
+    </section>
+  </div>
+
+  <script src="/static/engine/revocation.js"></script>
+</body>
+</html>

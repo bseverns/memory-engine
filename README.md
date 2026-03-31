@@ -107,6 +107,12 @@ Practical rule:
 - if you want the canonical repo gate, run `./scripts/check.sh`
 - if local host Python differs from `3.12`, treat it as a convenience path, not the source of truth
 
+`./scripts/check.sh` now also writes coverage artifacts under
+`test-results/coverage/`, including Python JSON/XML/HTML reports and Node V8
+coverage output for the frontend unit-test lane. It also runs a small default
+Playwright subset against real `/kiosk/`, `/room/`, `/ops/`, and `/revoke/`
+surfaces; the heavier compose-backed release smoke remains separate.
+
 ## Server deployment: public IP now, domain later
 The compose stack is set up for a reverse proxy in front of Django:
 - `caddy` is the public entrypoint on `80/443`

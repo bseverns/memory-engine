@@ -107,7 +107,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/first_boot.sh` creates `.env` if needed, replaces development defaults, and optionally chains into deployment.
 - `scripts/deploy.sh` writes host and TLS settings into `.env`, refuses obvious development secrets, and runs compose.
 - `scripts/update.sh` is the normal existing-server path: fast-forward pull, checks, doctor, backup, deploy, and final status.
-- `scripts/check.sh` is the quick sanity pass for browser JavaScript syntax, frontend smoke tests, Python, the Django behavior suite, shell syntax, and `git diff --check`.
+- `scripts/check.sh` is the quick sanity pass for browser JavaScript syntax, frontend unit tests with Node coverage thresholds, the default Playwright browser subset, Python, the Django behavior suite with Python coverage thresholds and reports, shell syntax, and `git diff --check`.
 - `scripts/release_smoke.sh` is the disposable compose-backed appliance proof: it boots an isolated smoke stack on `127.0.0.1:18080`, waits for `/healthz` and `/readyz`, then runs the live Playwright ritual for kiosk submit, room playback, and ops visibility.
 - `scripts/clean_local.sh` removes regenerable local caches such as `api/.test-cache`, `__pycache__`, and Playwright output. Pass `--include-screenshots` if you also want to clear generated screenshots.
 - `.github/workflows/check.yml` runs that same `scripts/check.sh` gate in GitHub Actions using a repo-local `.venv`, so CI stays aligned with the local check path.
@@ -117,7 +117,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` and `/readyz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.
 - `scripts/restore.sh` restores one of those snapshots into the current stack and now asks for explicit confirmation plus a fresh pre-restore snapshot by default.
-- `scripts/export_bundle.sh` packages one backup snapshot into a portable `.tgz` with a manifest, checksums, and an artifact summary when the API container is running.
+- `scripts/export_bundle.sh` packages one backup snapshot into a portable `.tgz` with a manifest, checksums, explicit import instructions, and an artifact summary when the API container is running.
 - `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, `/readyz`, compose status, doctor output, recent logs, and an artifact summary into a single handoff archive.
 - `/api/v1/operator/artifact-summary` gives stewards the same artifact posture snapshot as a direct JSON download from `/ops/`.
 - `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
@@ -239,8 +239,9 @@ Expected healthy services:
 
 ## Browser focus and reboot recovery
 
-If the kiosk machine boots and the Leonardo suddenly appears dead, check browser
-focus before checking firmware or wiring.
+If the kiosk machine boots and the Leonardo path suddenly appears dead, check
+browser focus before checking firmware or wiring, whether the trigger is a
+panel button or footswitch.
 
 The usual failure pattern is:
 
@@ -292,7 +293,8 @@ Restore cautions:
 Export bundle notes:
 
 - `scripts/export_bundle.sh --latest` packages the newest backup into `exports/`.
-- Each export includes the Postgres dump, MinIO archive, source manifest, a bundle manifest, `CHECKSUMS.txt`, and `artifact-summary.json` when the API container is available.
+- Each export includes the Postgres dump, MinIO archive, source manifest when available, a bundle manifest, `CHECKSUMS.txt`, `IMPORT-INSTRUCTIONS.txt`, and `artifact-summary.json` when the API container is available.
+- The unpacked export bundle is itself a valid `scripts/restore.sh --from ...` source directory, so the handoff format stays aligned with the existing restore flow.
 - Use export bundles for migration, archival handoff, or off-machine storage where a single file is easier to manage than a backup folder.
 
 Support bundle notes:
