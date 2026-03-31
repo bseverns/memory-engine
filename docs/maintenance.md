@@ -53,6 +53,12 @@ Walk through the install-day hardware and kiosk checklist:
 open docs/installation-checklist.md
 ```
 
+Open the reference Ubuntu host recipe:
+
+```bash
+open docs/UBUNTU_APPLIANCE.md
+```
+
 Review the current hands-free trigger path for `/kiosk/`:
 
 ```bash
@@ -106,6 +112,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 
 - `scripts/first_boot.sh` creates `.env` if needed, replaces development defaults, and optionally chains into deployment.
 - `scripts/deploy.sh` writes host and TLS settings into `.env`, refuses obvious development secrets, and runs compose.
+- `scripts/ubuntu_appliance.sh` configures the current Ubuntu host recipe: narrow firewall defaults plus a restart-on-boot systemd unit for this repo checkout.
 - `scripts/update.sh` is the normal existing-server path: fast-forward pull, checks, doctor, backup, deploy, and final status.
 - `scripts/check.sh` is the quick sanity pass for browser JavaScript syntax, frontend unit tests with Node coverage thresholds, the default Playwright browser subset, Python, the Django behavior suite with Python coverage thresholds and reports, shell syntax, and `git diff --check`.
 - `scripts/release_smoke.sh` is the disposable compose-backed appliance proof: it boots an isolated smoke stack on `127.0.0.1:18080`, waits for `/healthz` and `/readyz`, then runs the live Playwright ritual for kiosk submit, room playback, and ops visibility.
@@ -121,6 +128,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, `/readyz`, compose status, doctor output, recent logs, and an artifact summary into a single handoff archive.
 - `/api/v1/operator/artifact-summary` gives stewards the same artifact posture snapshot as a direct JSON download from `/ops/`.
 - `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
+- `docs/UBUNTU_APPLIANCE.md` is the explicit `Ubuntu Server 24.04.4 LTS` host recipe for firewall and restart-on-boot posture.
 - `docs/HANDS_FREE_CONTROLS.md` documents the current Leonardo-based kiosk button path that reuses the browser shortcut contract instead of adding a new host control layer.
 - `docs/OPERATOR_DRILL_CARD.md` is the shortest recovery ritual for kiosk, room, operator, and emergency archive removal when time is tight.
 - Django also validates runtime config relationships at startup now, so bad threshold ordering or insecure origin posture fails fast before the stack enters service.
@@ -157,6 +165,32 @@ Current bundled installation profiles:
 - `quiet_gallery`: slower pacing, gentler tone, and quiet-hours enabled
 - `shared_lab`: balanced defaults for a recording kiosk plus a separate playback surface
 - `active_exhibit`: quicker pacing, shorter slice windows, and more overlap
+
+## Ubuntu appliance bootstrap
+
+For the current reference host, the shortest repeatable path is:
+
+```bash
+sudo ./scripts/ubuntu_appliance.sh
+./scripts/first_boot.sh --public-host memory.example.com --deploy
+./scripts/status.sh
+./scripts/doctor.sh
+```
+
+That gives the host three things the repo previously only implied:
+
+- `ufw` enabled with SSH, HTTP, and HTTPS open
+- a `memory-engine-compose.service` unit under `/etc/systemd/system/`
+- Docker and the compose unit enabled for restart-on-boot
+
+Common variants:
+
+```bash
+sudo ./scripts/ubuntu_appliance.sh --ssh-port 2222
+sudo ./scripts/ubuntu_appliance.sh --start-now
+```
+
+If the host recipe changes materially, update both this runbook and [UBUNTU_APPLIANCE.md](./UBUNTU_APPLIANCE.md) together.
 
 ## MinIO image posture
 
@@ -259,6 +293,25 @@ Recovery order:
 
 Do not debug the microcontroller first unless a normal keyboard also fails to
 move the kiosk.
+
+## Disaster-recovery rehearsal
+
+Do this before first public deployment, and repeat it after major storage,
+retention, or infrastructure changes.
+
+1. Run `./scripts/backup.sh`.
+2. Run `./scripts/export_bundle.sh --latest`.
+3. Copy the newest backup directory or export bundle to a throwaway host or throwaway clone. Do not rehearse by overwriting the live node first.
+4. On that rehearsal target, bring up the stack and run `./scripts/restore.sh --from /path/to/backup-directory`.
+5. Open `/ops/`, `/kiosk/`, `/room/`, and `/revoke/` on the rehearsal target and confirm they still behave like a coherent appliance.
+6. Record the elapsed time, any missing secret or permission surprises, and any restore-only errors in the steward notes for that installation.
+
+Rehearsal is only complete when:
+
+- `/ops/` signs in and reports an understood state
+- the kiosk can still submit one test recording
+- the room can still play restored audio
+- the steward can point to the latest backup and export bundle without guessing
 
 ## Logs
 
@@ -381,6 +434,17 @@ If you want to inspect the MinIO console directly on the server, use `http://127
 
 ## Common operator failure modes
 
+Use this as the quick triage table before drilling into longer logs:
+
+| Symptom | First place to look | First likely action |
+|---|---|---|
+| `/ops/` says `broken` | failing warning card or dependency card | `./scripts/status.sh` |
+| Kiosk trigger appears dead after reboot | Chromium focus on `/kiosk/` | relaunch with `./scripts/browser_kiosk.sh --role kiosk --base-url ...` |
+| Room is silent | `/ops/` playback pause and `/room/` autoplay posture | clear pause state, then relaunch room browser |
+| Monitor path seems wrong | `/ops/` output tone then live monitor | verify browser mic permission and OS input device |
+| Storage is critical | `/ops/` storage card and host disk usage | run a backup, then clear non-essential local clutter intentionally |
+| Restore is needed | latest backup directory and export bundle | rehearse first if time permits, then run `./scripts/restore.sh --from ...` |
+
 ### `/ops/` loads a sign-in page, but the secret never works
 
 Check `OPS_SHARED_SECRET` in `.env`, then redeploy. `scripts/first_boot.sh` now generates that value automatically if it is still a placeholder.
@@ -417,6 +481,15 @@ Check `/ops/` first. If artifact counts are low, the system may be behaving corr
 ### Restore completed but the kiosk still looks stale
 
 Refresh the browser kiosk and re-run `./scripts/status.sh`. If the containers restarted cleanly, stale browser state is usually the issue before backend state is.
+
+### `/ops/` warns that storage is critical
+
+Treat this as a stewardship problem first, not a pool-tuning problem.
+
+- Run `./scripts/backup.sh` before changing too much.
+- Confirm whether the pressure is on the host volume, MinIO data, or accumulated support/export artifacts.
+- Move old support bundles and old copied exports off-machine if they are only lingering on the host for convenience.
+- Do not delete active MinIO or Postgres data by hand unless you are already in a restore or migration procedure.
 
 ## Ownership notes
 

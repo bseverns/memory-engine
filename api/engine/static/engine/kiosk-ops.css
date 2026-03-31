@@ -103,6 +103,22 @@
   grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
 }
 
+.ops-artifact-editor-quick-actions{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.ops-artifact-editor-quick-actions-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+
+.ops-artifact-editor-note{
+  color:var(--muted);
+}
+
 .ops-artifact-editor-actions{
   display:flex;
   flex-wrap:wrap;

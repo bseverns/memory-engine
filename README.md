@@ -10,6 +10,7 @@ If you need the shortest possible orientation:
 
 - first-glance system map and "which knob matters where": [docs/AT_A_GLANCE.md](docs/AT_A_GLANCE.md)
 - deploy, backup, restore, and troubleshooting commands: [docs/maintenance.md](docs/maintenance.md)
+- reference Ubuntu host recipe for firewall and restart-on-boot posture: [docs/UBUNTU_APPLIANCE.md](docs/UBUNTU_APPLIANCE.md)
 - ninety-second non-author recovery ritual: [docs/OPERATOR_DRILL_CARD.md](docs/OPERATOR_DRILL_CARD.md)
 - full architecture and request/data flow: [docs/how-the-stack-works.md](docs/how-the-stack-works.md)
 - deployment temperament and playback differences: [docs/DEPLOYMENT_BEHAVIORS.md](docs/DEPLOYMENT_BEHAVIORS.md)
@@ -446,6 +447,7 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 ## Directory map
 - `docker-compose.yml` — full local node stack
 - `docs/maintenance.md` — deployment, status, backup, restore, and troubleshooting runbook
+- `docs/UBUNTU_APPLIANCE.md` — reference `Ubuntu Server 24.04.4 LTS` host recipe
 - `docs/how-the-stack-works.md` — architecture, request flows, playback model, storage, and testing notes
 - `docs/installation-checklist.md` — hardware, browser kiosk mode, audio, and auto-start install checklist
 - `docs/roadmap.md` — landed changes and the next likely improvements

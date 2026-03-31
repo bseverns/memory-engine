@@ -8,6 +8,7 @@ Use this file when you need the shortest practical map of the machine:
 - what to inspect when something starts to drift or fail
 
 If you need installation-day steps, use [maintenance.md](./maintenance.md).
+If you need the current host-firewall and restart-on-boot recipe, use [UBUNTU_APPLIANCE.md](./UBUNTU_APPLIANCE.md).
 If you need full architecture detail, use [how-the-stack-works.md](./how-the-stack-works.md).
 If you need deployment temperament detail, use [DEPLOYMENT_BEHAVIORS.md](./DEPLOYMENT_BEHAVIORS.md).
 If you need the shortest explicit browser/API boundary rules, use [surface-contract.md](./surface-contract.md).

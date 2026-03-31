@@ -805,6 +805,36 @@
 
       fields.append(topicLabel, lifecycleLabel);
 
+      const quickStatusActions = Array.isArray(artifact.quick_status_actions) ? artifact.quick_status_actions : [];
+      let quickActionButtons = [];
+      if (quickStatusActions.length) {
+        const quickActions = doc.createElement("div");
+        quickActions.className = "ops-artifact-editor-quick-actions";
+        const quickActionsLabel = doc.createElement("strong");
+        quickActionsLabel.textContent = "Quick status actions";
+        const quickActionsRow = doc.createElement("div");
+        quickActionsRow.className = "ops-artifact-editor-quick-actions-row";
+        const quickActionsNote = doc.createElement("span");
+        quickActionsNote.className = "ops-artifact-editor-note";
+        quickActionsNote.textContent = "These shortcuts only change the deployment status field and leave the topic label alone.";
+
+        quickActionButtons = quickStatusActions.map((action) => {
+          const button = doc.createElement("button");
+          button.type = "button";
+          button.className = "btn secondary ops-quick-action";
+          button.textContent = action.label || action.value || "Update status";
+          if (action.detail) {
+            button.title = action.detail;
+          }
+          button.dataset.statusValue = String(action.value || "").trim().toLowerCase();
+          quickActionsRow.append(button);
+          return button;
+        });
+
+        quickActions.append(quickActionsLabel, quickActionsRow, quickActionsNote);
+        fields.append(quickActions);
+      }
+
       const actions = doc.createElement("div");
       actions.className = "ops-artifact-editor-actions";
       const saveButton = doc.createElement("button");
@@ -820,14 +850,21 @@
       status.textContent = "Ready";
       actions.append(saveButton, removeButton, status);
 
-      saveButton.addEventListener("click", async () => {
-        saveButton.disabled = true;
-        removeButton.disabled = true;
+      function setButtonsDisabled(disabled) {
+        saveButton.disabled = disabled;
+        removeButton.disabled = disabled;
+        quickActionButtons.forEach((button) => {
+          button.disabled = disabled;
+        });
+      }
+
+      async function persistMetadata(values, successLabel = "Saved") {
+        setButtonsDisabled(true);
         status.textContent = "Saving…";
         try {
           const updated = await saveArtifactMetadata(artifact.id, {
-            topic_tag: topicInput.value,
-            lifecycle_status: lifecycleInput.value,
+            topic_tag: values.topic_tag,
+            lifecycle_status: values.lifecycle_status,
           });
           topicInput.value = String(updated.topic_tag || "");
           const updatedStatus = String(updated.lifecycle_status || "").trim().toLowerCase();
@@ -838,13 +875,36 @@
             lifecycleInput.append(option);
           }
           lifecycleInput.value = updatedStatus;
-          status.textContent = "Saved";
+          quickActionButtons.forEach((button) => {
+            button.disabled = button.dataset.statusValue === updatedStatus;
+          });
+          status.textContent = successLabel;
         } catch (error) {
           status.textContent = error.message || "Save failed";
         } finally {
-          saveButton.disabled = false;
-          removeButton.disabled = false;
+          setButtonsDisabled(false);
+          quickActionButtons.forEach((button) => {
+            button.disabled = button.dataset.statusValue === lifecycleInput.value;
+          });
         }
+      }
+
+      saveButton.addEventListener("click", async () => {
+        await persistMetadata({
+          topic_tag: topicInput.value,
+          lifecycle_status: lifecycleInput.value,
+        });
+      });
+
+      quickActionButtons.forEach((button) => {
+        button.addEventListener("click", async () => {
+          const nextStatus = String(button.dataset.statusValue || "").trim().toLowerCase();
+          if (!nextStatus) return;
+          await persistMetadata({
+            topic_tag: topicInput.value,
+            lifecycle_status: nextStatus,
+          }, button.textContent.replace(/^Mark\s+/i, "Marked "));
+        });
       });
 
       removeButton.addEventListener("click", async () => {
@@ -854,8 +914,7 @@
         if (!confirmed) {
           return;
         }
-        saveButton.disabled = true;
-        removeButton.disabled = true;
+        setButtonsDisabled(true);
         status.textContent = "Removing…";
         try {
           await removeArtifactFromCirculation(artifact.id);
@@ -867,8 +926,7 @@
           });
         } catch (error) {
           status.textContent = error.message || "Removal failed";
-          saveButton.disabled = false;
-          removeButton.disabled = false;
+          setButtonsDisabled(false);
         }
       });
 

@@ -521,11 +521,35 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertEqual(payload["artifacts"][1]["id"], older.id)
         self.assertEqual(payload["artifacts"][1]["stack_position"], 2)
         self.assertEqual(payload["artifacts"][0]["deployment_kind"], "question")
+        self.assertEqual(
+            [action["value"] for action in payload["artifacts"][0]["quick_status_actions"]],
+            ["answered", "resolved"],
+        )
         self.assertEqual(payload["editable_fields"]["lifecycle_status"]["suggestions"][0], "open")
         self.assertEqual(payload["editable_fields"]["lifecycle_status"]["input_mode"], "select")
         self.assertTrue(payload["editable_fields"]["lifecycle_status"]["allow_blank"])
         self.assertIn("remove_from_circulation", payload["operator_actions"])
         self.assertEqual(payload["operator_actions"]["remove_from_circulation"]["label"], "Remove from stack")
+
+    @override_settings(ENGINE_DEPLOYMENT="repair")
+    def test_operator_recent_artifacts_exposes_repair_status_quick_actions(self):
+        self.login_operator()
+        artifact = self.make_active_artifact(
+            raw_uri="raw/repair-ticket.wav",
+            deployment_kind="repair",
+            topic_tag="amp_rack",
+            lifecycle_status="pending",
+        )
+
+        response = self.client.get("/api/v1/operator/artifacts")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["artifacts"][0]["id"], artifact.id)
+        self.assertEqual(
+            [action["value"] for action in payload["artifacts"][0]["quick_status_actions"]],
+            ["fixed", "obsolete"],
+        )
 
     @override_settings(ENGINE_DEPLOYMENT="repair")
     def test_operator_update_artifact_metadata_updates_topic_and_status(self):

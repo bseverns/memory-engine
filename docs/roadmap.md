@@ -76,6 +76,20 @@ this file is the longer memory of what changed, when, and why it mattered.
 - The operator stack now compacts itself when a memory is removed, so stewardship feels like tending one living pile instead of punching holes into a list.
 - It also adds the shortest drill card so a non-author steward can recover kiosk, room, and operator posture under time pressure.
 
+### Chapter 12: Make trust, handoff, and verification more explicit
+- The next pass tightened three seams that were previously only implied: participant trust, off-machine handoff, and routine proof that the stack still works.
+- Participants can now revoke a saved recording on the local node through a public `/revoke/` page instead of only being told to find a steward later.
+- Export bundles became more self-describing with explicit import instructions and broader checksum coverage, so archival handoff is less dependent on repo context or operator memory.
+- The repo gate also stopped being mostly syntax-plus-unit checks and now includes Python and Node coverage thresholds along with a small default Playwright browser slice.
+- This matters because the appliance is no longer only more capable; it is easier to trust, easier to hand off, and easier to verify after change.
+
+### Chapter 13: Lock the first deployment posture down
+- The next pre-deploy pass focused less on new public behavior and more on whether a first steward could actually stand the machine up, recover it, and close practical loops without the author nearby.
+- The Ubuntu host story is now explicit: one-command firewall posture, restart-on-boot systemd setup, and a written appliance recipe for `Ubuntu Server 24.04.4 LTS`.
+- Recovery guidance also became rehearsal-grade instead of only command-grade: the runbook now includes a real disaster-recovery rehearsal flow, a sharper failure matrix, and a longer drill card for storage and restore incidents.
+- On the public side, the kiosk monitor check now goes a little further with an optional spoken prompt after the tone, and `/ops/` now exposes safer quick status actions for `question` and `repair` threads.
+- This matters because "ready to deploy" is not only about feature completeness. It is about whether the stack can survive first contact with real stewards.
+
 ## Landed So Far
 
 ### Operator / deployment
@@ -94,9 +108,11 @@ this file is the longer memory of what changed, when, and why it mattered.
 - `scripts/check.sh` and `scripts/status.sh` for quicker maintenance passes
 - Coverage-aware repo gate with Node frontend thresholds and Python line/branch thresholds, plus reports under `test-results/coverage/`
 - Small Playwright browser subset promoted into the default repo gate so kiosk, room, ops, and revoke surfaces get lightweight real-browser coverage on each check pass
+- `scripts/ubuntu_appliance.sh` plus an explicit `Ubuntu Server 24.04.4 LTS` appliance recipe for firewall and restart-on-boot posture
 - `scripts/doctor.sh` to check `.env`, compose state, storage reachability, and browser/TLS constraints
 - `docs/maintenance.md` as the steward runbook
 - `docs/installation-checklist.md` for kiosk hardware, browser kiosk mode, audio routing, and auto-start
+- `docs/UBUNTU_APPLIANCE.md` for the reference host recipe
 - `README.md` pointers for operator maintenance and recovery flows
 - Disk-space and storage-pressure warnings surfaced in `/ops/`
 - Pool-health warnings in `/ops/` when lanes or moods become too sparse or imbalanced
@@ -106,6 +122,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Audit logging for revocation, restore, export, and stewardship actions
 - Retention summary in `/ops/` showing raw-audio expiry pressure and fossil hold posture
 - Safer restore flow with confirmation prompts and automatic pre-restore snapshots
+- Documented disaster-recovery rehearsal flow so backup and restore are practiced before opening day
 - Rotation notes and helper steps for Postgres, Django, and MinIO credential changes
 - MinIO deployment notes covering root-backed vs separate app credentials
 - Documented migration path from compose-managed MinIO to an external S3-compatible backend
@@ -130,6 +147,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 - First Leonardo-based hands-free trigger path for `/kiosk/`, reusing the existing keyboard shortcut model with no host-side bridge
 - Documented footswitch enclosure posture for that same Leonardo HID path, so the first hardware seam can live as either a panel button or a floor switch without changing browser behavior
 - Built-in monitor/headphone check on `/kiosk/`, plus optional Leonardo buttons for `1`, `2`, `3`, and monitor-check toggle
+- Monitor check can now follow the tone with a spoken prompt when the browser supports speech synthesis, so output verification is less abstract during install-day routing
 - Clearer participant-facing receipt guidance for later revocation on the same node
 - Public participant-facing `/revoke/` page so receipt codes can remove saved recordings on the local node without exposing steward controls
 - Deployment-owned prompt packs on `/kiosk/` so `memory`, `question`, `prompt`, and `repair` can offer distinct ways to begin without branching the kiosk flow
@@ -137,7 +155,9 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Stronger focus and reboot recovery guidance for unattended kiosk HID use
 - Sharper `/ops/` hierarchy so live controls, routing ritual, and recovery notes stay ahead of passive summary panels
 - Narrow steward-side “remove from stack” action for recent artifacts, with audit logging, automatic stack compaction, and no wider moderation sprawl
+- Quick status actions in `/ops/` for `question` and `repair`, so stewards can mark artifacts answered, resolved, fixed, or obsolete without inventing labels on the fly
 - One-page operator drill card for ninety-second recovery and opening checks
+- Expanded operator failure and incident guidance for storage pressure and restore paths
 
 
 ### Mission opening: deployment family groundwork
@@ -242,7 +262,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 ### User / speaker
 - Expand hands-free participation beyond the current Leonardo HID path
   - alternate enclosure layouts beyond the now-documented panel button / footswitch posture
-  - stronger participant self-service beyond the current steward-mediated receipt flow
+  - stronger participant self-service beyond the current local code-entry `/revoke/` flow
 
 ## Next
 
@@ -251,12 +271,15 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Add deployment-aware playback policy presets visible in operator status exports
 - Add deployment-aware retention/export presets for archival handoff bundles
 - Add installation-specific room identities that can be combined with deployment kind (e.g., `repair` + `shared_lab`)
-- Add a safe operator-facing way to mark questions `answered` / `resolved` and repairs `fixed` / `obsolete`
 
 ### User / speaker
-- Deepen the new monitor/headphone check beyond the current short tone and live play-through
-  - optional voice sample or spoken prompt
-  - clearer per-OS launch and recovery notes if one installation image becomes canonical
+- Deepen the new monitor/headphone check beyond the current tone-plus-spoken-prompt posture
+  - better launch-time troubleshooting if a browser blocks speech synthesis
+  - richer routing cues if one installation image becomes canonical across dedicated kiosk clients
+
+### Verification / release confidence
+- Raise the new Python and Node coverage thresholds as the current floor becomes easier to hold
+- Widen the default browser gate beyond the current Playwright check slice while keeping the heavier release smoke path separate
 
 ### Audience / room effect
 - Push beyond metadata-derived mood shaping into a room state that responds to context
@@ -282,15 +305,15 @@ this file is the longer memory of what changed, when, and why it mattered.
 Open buckets now look like this:
 
 - Input and participation:
-  first hands-free Leonardo path has landed; kiosk output check, steward live monitor, reboot/focus guidance, documented footswitch enclosure posture, and a basic participant-facing revocation path are now in place, while richer hands-free input, alternate layouts, and stronger participant self-service still remain
+  first hands-free Leonardo path has landed; kiosk output check, steward live monitor, reboot/focus guidance, documented footswitch enclosure posture, and a public participant-facing revoke path are now in place, while richer hands-free input, alternate layouts, and stronger participant self-service still remain
 - Deployment follow-through:
-  the deployment family is behaviorally real, but intake cards, operator-safe state changes, and deployment-aware export posture remain
+  the deployment family is behaviorally real, kiosk prompt packs now make that visible at intake, and `/ops/` now has quick status actions for question/repair, but steward-tunable intake cards and deployment-aware export posture still remain
 - Room intelligence:
   the room has short-horizon thread memory now, but not fuller room-state transitions, sensing, or semantic grouping decisions
 - Steward tooling:
   `/ops/` is useful and lightweight, but it still stops short of fuller deployment-aware tuning, multi-node stewardship, and richer export/recovery posture
 - Documentation and operations:
-  the story, quick map, and archaeology work have started, but drill cards, failure matrices, and more explicit env-var grouping remain
+  the story, quick map, and archaeology work have started, the default check gate now has coverage reporting plus a small browser slice, and the appliance runbook now includes a host recipe plus recovery rehearsal, but explicit env-var grouping and deeper incident variants still remain
 
 ## Later
 
@@ -320,7 +343,6 @@ Open buckets now look like this:
 - Add deployment-aware operator controls so stewardship UI can expose mode-specific tuning safely, without turning `/ops/` into a giant behavior console
 - Add long-term retention policy controls that can differ by consent mode, artifact type, or installation
 - Add artifact-type-aware export posture so handoff bundles can preserve deployment semantics
-- Add a documented disaster-recovery rehearsal flow rather than only backup and restore commands
 - Add a fuller external-storage migration story for moving beyond MinIO if scale or policy changes
 
 ## Later Research Questions

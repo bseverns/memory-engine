@@ -43,6 +43,22 @@ next to the machine.
 4. Run `./scripts/status.sh`.
 5. If needed, use `./scripts/support_bundle.sh` before changing too much.
 
+## If Storage Looks Critical
+
+1. Open `/ops/`.
+2. Confirm the warning is really storage and not pool balance.
+3. Run `./scripts/backup.sh`.
+4. Move old support bundles or copied exports off-machine if they are just sitting on the host.
+5. Do not delete live MinIO or Postgres data by hand unless you are already inside a restore or migration procedure.
+
+## If A Restore Must Happen
+
+1. Find the newest known-good backup.
+2. If time allows, rehearse on a throwaway target before touching the live node.
+3. Run `./scripts/restore.sh --from backups/...`.
+4. Re-open `/ops/`, `/kiosk/`, and `/room/`.
+5. Make one short test recording before reopening to the public.
+
 ## Before Opening To The Public
 
 1. `/ops/` signs in and shows an understood state.

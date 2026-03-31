@@ -169,6 +169,46 @@ def deployment_topic_placeholder(deployment_code: str) -> str:
     return "memory_thread"
 
 
+def deployment_status_quick_actions(deployment_code: str, current_status: str) -> list[dict[str, str]]:
+    code = deployment_spec(deployment_code).code
+    current = resolved_lifecycle_status(current_status)
+
+    if code == "question":
+        actions = [
+            {
+                "value": "answered",
+                "label": "Mark answered",
+                "detail": "Use when the room has received a practical answer but the question may still matter later.",
+                "success_label": "Marked answered",
+            },
+            {
+                "value": "resolved",
+                "label": "Mark resolved",
+                "detail": "Use when the question no longer needs active recurrence in this deployment.",
+                "success_label": "Marked resolved",
+            },
+        ]
+    elif code == "repair":
+        actions = [
+            {
+                "value": "fixed",
+                "label": "Mark fixed",
+                "detail": "Use when the practical issue has been handled and can cool down in playback.",
+                "success_label": "Marked fixed",
+            },
+            {
+                "value": "obsolete",
+                "label": "Mark obsolete",
+                "detail": "Use when the note no longer applies to the current installation or setup.",
+                "success_label": "Marked obsolete",
+            },
+        ]
+    else:
+        return []
+
+    return [action for action in actions if action["value"] != current]
+
+
 def serialize_operator_artifact(artifact: Artifact, now) -> dict:
     return {
         "id": artifact.id,
@@ -186,6 +226,7 @@ def serialize_operator_artifact(artifact: Artifact, now) -> dict:
         "mood": artifact_mood(artifact, now),
         "age_hours": round(artifact_age_hours(artifact, now), 2),
         "absence_hours": round(artifact_absence_hours(artifact, now), 2),
+        "quick_status_actions": deployment_status_quick_actions(artifact.deployment_kind, artifact.lifecycle_status),
     }
 
 

@@ -948,6 +948,52 @@ function closeMonitorCheck() {
 
 async function runMonitorCheck() {
   await playMonitorCheckTone();
+  const spokePrompt = await playMonitorSpeechPrompt();
+  setMicCheckStatus(
+    spokePrompt ? currentCopy().micCheckPromptComplete : currentCopy().micCheckComplete,
+    "good",
+  );
+  meterText.textContent = spokePrompt
+    ? currentCopy().meterMonitorPrompt
+    : currentCopy().meterMonitor;
+}
+
+async function playMonitorSpeechPrompt() {
+  const speechSynthesisApi = window.speechSynthesis;
+  const SpeechSynthesisUtteranceCtor = window.SpeechSynthesisUtterance;
+  const promptText = String(currentCopy().monitorSpeechPrompt || "").trim();
+  if (!speechSynthesisApi || !SpeechSynthesisUtteranceCtor || !promptText) {
+    return false;
+  }
+
+  return await new Promise((resolve) => {
+    let settled = false;
+    let timeoutId = 0;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      resolve(Boolean(value));
+    };
+
+    const utterance = new SpeechSynthesisUtteranceCtor(promptText);
+    utterance.lang = currentCopy().htmlLang || "en";
+    utterance.rate = 0.96;
+    utterance.pitch = 1.0;
+    utterance.volume = 0.88;
+    utterance.onend = () => finish(true);
+    utterance.onerror = () => finish(false);
+
+    timeoutId = window.setTimeout(() => finish(false), 6500);
+    try {
+      speechSynthesisApi.cancel();
+      speechSynthesisApi.speak(utterance);
+    } catch (error) {
+      finish(false);
+    }
+  });
 }
 
 async function startFreshSession() {

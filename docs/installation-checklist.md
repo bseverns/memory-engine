@@ -33,6 +33,10 @@ As of `March 30, 2026`, Ubuntu `26.04 LTS` is still in beta and its final
 release is expected on `April 23, 2026`, so `24.04.4 LTS` is the stable target
 to standardize on for first-run hosting.
 
+For the host-level firewall and restart-on-boot recipe, use
+[UBUNTU_APPLIANCE.md](./UBUNTU_APPLIANCE.md) and
+`sudo ./scripts/ubuntu_appliance.sh` before the first public opening.
+
 ## Network And URL
 
 - Decide whether the kiosk will record through `localhost`, a real `https://` domain, or a trusted internal-TLS IP setup.
@@ -79,6 +83,7 @@ to standardize on for first-run hosting.
 - Ensure the browser launch waits until the network stack and display are ready, or it may open to a blank or unreachable page.
 - On the playback machine, prefer a launch command that preserves autoplay allowance rather than relying on a one-tap manual recovery after every reboot.
 - On the recording machine, prefer a launch path that returns Chromium directly to `/kiosk/` and leaves it frontmost after login. The Leonardo path depends on that focus posture.
+- On Ubuntu client machines, prefer a generated `./scripts/browser_kiosk.sh --print ...` command inside a systemd user service or desktop autostart entry instead of a handwritten launcher.
 - Reboot once as a real test. Do not consider auto-start complete until the recording machine returns to `/kiosk/` and the playback machine returns to `/room/` without operator intervention.
 - During that reboot test, verify one keyboard shortcut on each surface: `Space` on `/kiosk/`, the playback start/stop buttons on `/room/`, and sign-in plus monitor check access on `/ops/`.
 
@@ -92,6 +97,7 @@ to standardize on for first-run hosting.
 - Confirm there are no critical storage warnings.
 - Confirm there are no unexpected pool warnings before public use.
 - Use the `/ops/` monitor panel to verify the operator browser can still request microphone access and run a short live monitor pass after a fresh boot.
+- Open `/kiosk/`, run the monitor check, and listen for the spoken prompt after the tone if the browser supports speech synthesis. If the tone plays but the voice does not, the output path is still likely fine.
 - Test one full participant flow: arm, record, review, choose a mode, receive a receipt if applicable.
 - If you are using the Leonardo path, test one short press and one long press at `/kiosk/` during the acceptance pass, whether the trigger is a panel button or footswitch.
 - If you wired the optional Leonardo buttons, test `1`, `2`, `3`, and `M` during the same pass.
