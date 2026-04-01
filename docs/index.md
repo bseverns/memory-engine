@@ -42,6 +42,17 @@ Memory Engine remains the canonical center of the project. The deployment family
 - an explicit proof board for what this stack has already demonstrated and what still needs experimental validation
 - a clearer split between install-day guidance, steward rituals, architecture, and project direction
 
+## Site Branches
+
+Use the manual by branch, not by filename.
+
+| Branch | What it is for | Start here |
+|---|---|---|
+| Start Here | install-day orientation, lifecycle overview, and practical operating entry points | [start-here-branch.md](./start-here-branch.md) |
+| Machine | architecture, browser/API boundaries, deployment behavior, and control seams | [machine-branch.md](./machine-branch.md) |
+| Steward & Participant Materials | the light public/steward handoff layer around the machine | [stewardship-branch.md](./stewardship-branch.md) |
+| Project Direction | mission boundary, open work, and strategic posture | [project-direction-branch.md](./project-direction-branch.md) |
+
 ## Start With The Right Path
 
 If you are installing the machine:
@@ -98,12 +109,16 @@ If you are deciding what still needs to be proven:
 
 ## Documentation Map
 
+- [start-here-branch.md](./start-here-branch.md): navigation hub for install and orientation docs
 - [start-here.md](./start-here.md): role-based orientation
 - [AT_A_GLANCE.md](./AT_A_GLANCE.md): shortest machine map
 - [memory-lifecycle.md](./memory-lifecycle.md): ingest, playback, wear, expiry, and revoke diagrams
 - [experimental-proofs.md](./experimental-proofs.md): proof board for current and next validation passes
 - [maintenance.md](./maintenance.md): deploy, backup, restore, and repair commands
 - [UBUNTU_APPLIANCE.md](./UBUNTU_APPLIANCE.md): firewall and restart-on-boot host recipe
+- [machine-branch.md](./machine-branch.md): navigation hub for architecture and behavior docs
 - [how-the-stack-works.md](./how-the-stack-works.md): architecture and request flow
+- [stewardship-branch.md](./stewardship-branch.md): navigation hub for steward and participant handoff material
+- [project-direction-branch.md](./project-direction-branch.md): navigation hub for mission and roadmap docs
 - [MISSION_EXPANSION.md](./MISSION_EXPANSION.md): strategic boundary for the project
 - [roadmap.md](./roadmap.md): what is still open and why

@@ -20,6 +20,7 @@ extra_css:
 nav:
   - Home: index.md
   - Start Here:
+      - Branch Overview: start-here-branch.md
       - Orientation: start-here.md
       - At A Glance: AT_A_GLANCE.md
       - Memory Lifecycle: memory-lifecycle.md
@@ -30,13 +31,16 @@ nav:
       - Operator Drill Card: OPERATOR_DRILL_CARD.md
       - Multi-Machine Setup: multi-machine-setup.md
   - Machine:
+      - Branch Overview: machine-branch.md
       - How The Stack Works: how-the-stack-works.md
       - Surface Contract: surface-contract.md
       - Deployment Behaviors: DEPLOYMENT_BEHAVIORS.md
       - Responsiveness: RESPONSIVENESS.md
       - Hands-Free Controls: HANDS_FREE_CONTROLS.md
   - Steward & Participant Materials:
+      - Branch Overview: stewardship-branch.md
       - Participant Prompt Card: participant-prompt-card.md
   - Project Direction:
+      - Branch Overview: project-direction-branch.md
       - Mission Expansion: MISSION_EXPANSION.md
       - Roadmap: roadmap.md
