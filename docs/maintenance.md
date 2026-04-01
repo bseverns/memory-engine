@@ -259,6 +259,33 @@ There are four practical health surfaces:
 - `/ops/` is also the place to run the deeper monitor check: output tone plus live mic pass-through, both local to the steward browser and never archived.
 - For unattended listening machines, launch Chromium through `./scripts/browser_kiosk.sh --role room --base-url ...` so the browser picks up the autoplay-safe flags instead of relying on a one-tap recovery after every reboot.
 
+## Opening posture
+
+Use this sequence before the public arrives:
+
+1. Run `./scripts/status.sh` and `./scripts/doctor.sh`.
+2. Open `/ops/` and confirm the state reads `ready` or a known non-critical degraded state.
+3. Run the `/ops/` output tone.
+4. Run live monitor only if local steward-browser routing needs proof.
+5. Open `/kiosk/`, `/room/`, and `/revoke/` on their intended machines.
+6. Confirm intake and playback are not paused by accident.
+
+Practical reminder:
+
+- the `/ops/` monitor proves the steward browser's local routing only
+- it does not certify the dedicated kiosk recorder path
+- it does not certify the separate room playback machine
+
+## Closing posture
+
+Use this sequence when the session ends:
+
+1. Confirm no one is still recording and the room can fall quiet naturally.
+2. Check `/ops/` for critical storage or queue warnings that should be handed off immediately.
+3. Run `./scripts/backup.sh` or `./scripts/export_bundle.sh --latest` if that day requires a handoff snapshot.
+4. Leave a short steward note in whatever local log or notebook the installation uses.
+5. Use maintenance mode only if the node should stay explicitly out of service until the next steward returns.
+
 Expected healthy services:
 
 - `proxy`

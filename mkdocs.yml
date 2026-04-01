@@ -39,8 +39,13 @@ nav:
       - Hands-Free Controls: HANDS_FREE_CONTROLS.md
   - Steward & Participant Materials:
       - Branch Overview: stewardship-branch.md
+      - First-Day Packet: FIRST_DAY_PACKET.md
+      - Handoff Rehearsal: HANDOFF_REHEARSAL.md
+      - Archive Stewardship: ARCHIVE_STEWARDSHIP.md
       - Participant Prompt Card: participant-prompt-card.md
   - Project Direction:
       - Branch Overview: project-direction-branch.md
+      - Naming Policy: NAMING.md
+      - v1.3 Status: V1_3_STATUS.md
       - Mission Expansion: MISSION_EXPANSION.md
       - Roadmap: roadmap.md

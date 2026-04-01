@@ -14,6 +14,8 @@ Use it when you need to understand what the project is trying to protect, what r
 
 ## Pages In This Branch
 
+- [NAMING.md](./NAMING.md): naming hierarchy and deployment-status language
+- [V1_3_STATUS.md](./V1_3_STATUS.md): short stable / supported / experimental release-facing note
 - [MISSION_EXPANSION.md](./MISSION_EXPANSION.md): expansion boundary, anti-frameworkization guardrail, and canonical center
 - [roadmap.md](./roadmap.md): story so far, open work, and near-term priorities
 

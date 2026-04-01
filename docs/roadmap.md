@@ -13,6 +13,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 ## Story So Far
 
 ### Chapter 1: Make it a real appliance
+- I wanted to make something to held on, but not too tightly.
 - The first major push was not aesthetic. It was operational.
 - The machine gained a real deployment path with `caddy` + `gunicorn`, health probes, an `/ops/` dashboard, and enough scripts to boot, deploy, check, back up, restore, export, and diagnose a node without improvising every step.
 - This was the moment the project stopped being only an app and started becoming an appliance.
@@ -89,6 +90,44 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Recovery guidance also became rehearsal-grade instead of only command-grade: the runbook now includes a real disaster-recovery rehearsal flow, a sharper failure matrix, and a longer drill card for storage and restore incidents.
 - On the public side, the kiosk monitor check now goes a little further with an optional spoken prompt after the tone, and `/ops/` now exposes safer quick status actions for `question` and `repair` threads.
 - This matters because "ready to deploy" is not only about feature completeness. It is about whether the stack can survive first contact with real stewards.
+
+## v1.3 Frame
+
+### Theme
+- `v1.3` should be the first steward release.
+- The right subtitle is probably `Handoff`.
+- The point is not to prove that the machine can do more. The point is to prove that it can be deployed, trusted, explained, and recovered by someone who did not build it without losing its tone.
+
+### Must Be True Before v1.3 Feels Landed
+- Identity closure:
+  naming is settled enough that project docs, participant-facing surfaces, operator-facing surfaces, and internal architectural language stop competing
+- Appliance closure:
+  the `Ubuntu Server 24.04.4 LTS` path has been rehearsed from a clean machine and the appliance recipe has real tire tracks
+- Steward closure:
+  at least one non-author steward has opened, operated, recovered, and closed the machine successfully
+- Public ritual closure:
+  at least one soft pilot has happened and been debriefed with actual participant confusion, hesitation, and facilitator repetition captured
+- Trust closure:
+  participant-facing docs, receipt language, `/revoke/`, and steward explanation all agree about storage, color, consent, and revocation
+- Archive closure:
+  archive/removal/handoff posture exists as an explicit stewardship memo instead of folklore
+- Ops closure:
+  `/ops/` is legible as a bench for opening, local routing checks, problem removal, and scarcity/burden diagnosis
+- Regression closure:
+  the default repo gate defends the most important ceremony seams, not just the codebase in the abstract
+
+### Strongly Desired For v1.3
+- one print-ready staff kit that matches reality
+- one first-day packet that matches the actual opening ritual
+- one install transcript or dated appliance rehearsal log
+- one restore drill report
+- one short release note that says what is now stable, what is experimental, and what is next
+
+### Not The Point Of v1.3
+- deepening every sibling deployment equally
+- widening moderation into a larger archive console
+- adding transcripts, embeddings, or semantic systems before public use earns them
+- turning `/ops/` into a full archive management suite
 
 ## Landed So Far
 
@@ -266,35 +305,71 @@ this file is the longer memory of what changed, when, and why it mattered.
 
 ## Next
 
-### Multi-deployment follow-through
-- Add deployment-specific intake cards so stewards can tune prompts without touching code
-- Add deployment-aware playback policy presets visible in operator status exports
-- Add deployment-aware retention/export presets for archival handoff bundles
-- Add installation-specific room identities that can be combined with deployment kind (e.g., `repair` + `shared_lab`)
+### 1. Identity closure
+- Add a short naming policy that states:
+  - project name
+  - participant-facing surface language
+  - operator-facing surface language
+  - internal architectural terms that should stay internal
+  - which deployments are stable, supported, experimental, or still in progress
+- Keep `Memory Engine` as the project name and canonical center
+- Keep `Room Memory` / recording-station language as the public surface default
+- Keep `artifact engine` or similar substrate language architectural and secondary
 
-### User / speaker
-- Deepen the new monitor/headphone check beyond the current tone-plus-spoken-prompt posture
-  - better launch-time troubleshooting if a browser blocks speech synthesis
-  - richer routing cues if one installation image becomes canonical across dedicated kiosk clients
+### 2. Appliance closure
+- Rehearse the golden path on a clean `Ubuntu Server 24.04.4 LTS` host:
+  blank box -> install -> boot -> kiosk live -> room live -> ops live -> test recording -> revoke test -> backup -> restore rehearsal
+- Capture the run as a dated appliance rehearsal, not only as commands
+- Confirm reboot, browser autostart, and focus posture under real install conditions
 
-### Verification / release confidence
-- Raise the new Python and Node coverage thresholds as the current floor becomes easier to hold
-- Widen the default browser gate beyond the current Playwright check slice while keeping the heavier release smoke path separate
+### 3. Steward closure
+- Run at least one real non-author steward handoff
+- Capture where the steward got stuck, what they misread, and what they assumed incorrectly
+- Tighten docs, `/ops/`, and drill cards based on those specific failures instead of hypothetical ones
 
-### Audience / room effect
-- Push beyond metadata-derived mood shaping into a room state that responds to context
-- Learn from time-of-day or room activity patterns without losing inspectability
-- Decide whether semantic or transcript-aware grouping is worth the complexity later
+### 4. Public ritual closure
+- Run at least one soft pilot with trusted participants, then one more public mix if possible
+- Debrief the invitation, hesitation points, memory-color legibility, `Don't Save` trust, and whether the room’s change was actually perceptible
+- Watch whether facilitators are over-explaining or under-explaining the system
 
-### Operator / stewardship
-- Add one-command firewall / restart-on-boot setup for a specific server OS target
-- Turn the new Ubuntu reference image into a more explicit appliance recipe for `Ubuntu Server 24.04.4 LTS`
-- Continue documentation passes:
-  - quick-reference tables for common failure modes by service
-  - more explicit env-var grouping by subsystem and risk level
-  - expand the first operator drill card into storage and restore incident variants
+### 5. Trust closure
+- Keep public trust language aligned across:
+  - receipt copy
+  - `/revoke/`
+  - participant card
+  - kiosk review language
+  - steward explanation
+- Make sure participants can truthfully explain back:
+  - what is stored
+  - what is not stored
+  - what color changes and what it does not change
+  - how revocation works and that it is local-node only
 
-### Interaction watch
+### 6. Archive closure
+- Add an internal stewardship note for:
+  - raw vs fossil vs trace/residue
+  - remove from stack vs revoke entirely
+  - authority boundaries for each action
+  - export-bundle treatment and handoff expectations
+  - whether materials ever leave the live installation context
+
+### 7. Ops closure
+- Keep `/ops/` narrow, but make it more bench-like
+- Add clearer opening and closing posture sections
+- Keep clarifying what the local monitor proves and what it does not
+- Make public-state issues easier to distinguish from steward-browser issues
+
+### 8. Regression closure
+- Keep strengthening the default gate around:
+  - kiosk happy path
+  - room load and playability
+  - ops auth and basic health rendering
+  - revoke path
+  - one recent stewardship action path
+  - one install-time/browser-behavior check, even if partly manual
+- Raise coverage floors and widen the default browser slice only where they defend public ritual seams
+
+### Ongoing interaction watch
 - Keep watching the prominence of the memory-color review step
   - the feature is conceptually strong
   - the risk is decision dilation immediately after recording
@@ -346,6 +421,7 @@ Open buckets now look like this:
 - Add a fuller external-storage migration story for moving beyond MinIO if scale or policy changes
 
 ## Later Research Questions
+- Whether "glitch" effects could prove themselves to be useful or just confusing
 - Whether browser-side normalization is sufficient, or if server-side loudness analysis is worth the added complexity
 - Whether the pool should learn from time-of-day or room activity patterns
 - Whether the kiosk should expose revocation and moderation tools directly, or keep those fully steward-side

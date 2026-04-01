@@ -1,8 +1,8 @@
-# Mission Expansion: Memory Engine → Artifact Engine Family
+# Mission Expansion: Memory Engine With Secondary Deployments
 
 This repository still ships as **Memory Engine** first. That default is not being diluted.
 
-The opening in this pass is architectural and editorial: we now name the shared substrate as a **local-first artifact/offering engine** that can host multiple sibling deployments without breaking the current machine.
+The opening in this pass is architectural and editorial: the repo now has a small set of secondary deployments without breaking the current machine. The shared substrate can still be described internally as a local-first artifact/offering engine, but that language is architectural, not the public identity of the work.
 
 ## What stays the same
 
@@ -11,8 +11,6 @@ The opening in this pass is architectural and editorial: we now name the shared 
 - Memory Engine default behavior, default copy, and default policy tuning.
 - Existing operator workflow and route map.
 - Existing persistence model for artifacts, derivatives, and revocation.
-
-## What becomes configurable
 
 ## Deployment catalog shape (explicit)
 
@@ -30,14 +28,14 @@ This keeps extension work concrete: no plugin loaders, no abstract platform shel
 
 Deployment kind (`ENGINE_DEPLOYMENT`) is now a first-pass config primitive.
 
-Planned supported values:
+Current deployment catalog:
 
-- `memory` (default, fully wired)
-- `question`
-- `prompt`
-- `repair`
-- `witness`
-- `oracle`
+- `memory` (default, canonical, stable baseline)
+- `question` (secondary, supported, still deepening)
+- `repair` (secondary, supported, still deepening)
+- `prompt` (secondary, experimental first pass)
+- `witness` (secondary, experimental first pass)
+- `oracle` (secondary, experimental first pass)
 
 In this pass, deployment kind is intentionally lightweight and used for:
 
@@ -58,14 +56,14 @@ Question Engine should not be built as a separate system because it shares the s
 
 What changes is mostly **policy and rhetoric**: intake framing, review language, artifact interpretation, and replay bias.
 
-## Plausible deployment family
+## Secondary deployment family
 
 - **Memory Engine**: voice offerings for weathered room memory.
-- **Question Engine**: unresolved prompts and recurring asks.
-- **Prompt Engine**: authored prompt cycles and participant responses.
-- **Repair Engine**: practical notes, fixes, and resurfacing tasks.
-- **Witness Engine**: testimony-oriented offerings with trace stewardship.
-- **Oracle Engine**: sparse, ceremonial, cue-like resurfacing.
+- `question`: unresolved prompts and recurring asks.
+- `prompt`: authored prompt cycles and participant responses.
+- `repair`: practical notes, fixes, and resurfacing tasks.
+- `witness`: testimony-oriented offerings with trace stewardship.
+- `oracle`: sparse, ceremonial, cue-like resurfacing.
 
 ## Deployment-defining system layers
 

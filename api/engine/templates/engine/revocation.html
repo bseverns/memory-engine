@@ -11,7 +11,7 @@
     <header class="hero">
       <p class="eyebrow">Participant revocation</p>
       <h1>Remove a saved recording</h1>
-      <p class="sub">Enter the receipt code from this node to remove a saved recording without opening steward controls. This only works on this node's network.</p>
+      <p class="sub">Enter the receipt code from this node to remove a saved recording without opening steward controls. This works only on this node's network and only for saved recordings from this node.</p>
     </header>
 
     <section class="panel revoke-panel">
@@ -30,10 +30,10 @@
             required
           />
         </label>
-        <p id="revokeHelp" class="stage-copy">Use the code exactly as it appears on the receipt. One-time playback items are already discarded and do not need this page.</p>
+        <p id="revokeHelp" class="stage-copy">Use the code exactly as it appears on the receipt. "Don't Save" items are already discarded from the device after one playback and do not need this page.</p>
         <div class="shortcut-row">
           <button id="revokeSubmit" type="submit" class="btn">Revoke with this code</button>
-          <span class="shortcut">A steward on this node can still help if the receipt is unclear.</span>
+          <span class="shortcut">A steward on this node can still help if the receipt is unclear. This page removes the saved recording from this node only.</span>
         </div>
       </form>
 

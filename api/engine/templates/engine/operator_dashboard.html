@@ -26,8 +26,12 @@
       <p class="stage-copy">These are the first actions to reach for during install day, daily open, or a rough reboot. Keep the living controls and routing checks above the archive summaries.</p>
       <div class="component-list">
         <article class="component-card ready">
-          <strong>Start-of-day ritual</strong>
-          <span>1. Open `/ops/` and confirm the state badge below makes sense. 2. Run the output tone. 3. Run live monitor with closed headphones. 4. Open `/kiosk/` and `/room/` before the public arrives.</span>
+          <strong>Opening posture</strong>
+          <span>1. Open `/ops/` and confirm the state badge below makes sense. 2. Run the output tone. 3. Run live monitor with closed headphones only if local routing is in doubt. 4. Open `/kiosk/` and `/room/` before the public arrives. 5. Confirm intake and playback are not paused by mistake.</span>
+        </article>
+        <article class="component-card ready">
+          <strong>Closing posture</strong>
+          <span>1. Confirm no one is still recording. 2. Check for critical storage or queue warnings. 3. Back up or export if the day calls for handoff. 4. Leave a short steward note. 5. Use maintenance mode only if the node should stay explicitly out of service.</span>
         </article>
         <article class="component-card ready">
           <strong>Say this during live monitor</strong>
@@ -41,6 +45,7 @@
       <div class="shortcut-row">
         <a class="btn secondary link-btn" href="/kiosk/">Open kiosk</a>
         <a class="btn secondary link-btn" href="/room/">Open room playback</a>
+        <a class="btn secondary link-btn" href="/revoke/">Open participant revoke page</a>
         <a class="btn secondary link-btn" href="/admin/">Open admin</a>
         <a class="btn secondary link-btn" href="/healthz">Raw health JSON</a>
         <a class="btn secondary link-btn" href="/readyz">Cluster readiness JSON</a>
@@ -348,6 +353,10 @@
         <article class="component-card degraded">
           <strong>If there is no signal</strong>
           <span>Check browser microphone permission on `/ops/`, confirm the intended USB mic is the OS default, then test with a normal keyboard before assuming the kiosk HID path is related.</span>
+        </article>
+        <article class="component-card degraded">
+          <strong>If `/ops/` looks wrong but kiosk or room are fine</strong>
+          <span>Treat this as a steward-browser issue first: auth state, local browser audio permission, stale tab state, or the steward machine's own routing can fail without proving anything about the dedicated kiosk or room machines.</span>
         </article>
         <article class="component-card degraded">
           <strong>If there is feedback</strong>

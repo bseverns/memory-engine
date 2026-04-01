@@ -2,7 +2,7 @@
 
 Local-first “room memory” appliance: record a short sound offering, choose consent, receive a revoke code, and let the room replay contributions with **very light decay per access**. Nodes are offline/local-first by design.
 
-This repo now opens one layer wider: **Memory Engine is still the default deployment**, but it is treated as a memory-first deployment of a broader local-first artifact engine. This is an expansion, not a rebrand. The current runtime, routes, and operator flow stay intact while the config and docs now name future sibling deployments (`question`, `prompt`, `repair`, `witness`, `oracle`) that can be realized mostly through copy, metadata framing, and playback policy.
+This repo now opens one layer wider: **Memory Engine is still the canonical center and default deployment**. The current runtime, routes, and operator flow stay intact while the config and docs now name a small set of secondary deployment temperaments (`question`, `prompt`, `repair`, `witness`, `oracle`) that can be realized mostly through copy, metadata framing, and playback policy. This is an expansion, not a rebrand, and the shared architectural substrate remains internal language rather than the public face of the project.
 
 ## Documentation Site
 
@@ -11,6 +11,7 @@ The repo now includes an MkDocs manual so the machine has a real front door inst
 - docs landing page: [docs/index.md](docs/index.md)
 - role-based orientation: [docs/start-here.md](docs/start-here.md)
 - shortest system map: [docs/AT_A_GLANCE.md](docs/AT_A_GLANCE.md)
+- naming and deployment-status policy: [docs/NAMING.md](docs/NAMING.md)
 
 Serve the docs locally:
 
@@ -71,6 +72,12 @@ ENGINE_DEPLOYMENT=memory
 If unset, startup defaults to `memory`. If set to an unknown value, startup fails fast during config validation so operators see the mistake immediately.
 
 Practical intent: same routes and steward posture, different intake framing, copy, metadata expectations, and playback weighting.
+
+Current documentation posture:
+
+- `memory` is the stable home deployment
+- `question` and `repair` are the most developed secondary deployments
+- `prompt`, `witness`, and `oracle` remain more experimental and should be described that way
 
 ## Quick start
 1) Install Docker + Docker Compose.

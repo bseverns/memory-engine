@@ -14,6 +14,9 @@ Use it when the question is less about architecture and more about what a stewar
 
 ## Pages In This Branch
 
+- [FIRST_DAY_PACKET.md](./FIRST_DAY_PACKET.md): compact staff-facing opening, explanation, and closing packet
+- [HANDOFF_REHEARSAL.md](./HANDOFF_REHEARSAL.md): dated appliance, steward, pilot, and restore rehearsal log
+- [ARCHIVE_STEWARDSHIP.md](./ARCHIVE_STEWARDSHIP.md): short internal note on removal, revocation, and handoff posture
 - [participant-prompt-card.md](./participant-prompt-card.md): plain-language public handoff copy
 - [OPERATOR_DRILL_CARD.md](./OPERATOR_DRILL_CARD.md): shortest steward recovery ritual
 - [maintenance.md](./maintenance.md): operational runbook and caveats that stewards need when the short card is not enough
