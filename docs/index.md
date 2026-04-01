@@ -6,6 +6,25 @@ This documentation set is the machine's front door. Use it when you need to inst
 
 ![Recording kiosk idle](screenshots/recording-kiosk-idle.png){ .hero-shot }
 
+## The Machine In One Diagram
+
+```mermaid
+flowchart LR
+    kiosk["/kiosk/<br>recording station"] --> ingest["ingest + consent validation"]
+    ingest --> active["ACTIVE artifact<br>raw WAV in MinIO<br>metadata in Postgres"]
+    ingest --> ephemeral["EPHEMERAL artifact<br>one-time playback path"]
+    active --> room["/room/<br>weighted resurfacing"]
+    room --> wear["play_count + wear advance"]
+    active --> revoke["/revoke/<br>participant revocation"]
+    revoke --> removed["REVOKED<br>raw + derivatives cleared"]
+    active --> fossil["FOSSIL consent<br>derivatives and residue"]
+    fossil --> expiry["expiry + prune tasks"]
+    ephemeral --> once["single fetch"]
+    once --> removed
+```
+
+The key point is that Memory Engine is not only a recorder. It is a machine for truthful intake, bounded afterlife, and legible stewardship.
+
 ## What This Machine Is
 
 - a dedicated recording surface at `/kiosk/`
@@ -15,6 +34,13 @@ This documentation set is the machine's front door. Use it when you need to inst
 - a local-first runtime built around Django, Postgres, Redis, Celery, and MinIO
 
 Memory Engine remains the canonical center of the project. The deployment family exists so the same appliance can support closely related public rituals without turning into a generic platform.
+
+## What The Manual Adds Beyond The Repo Front Page
+
+- a role-based entry path instead of one long README
+- machine diagrams for ingest, playback, wear, expiry, and revocation
+- an explicit proof board for what this stack has already demonstrated and what still needs experimental validation
+- a clearer split between install-day guidance, steward rituals, architecture, and project direction
 
 ## Start With The Right Path
 
@@ -33,9 +59,15 @@ If you are stewarding a live node:
 If you are changing code or deployment behavior:
 
 - use [AT_A_GLANCE.md](./AT_A_GLANCE.md) for subsystem ownership and first knobs
+- use [memory-lifecycle.md](./memory-lifecycle.md) for the actual artifact path through the current stack
 - use [how-the-stack-works.md](./how-the-stack-works.md) for architecture
 - use [surface-contract.md](./surface-contract.md) for browser/API boundaries
 - use [DEPLOYMENT_BEHAVIORS.md](./DEPLOYMENT_BEHAVIORS.md) for deployment-specific grammar
+
+If you are deciding what still needs to be proven:
+
+- use [experimental-proofs.md](./experimental-proofs.md)
+- then cross-check [roadmap.md](./roadmap.md)
 
 ## Surface Map
 
@@ -54,10 +86,22 @@ If you are changing code or deployment behavior:
 - default deployment: `ENGINE_DEPLOYMENT=memory`
 - recommended install split: one kiosk machine, one room machine, one steward machine
 
+## Read These Next
+
+| If you need to understand... | Go here |
+|---|---|
+| the lifecycle of a memory as currently implemented | [memory-lifecycle.md](./memory-lifecycle.md) |
+| what the machine still needs experimental proof for | [experimental-proofs.md](./experimental-proofs.md) |
+| the main code ownership map | [AT_A_GLANCE.md](./AT_A_GLANCE.md) |
+| the full architecture and process split | [how-the-stack-works.md](./how-the-stack-works.md) |
+| deployment-specific behavior differences | [DEPLOYMENT_BEHAVIORS.md](./DEPLOYMENT_BEHAVIORS.md) |
+
 ## Documentation Map
 
 - [start-here.md](./start-here.md): role-based orientation
 - [AT_A_GLANCE.md](./AT_A_GLANCE.md): shortest machine map
+- [memory-lifecycle.md](./memory-lifecycle.md): ingest, playback, wear, expiry, and revoke diagrams
+- [experimental-proofs.md](./experimental-proofs.md): proof board for current and next validation passes
 - [maintenance.md](./maintenance.md): deploy, backup, restore, and repair commands
 - [UBUNTU_APPLIANCE.md](./UBUNTU_APPLIANCE.md): firewall and restart-on-boot host recipe
 - [how-the-stack-works.md](./how-the-stack-works.md): architecture and request flow

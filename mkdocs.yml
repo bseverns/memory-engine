@@ -1,6 +1,10 @@
 site_name: Memory Engine
 site_description: Local-first room memory appliance documentation
 docs_dir: docs
+plugins:
+  - search
+  - mermaid2:
+      javascript: javascripts/mermaid.min.js
 theme:
   name: readthedocs
 use_directory_urls: true
@@ -18,6 +22,8 @@ nav:
   - Start Here:
       - Orientation: start-here.md
       - At A Glance: AT_A_GLANCE.md
+      - Memory Lifecycle: memory-lifecycle.md
+      - Experimental Proofs: experimental-proofs.md
       - Installation Checklist: installation-checklist.md
       - Ubuntu Appliance: UBUNTU_APPLIANCE.md
       - Maintenance Runbook: maintenance.md
