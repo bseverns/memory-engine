@@ -317,7 +317,7 @@
           <h3>Live mic and output verification</h3>
         </div>
       </div>
-      <p class="stage-copy">This check stays inside the steward browser and never enters the archive. Use closed headphones or very low speaker gain before enabling live monitor to avoid feedback.</p>
+      <p class="stage-copy">This check stays inside the steward browser and never enters the archive. It proves the current steward browser's output and live mic routing only. It does not prove the dedicated kiosk recorder path or the separate room playback machine. Use closed headphones or very low speaker gain before enabling live monitor to avoid feedback.</p>
       <div class="shortcut-row">
         <button id="opsAudioTone" type="button" class="btn secondary">Play output tone</button>
         <button id="opsAudioMonitorStart" type="button" class="btn secondary">Start live monitor</button>
@@ -341,6 +341,10 @@
           <strong>Good routing sounds like</strong>
           <span>The tone is clean, the live meter moves quickly, the quiet line still registers, and the clap arrives as a clear transient without runaway feedback.</span>
         </article>
+        <article class="component-card ready">
+          <strong>What this check actually proves</strong>
+          <span>This steward machine can hear its current mic path and play local output cleanly. Treat it as a steward-browser routing check, not a full proof of kiosk or room hardware.</span>
+        </article>
         <article class="component-card degraded">
           <strong>If there is no signal</strong>
           <span>Check browser microphone permission on `/ops/`, confirm the intended USB mic is the OS default, then test with a normal keyboard before assuming the kiosk HID path is related.</span>
@@ -350,7 +354,7 @@
           <span>Stop monitor first. Then lower speaker gain or switch to headphones. Only return to live monitor after the output path is under control.</span>
         </article>
       </div>
-      <p id="opsAudioCheckStatus" class="shortcut">Use the tone first, then start live monitor if you need to hear the actual microphone path on this operator machine.</p>
+      <p id="opsAudioCheckStatus" class="shortcut">Use the tone first, then start live monitor if you need to hear the actual microphone path on this steward machine. This does not certify the separate kiosk or room browsers.</p>
     </section>
   </div>
 

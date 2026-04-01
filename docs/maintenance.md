@@ -120,7 +120,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `.github/workflows/check.yml` runs that same `scripts/check.sh` gate in GitHub Actions using a repo-local `.venv`, so CI stays aligned with the local check path.
 - `scripts/doctor.sh` checks `.env`, compose state, narrow API health through `/healthz`, broader cluster readiness through `/readyz`, and browser/TLS constraints that affect recording.
 - `scripts/browser_kiosk.sh` launches Chromium into `/kiosk/`, `/room/`, or `/ops/` with a repeatable kiosk-safe flag set. The `/room/` role adds autoplay-hardening flags automatically.
-- `/ops/` also now includes an operator-only monitor panel for output-tone checks and local live mic play-through. Use that surface, not `/kiosk/`, when you need to verify the real capture path through the current steward machine.
+- `/ops/` also now includes an operator-only monitor panel for output-tone checks and local live mic play-through. Use that surface, not `/kiosk/`, when you need to verify the current steward machine's local routing. Do not overread it as proof of the separate kiosk recorder or room playback machine.
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` and `/readyz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.
 - `scripts/restore.sh` restores one of those snapshots into the current stack and now asks for explicit confirmation plus a fresh pre-restore snapshot by default.
@@ -441,7 +441,7 @@ Use this as the quick triage table before drilling into longer logs:
 | `/ops/` says `broken` | failing warning card or dependency card | `./scripts/status.sh` |
 | Kiosk trigger appears dead after reboot | Chromium focus on `/kiosk/` | relaunch with `./scripts/browser_kiosk.sh --role kiosk --base-url ...` |
 | Room is silent | `/ops/` playback pause and `/room/` autoplay posture | clear pause state, then relaunch room browser |
-| Monitor path seems wrong | `/ops/` output tone then live monitor | verify browser mic permission and OS input device |
+| Monitor path seems wrong | `/ops/` output tone then live monitor | verify steward-browser mic permission and OS input device first; this does not prove the kiosk or room machines |
 | Storage is critical | `/ops/` storage card and host disk usage | run a backup, then clear non-essential local clutter intentionally |
 | Restore is needed | latest backup directory and export bundle | rehearse first if time permits, then run `./scripts/restore.sh --from ...` |
 

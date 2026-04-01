@@ -85,3 +85,17 @@ A deployment is defined by tuning these layers (not by rewriting the stack):
 - Keep the code inspectable and local-first.
 - Prefer small policy seams over heavyweight abstraction frameworks.
 - Add deployment hooks only where they have immediate operational use.
+
+## Strategic guardrail
+
+This repo must not drift into a generic "host many experiences" platform.
+
+The center of gravity stays here:
+
+- **Memory Engine** is the project and the canonical deployment.
+- sibling deployments only earn their place when they have a distinct public ritual, stewardship posture, and playback grammar
+- shared substrate language stays architectural and internal; it should not outrank the lived identity of the machine
+- if a new abstraction makes the system easier to describe as a framework than as a specific appliance, that abstraction is probably too broad
+
+The test for future expansion is not "could this be configurable?" It is
+"does this still feel like one inspectable machine with a strong center?"

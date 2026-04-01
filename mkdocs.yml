@@ -1,0 +1,36 @@
+site_name: Memory Engine
+site_description: Local-first room memory appliance documentation
+docs_dir: docs
+theme:
+  name: readthedocs
+use_directory_urls: true
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - toc:
+      permalink: true
+extra_css:
+  - stylesheets/docs.css
+nav:
+  - Home: index.md
+  - Start Here:
+      - Orientation: start-here.md
+      - At A Glance: AT_A_GLANCE.md
+      - Installation Checklist: installation-checklist.md
+      - Ubuntu Appliance: UBUNTU_APPLIANCE.md
+      - Maintenance Runbook: maintenance.md
+      - Operator Drill Card: OPERATOR_DRILL_CARD.md
+      - Multi-Machine Setup: multi-machine-setup.md
+  - Machine:
+      - How The Stack Works: how-the-stack-works.md
+      - Surface Contract: surface-contract.md
+      - Deployment Behaviors: DEPLOYMENT_BEHAVIORS.md
+      - Responsiveness: RESPONSIVENESS.md
+      - Hands-Free Controls: HANDS_FREE_CONTROLS.md
+  - Steward & Participant Materials:
+      - Participant Prompt Card: participant-prompt-card.md
+  - Project Direction:
+      - Mission Expansion: MISSION_EXPANSION.md
+      - Roadmap: roadmap.md

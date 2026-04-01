@@ -1,13 +1,36 @@
-# Memory Engine — Confessional Kiosk
+# Memory Engine
 
 Local-first “room memory” appliance: record a short sound offering, choose consent, receive a revoke code, and let the room replay contributions with **very light decay per access**. Nodes are offline/local-first by design.
 
 This repo now opens one layer wider: **Memory Engine is still the default deployment**, but it is treated as a memory-first deployment of a broader local-first artifact engine. This is an expansion, not a rebrand. The current runtime, routes, and operator flow stay intact while the config and docs now name future sibling deployments (`question`, `prompt`, `repair`, `witness`, `oracle`) that can be realized mostly through copy, metadata framing, and playback policy.
 
+## Documentation Site
+
+The repo now includes an MkDocs manual so the machine has a real front door instead of asking operators and maintainers to navigate raw repo structure first.
+
+- docs landing page: [docs/index.md](docs/index.md)
+- role-based orientation: [docs/start-here.md](docs/start-here.md)
+- shortest system map: [docs/AT_A_GLANCE.md](docs/AT_A_GLANCE.md)
+
+Serve the docs locally:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/pip install -r docs/requirements.txt
+./.venv/bin/mkdocs serve
+```
+
+Build the static docs site:
+
+```bash
+./.venv/bin/mkdocs build
+```
+
 ## Start Here
 
 If you need the shortest possible orientation:
 
+- docs front door and role-based manual: [docs/index.md](docs/index.md), [docs/start-here.md](docs/start-here.md)
 - first-glance system map and "which knob matters where": [docs/AT_A_GLANCE.md](docs/AT_A_GLANCE.md)
 - deploy, backup, restore, and troubleshooting commands: [docs/maintenance.md](docs/maintenance.md)
 - reference Ubuntu host recipe for firewall and restart-on-boot posture: [docs/UBUNTU_APPLIANCE.md](docs/UBUNTU_APPLIANCE.md)

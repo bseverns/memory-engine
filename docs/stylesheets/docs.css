@@ -1,0 +1,50 @@
+body {
+  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  color: #1f1d1a;
+}
+
+a {
+  color: #8a2f1d;
+}
+
+a:hover,
+a:focus {
+  color: #5f2116;
+}
+
+code,
+pre,
+kbd {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+h1,
+h2,
+h3 {
+  color: #24150f;
+  letter-spacing: 0.01em;
+}
+
+table {
+  width: 100%;
+}
+
+thead tr {
+  background: #f3e9dd;
+}
+
+tbody tr:nth-child(even) {
+  background: #faf6f1;
+}
+
+img {
+  border: 1px solid #d8c7b5;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(36, 21, 15, 0.08);
+}
+
+.hero-shot {
+  display: block;
+  margin: 1.5rem auto;
+  max-width: 960px;
+}

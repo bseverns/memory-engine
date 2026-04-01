@@ -398,7 +398,7 @@ def create_audio_artifact(request):
     return Response({
         "artifact": ArtifactSerializer(artifact).data,
         "revocation_token": token,
-        "revocation_url": "/kiosk/#revoke",
+        "revocation_url": "/revoke/",
     }, status=201)
 
 

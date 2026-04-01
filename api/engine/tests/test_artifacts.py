@@ -38,6 +38,7 @@ class ArtifactBehaviorTests(EngineTestCase):
         self.assertTrue(artifact.raw_uri.endswith("/audio.wav"))
         self.assertEqual(response.json()["artifact"]["id"], artifact.id)
         self.assertEqual(len(response.json()["revocation_token"]), 10)
+        self.assertEqual(response.json()["revocation_url"], "/revoke/")
         put_bytes_mock.assert_called_once()
 
     @override_settings(ENGINE_DEPLOYMENT="question")
