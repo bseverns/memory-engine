@@ -380,9 +380,23 @@ Restore cautions:
 Export bundle notes:
 
 - `scripts/export_bundle.sh --latest` packages the newest backup into `exports/`.
-- Each export includes the Postgres dump, MinIO archive, source manifest when available, a bundle manifest, `CHECKSUMS.txt`, `IMPORT-INSTRUCTIONS.txt`, and `artifact-summary.json` when the API container is available.
+- `scripts/export_bundle.sh --latest --to-usb /mount/point` also copies that archive onto a mounted USB path, verifies SHA-256 parity, and writes a sidecar `.sha256` file next to the copied archive.
+- Each export includes the Postgres dump, MinIO archive, source manifest when available, a bundle manifest, `CHECKSUMS.txt`, `IMPORT-INSTRUCTIONS.txt`, and anonymized summary stats (`anonymized-stats.json`, plus `artifact-summary.json` compatibility alias) when the API container is available.
 - The unpacked export bundle is itself a valid `scripts/restore.sh --from ...` source directory, so the handoff format stays aligned with the existing restore flow.
 - Use export bundles for migration, archival handoff, or off-machine storage where a single file is easier to manage than a backup folder.
+
+USB handoff ritual (fossils + anonymized stats):
+
+1. Insert and mount the USB drive on the steward host.
+2. Run:
+   `./scripts/export_bundle.sh --latest --to-usb /absolute/mount/path`
+3. Confirm the script prints both:
+   - `USB copy created: ...`
+   - `USB checksum file: ...`
+4. Optional double-check on that same mount:
+   - Linux: `sha256sum -c /absolute/mount/path/memory-engine-export-*.tgz.sha256`
+   - macOS: `shasum -a 256 /absolute/mount/path/memory-engine-export-*.tgz`
+5. Eject the USB drive only after the checksum step succeeds.
 
 Support bundle notes:
 
