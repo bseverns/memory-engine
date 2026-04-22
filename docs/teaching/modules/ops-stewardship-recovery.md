@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Position steward operations as part of the artwork's integrity, not only administration.
+Position steward operations as part of the artwork's integrity, not just administration.
 
 ## Steward Recovery Loop
 
@@ -31,7 +31,7 @@ flowchart LR
 
 1. Read current node status and warnings.
 2. Run one controlled degradation + recovery scenario.
-3. Produce a short steward handoff note.
+3. Produce a short steward handoff note with evidence.
 
 ## Reflection Prompts
 

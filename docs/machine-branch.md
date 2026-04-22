@@ -9,6 +9,7 @@ Use it when you need to understand which layer owns a behavior, where a policy l
 | Question | Read this first | Then go to |
 |---|---|---|
 | what process owns what responsibility | [how-the-stack-works.md](./how-the-stack-works.md) | [AT_A_GLANCE.md](./AT_A_GLANCE.md) |
+| where a code path lives in the full repo and what doc owns it | [repo-coverage-map.md](./repo-coverage-map.md) | [how-the-stack-works.md](./how-the-stack-works.md) |
 | where the browser/API boundary actually sits | [surface-contract.md](./surface-contract.md) | [how-the-stack-works.md](./how-the-stack-works.md) |
 | what changes between `memory`, `question`, `repair`, `prompt`, `witness`, and `oracle` | [DEPLOYMENT_BEHAVIORS.md](./DEPLOYMENT_BEHAVIORS.md) | [roadmap.md](./roadmap.md) |
 | what responsiveness the machine should preserve | [RESPONSIVENESS.md](./RESPONSIVENESS.md) | [DEPLOYMENT_BEHAVIORS.md](./DEPLOYMENT_BEHAVIORS.md) |

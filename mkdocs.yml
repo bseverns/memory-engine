@@ -23,6 +23,7 @@ nav:
       - Branch Overview: start-here-branch.md
       - Orientation: start-here.md
       - At A Glance: AT_A_GLANCE.md
+      - Repo Coverage Map: repo-coverage-map.md
       - Memory Lifecycle: memory-lifecycle.md
       - Experimental Proofs: experimental-proofs.md
       - Installation Checklist: installation-checklist.md
@@ -43,6 +44,35 @@ nav:
       - Handoff Rehearsal: HANDOFF_REHEARSAL.md
       - Archive Stewardship: ARCHIVE_STEWARDSHIP.md
       - Participant Prompt Card: participant-prompt-card.md
+  - Teaching & Evaluation:
+      - Branch Overview: teaching/index.md
+      - Instructor Guide: teaching/instructor-guide.md
+      - Learning Objectives: teaching/learning-objectives.md
+      - Modules:
+          - Room Memory As A System: teaching/modules/room-memory-as-a-system.md
+          - Local-First Architecture: teaching/modules/local-first-architecture.md
+          - Consent, Retention, And Revocation: teaching/modules/consent-retention-revocation.md
+          - Browser Surfaces And Public Interfaces: teaching/modules/browser-surfaces-public-interfaces.md
+          - Playback, Wear, And Composition: teaching/modules/playback-wear-composition.md
+          - Ops, Stewardship, And Recovery: teaching/modules/ops-stewardship-recovery.md
+          - Experimental Deployment And Evaluation: teaching/modules/experimental-deployment-evaluation.md
+          - Ethics, Public Memory, And Research Boundaries: teaching/modules/ethics-public-memory-boundaries.md
+      - Labs:
+          - Trace A Memory Through The Stack: teaching/labs/trace-memory-through-stack.md
+          - Run A Consent And Revocation Audit: teaching/labs/consent-revocation-audit.md
+          - Observe Room Playback Behavior: teaching/labs/observe-room-playback-behavior.md
+          - Perform An Ops Recovery Drill: teaching/labs/ops-recovery-drill.md
+          - Compare Deployment Temperaments: teaching/labs/compare-deployment-temperaments.md
+          - Run A Participant Comprehension Check: teaching/labs/participant-comprehension-check.md
+      - Glossary: teaching/glossary.md
+      - Discussion Prompts: teaching/discussion-prompts.md
+      - Assessment Rubric: teaching/assessment-rubric.md
+      - Templates:
+          - Pilot Notes Template: teaching/templates/pilot-notes-template.md
+          - Steward Handoff Template: teaching/templates/steward-handoff-template.md
+          - Install Rehearsal Template: teaching/templates/install-rehearsal-template.md
+          - Restore Drill Template: teaching/templates/restore-drill-template.md
+          - Participant Comprehension Template: teaching/templates/participant-comprehension-template.md
   - Project Direction:
       - Branch Overview: project-direction-branch.md
       - Naming Policy: NAMING.md

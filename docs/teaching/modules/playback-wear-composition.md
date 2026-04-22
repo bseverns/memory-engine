@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Teach room playback as a compositional system with operational constraints.
+Teach room playback as a compositional system with explicit operational constraints.
 
 ## Playback Composition Loop
 
@@ -26,7 +26,7 @@ flowchart LR
 
 - Playback is weighted resurfacing, not random shuffle.
 - Wear and play count shape recurrence and texture over time.
-- Deployment temperament changes room feel while keeping one machine contract.
+- Deployment temperament changes room feel while preserving one machine contract.
 
 ## In-Class Flow (35-50 min)
 

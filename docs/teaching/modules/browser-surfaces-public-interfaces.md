@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Understand the multi-surface installation as a social-technical contract.
+Explain how the four browser surfaces form a social and technical contract.
 
 ## Multi-Surface Interaction Flow
 
@@ -31,15 +31,18 @@ sequenceDiagram
 
 ## Key Ideas
 
-- `/kiosk/` captures offerings, `/room/` performs memory, `/ops/` tends the machine, `/revoke/` preserves participant agency.
-- Surface separation reduces role confusion and protects stewardship boundaries.
+- `/kiosk/` captures offerings.
+- `/room/` performs memory.
+- `/ops/` tends the machine.
+- `/revoke/` preserves participant agency.
+- Clear surface separation reduces role confusion and protects stewardship boundaries.
 - Public interface quality includes pacing, language, and recovery behavior.
 
 ## In-Class Flow (30-45 min)
 
 1. Assign roles (participant, steward, maintainer).
-2. Simulate one full pass across surfaces.
-3. Document where role confusion appears.
+2. Simulate one complete pass across surfaces.
+3. Document where role confusion appears and why.
 
 ## Reflection Prompts
 

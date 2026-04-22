@@ -71,6 +71,7 @@ If you are stewarding a live node:
 If you are changing code or deployment behavior:
 
 - use [AT_A_GLANCE.md](./AT_A_GLANCE.md) for subsystem ownership and first knobs
+- use [repo-coverage-map.md](./repo-coverage-map.md) for full repo path-to-doc coverage
 - use [memory-lifecycle.md](./memory-lifecycle.md) for the actual artifact path through the current stack
 - use [how-the-stack-works.md](./how-the-stack-works.md) for architecture
 - use [surface-contract.md](./surface-contract.md) for browser/API boundaries
@@ -107,6 +108,7 @@ If you are teaching, training stewards, or running bounded evaluations:
 
 | If you need to understand... | Go here |
 |---|---|
+| where every top-level repo path fits and which doc owns it | [repo-coverage-map.md](./repo-coverage-map.md) |
 | the lifecycle of a memory as currently implemented | [memory-lifecycle.md](./memory-lifecycle.md) |
 | what the machine still needs experimental proof for | [experimental-proofs.md](./experimental-proofs.md) |
 | the main code ownership map | [AT_A_GLANCE.md](./AT_A_GLANCE.md) |
@@ -118,6 +120,7 @@ If you are teaching, training stewards, or running bounded evaluations:
 - [start-here-branch.md](./start-here-branch.md): navigation hub for install and orientation docs
 - [start-here.md](./start-here.md): role-based orientation
 - [AT_A_GLANCE.md](./AT_A_GLANCE.md): shortest machine map
+- [repo-coverage-map.md](./repo-coverage-map.md): end-to-end repo path map and ownership links
 - [memory-lifecycle.md](./memory-lifecycle.md): ingest, playback, wear, expiry, and revoke diagrams
 - [experimental-proofs.md](./experimental-proofs.md): proof board for current and next validation passes
 - [maintenance.md](./maintenance.md): deploy, backup, restore, and repair commands

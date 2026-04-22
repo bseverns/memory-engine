@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Introduce Memory Engine as a coherent system where intake, resurfacing, stewardship, and revocation are one machine, not separate apps.
+Introduce Memory Engine as one coherent machine where intake, resurfacing, stewardship, and revocation stay connected.
 
 ## System Flow
 
@@ -27,8 +27,8 @@ flowchart LR
 ## Key Ideas
 
 - Room Memory is participant-facing language for a bounded machine.
-- The machine has four public/steward surfaces with distinct roles.
-- System trust depends on lifecycle legibility, not only uptime.
+- The machine has four surfaces with distinct public and steward roles.
+- Trust depends on lifecycle legibility, not only uptime.
 
 ## In-Class Flow (30-45 min)
 

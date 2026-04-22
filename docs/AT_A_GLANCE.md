@@ -7,6 +7,8 @@ Use this file when you need the shortest practical map of the machine:
 - which settings usually matter first
 - what to inspect when something starts to drift or fail
 
+If you need full top-level repo coverage (including scripts, tests, CI, generated paths, and optional sidecars), use [repo-coverage-map.md](./repo-coverage-map.md).
+
 If you need installation-day steps, use [maintenance.md](./maintenance.md).
 If you need the current host-firewall and restart-on-boot recipe, use [UBUNTU_APPLIANCE.md](./UBUNTU_APPLIANCE.md).
 If you need full architecture detail, use [how-the-stack-works.md](./how-the-stack-works.md).

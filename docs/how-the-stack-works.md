@@ -532,7 +532,7 @@ The room-loop handoff between browser and server looks like this:
 
 ```mermaid
 sequenceDiagram
-    participant Loop as Listening surface room loop
+    participant RoomClient as Listening surface room loop
     participant Local as localStorage anti-repeat window
     participant API as Django /api/v1/pool/next
     participant DB as Postgres
@@ -540,19 +540,19 @@ sequenceDiagram
     participant MinIO as MinIO
     participant Audio as Web Audio playback
 
-    Loop->>Local: read recent artifact IDs
-    Loop->>API: GET /pool/next?lane=...&mood=...&exclude_ids=...
+    RoomClient->>Local: read recent artifact IDs
+    RoomClient->>API: GET /pool/next?lane=...&mood=...&exclude_ids=...
     API->>DB: query ACTIVE playable artifacts
-    API-->>Loop: artifact_id, wear, audio_url, playback_ack_url, pool_size
-    Loop->>Local: persist selected artifact_id
-    Loop->>Blob: GET /media/raw/<token>
+    API-->>RoomClient: artifact_id, wear, audio_url, playback_ack_url, pool_size
+    RoomClient->>Local: persist selected artifact_id
+    RoomClient->>Blob: GET /media/raw/<token>
     Blob->>MinIO: stream raw WAV or essence residue
     MinIO-->>Blob: playable audio stream
-    Blob-->>Loop: no-store audio response
-    Loop->>Audio: apply wear-based playback chain
-    Loop->>API: POST /pool/heard/<token>
+    Blob-->>RoomClient: no-store audio response
+    RoomClient->>Audio: apply wear-based playback chain
+    RoomClient->>API: POST /pool/heard/<token>
     API->>DB: update play_count, wear, last_access_at
-    Audio-->>Loop: finish cue / continue movement
+    Audio-->>RoomClient: finish cue / continue movement
 ```
 
 ## Browser-side room loop

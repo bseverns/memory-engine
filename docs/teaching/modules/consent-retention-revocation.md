@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Teach consent modes as storage/afterlife policy, not only UI choices.
+Teach consent modes as storage and afterlife policy, not just UI choices.
 
 ## Consent And Retention Flow
 

@@ -11,6 +11,7 @@ The repo now includes an MkDocs manual so the machine has a real front door inst
 - docs landing page: [docs/index.md](docs/index.md)
 - role-based orientation: [docs/start-here.md](docs/start-here.md)
 - shortest system map: [docs/AT_A_GLANCE.md](docs/AT_A_GLANCE.md)
+- full repo path-to-doc coverage map: [docs/repo-coverage-map.md](docs/repo-coverage-map.md)
 - naming and deployment-status policy: [docs/NAMING.md](docs/NAMING.md)
 
 Serve the docs locally:
