@@ -43,6 +43,13 @@ next to the machine.
 4. Run `./scripts/status.sh`.
 5. If needed, use `./scripts/support_bundle.sh` before changing too much.
 
+## Stale Framing Cleanup (30 Seconds)
+
+1. Open `/ops/` (or `/ops/bench/`).
+2. Press `Clear session framing`.
+3. Confirm the status line says no session framing/focus overrides are active.
+4. If it does not clear, refresh once and repeat.
+
 ## If Storage Looks Critical
 
 1. Open `/ops/`.
@@ -58,6 +65,12 @@ next to the machine.
 3. Run `./scripts/restore.sh --from backups/...`.
 4. Re-open `/ops/`, `/kiosk/`, and `/room/`.
 5. Make one short test recording before reopening to the public.
+
+## End-Session Archive (Quick)
+
+1. On the host shell, run `./scripts/session_close_archive.sh`.
+2. For USB handoff, run `./scripts/session_close_archive.sh --to-usb /absolute/mount/path`.
+3. Copy the printed backup/export paths into steward notes.
 
 ## Before Opening To The Public
 

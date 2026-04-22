@@ -14,6 +14,7 @@ It is not the same thing as the roadmap. The roadmap says what the project may s
 | `question` and `repair` stewardship changes produce audible room differences | `/ops/` quick status actions only matter if the room actually responds | deployment policy, thread signals, status pickers, room-loop behavior | run a short annotated playback session and log whether status changes alter recurrence within the expected horizon | `TODO` |
 | Ubuntu appliance bootstrap reduces install-day drift | First deployment depends more on reproducible host posture than elegant scripts | Ubuntu bootstrap script and host recipe docs | rehearse from a fresh `Ubuntu Server 24.04.4 LTS` image and record exact elapsed time plus surprises | `TODO` |
 | `/ops/` monitor check language prevents false confidence | Stewards should not mistake local browser routing proof for whole-system proof | sharper `/ops/` wording and runbook warnings | ask a new steward to explain what the monitor check proves after using it once | `TODO` |
+| Stewards clear session framing/focus reliably at close and complete archive flow under time pressure | stale session framing and missed end-of-day archives are soft trust failures | bounded clear action on `/ops/` + `/ops/bench/`, guided archive command card, close-of-day wrapper script | run timed close drill with non-author stewards; record skipped steps, command errors, and note quality | `TODO` |
 | Coverage gate plus default Playwright slice catch common regressions before deploy | The stack now claims a testing-ready posture | CI gate, Python/Node coverage thresholds, browser subset | track the next several regressions and note whether the default gate would have caught them | `PARTIAL` |
 
 ## Good Experimental Passes To Run Next
@@ -23,6 +24,7 @@ It is not the same thing as the roadmap. The roadmap says what the project may s
 - Record the same small prompt set under `memory`, `question`, and `repair`, then compare prompt-pack effect, room resurfacing, and operator posture.
 - Flip `question` and `repair` lifecycle statuses in `/ops/` during a controlled room session and note the audible recurrence delay.
 - Rehearse a fresh Ubuntu appliance bootstrap from blank host to serviceable `/kiosk/`, `/room/`, and `/ops/`.
+- Run three timed close-of-day drills and log whether stewards clear framing/focus, run archive command correctly, and record resulting paths without prompting.
 
 ## Evidence To Capture During Each Pass
 

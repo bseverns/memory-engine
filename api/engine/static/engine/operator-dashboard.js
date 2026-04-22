@@ -581,6 +581,75 @@
     return "";
   }
 
+  function buildArchiveCommand(usbPath = "") {
+    const trimmedUsbPath = String(usbPath || "").trim();
+    if (!trimmedUsbPath) {
+      return "./scripts/session_close_archive.sh";
+    }
+    return `./scripts/session_close_archive.sh --to-usb "${trimmedUsbPath}"`;
+  }
+
+  function hasSessionFraming(state = {}) {
+    return Boolean(
+      String(state.session_theme_title || "").trim()
+      || String(state.session_theme_prompt || "").trim()
+      || String(state.deployment_focus_topic || "").trim()
+      || String(state.deployment_focus_status || "").trim(),
+    );
+  }
+
+  function renderSessionFramingStatus(dom, state = {}) {
+    if (!dom.opsSessionFramingStatus) {
+      return;
+    }
+    const labels = [];
+    if (String(state.session_theme_title || "").trim()) {
+      labels.push(`theme title: ${String(state.session_theme_title).trim()}`);
+    }
+    if (String(state.session_theme_prompt || "").trim()) {
+      labels.push("theme framing line set");
+    }
+    if (String(state.deployment_focus_topic || "").trim()) {
+      labels.push(`focus topic: ${String(state.deployment_focus_topic).trim()}`);
+    }
+    if (String(state.deployment_focus_status || "").trim()) {
+      labels.push(`focus status: ${String(state.deployment_focus_status).trim()}`);
+    }
+    dom.opsSessionFramingStatus.textContent = labels.length
+      ? `Session framing active: ${labels.join(", ")}.`
+      : "No session framing/focus overrides are active.";
+  }
+
+  function archiveReadinessLine(payload = {}) {
+    const warningCount = Array.isArray(payload.warnings) ? payload.warnings.length : 0;
+    const operatorState = payload.operator_state || {};
+    const check = classifyState(payload);
+    const parts = [];
+    if (check.state === "broken") {
+      parts.push("node is broken");
+    } else if (check.state === "degraded") {
+      parts.push("node is degraded");
+    } else {
+      parts.push("node is ready");
+    }
+    if (warningCount > 0) {
+      parts.push(`${warningCount} warning${warningCount === 1 ? "" : "s"}`);
+    }
+    if (operatorState.maintenance_mode) {
+      parts.push("maintenance mode active");
+    }
+    if (operatorState.intake_paused || operatorState.playback_paused) {
+      parts.push("some live paths paused");
+    }
+    return `Archive cue: ${parts.join(" · ")}.`;
+  }
+
+  function renderArchiveCommand(dom, command = "./scripts/session_close_archive.sh") {
+    if (dom.opsArchiveCommand) {
+      dom.opsArchiveCommand.textContent = command;
+    }
+  }
+
   function collectDom(doc) {
     return {
       opsStateBadge: doc.getElementById("opsStateBadge"),
@@ -624,7 +693,14 @@
       opsKioskReducedMotion: doc.getElementById("opsKioskReducedMotion"),
       opsKioskMaxRecordingSeconds: doc.getElementById("opsKioskMaxRecordingSeconds"),
       opsControlsSave: doc.getElementById("opsControlsSave"),
+      opsClearSessionFraming: doc.getElementById("opsClearSessionFraming"),
       opsControlStatus: doc.getElementById("opsControlStatus"),
+      opsSessionFramingStatus: doc.getElementById("opsSessionFramingStatus"),
+      opsArchiveReadiness: doc.getElementById("opsArchiveReadiness"),
+      opsArchiveUsbPath: doc.getElementById("opsArchiveUsbPath"),
+      opsArchiveCommandBuild: doc.getElementById("opsArchiveCommandBuild"),
+      opsArchiveCommandCopy: doc.getElementById("opsArchiveCommandCopy"),
+      opsArchiveCommand: doc.getElementById("opsArchiveCommand"),
       opsRecentActions: doc.getElementById("opsRecentActions"),
       opsArtifactMetadata: doc.getElementById("opsArtifactMetadata"),
       opsArtifactMetadataStatus: doc.getElementById("opsArtifactMetadataStatus"),
@@ -730,11 +806,15 @@
     replaceCardList(doc, dom.opsThrottleSummary, throttleCards(payload.throttles));
     replaceCardList(doc, dom.opsComponents, componentCards(payload.components || {}));
     renderOperatorState(dom, payload.operator_state || {});
+    if (dom.opsArchiveReadiness) {
+      dom.opsArchiveReadiness.textContent = archiveReadinessLine(payload);
+    }
     dom.opsRefreshed.textContent = `Last refreshed ${new Date().toLocaleTimeString()}`;
   }
 
   function renderControlPayload(doc, dom, payload) {
     renderOperatorState(dom, payload.operator_state || {}, payload.deployment_controls || null);
+    renderSessionFramingStatus(dom, payload.operator_state || {});
     replaceCardList(doc, dom.opsRecentActions, actionCards(payload.recent_actions || []));
     if (dom.opsControlStatus) {
       const state = payload.operator_state || {};
@@ -994,12 +1074,22 @@
   function start({ doc = document, fetchImpl = fetch, intervalMs = 10000 } = {}) {
     const dom = collectDom(doc);
     const initialState = readJsonScript(doc, "ops-operator-state", {});
+    let latestStatusPayload = {
+      components: {},
+      warnings: [],
+      operator_state: initialState,
+    };
     const audioMonitor = createAudioMonitorController({
       onLevelChange(level) {
         renderAudioMonitorLevel(dom, level);
       },
     });
     renderOperatorState(dom, initialState);
+    renderSessionFramingStatus(dom, initialState);
+    renderArchiveCommand(dom, buildArchiveCommand(""));
+    if (dom.opsArchiveReadiness) {
+      dom.opsArchiveReadiness.textContent = archiveReadinessLine(latestStatusPayload);
+    }
     replaceCardList(doc, dom.opsRecentActions, actionCards([]));
     renderAudioMonitorLevel(dom, 0);
     if (!audioMonitor.supportsLiveMonitor()) {
@@ -1016,6 +1106,7 @@
     async function refreshStatus() {
       try {
         const payload = await fetchJson(fetchImpl, "/api/v1/node/status", { cache: "no-store" });
+        latestStatusPayload = payload;
         renderPayload(doc, dom, payload);
       } catch (error) {
         renderError(doc, dom, error);
@@ -1025,6 +1116,10 @@
     async function refreshControls() {
       try {
         const payload = await fetchJson(fetchImpl, "/api/v1/operator/controls", { cache: "no-store" });
+        latestStatusPayload = {
+          ...(latestStatusPayload || {}),
+          operator_state: payload.operator_state || {},
+        };
         renderControlPayload(doc, dom, payload);
       } catch (error) {
         if (dom.opsControlStatus) {
@@ -1108,6 +1203,10 @@
             kiosk_max_recording_seconds: Number(dom.opsKioskMaxRecordingSeconds?.value || 120),
           }),
         });
+        latestStatusPayload = {
+          ...(latestStatusPayload || {}),
+          operator_state: payload.operator_state || {},
+        };
         renderControlPayload(doc, dom, payload);
         await refreshStatus();
         await refreshArtifacts();
@@ -1120,9 +1219,93 @@
       }
     }
 
+    async function clearSessionFraming() {
+      if (dom.opsClearSessionFraming) {
+        dom.opsClearSessionFraming.disabled = true;
+      }
+      if (dom.opsSessionFramingStatus) {
+        dom.opsSessionFramingStatus.textContent = "Clearing session framing and deployment focus...";
+      }
+      try {
+        const payload = await fetchJson(fetchImpl, "/api/v1/operator/controls", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": readCookie(doc, "csrftoken"),
+          },
+          body: JSON.stringify({
+            session_theme_title: "",
+            session_theme_prompt: "",
+            deployment_focus_topic: "",
+            deployment_focus_status: "",
+          }),
+        });
+        latestStatusPayload = {
+          ...(latestStatusPayload || {}),
+          operator_state: payload.operator_state || {},
+        };
+        renderControlPayload(doc, dom, payload);
+        await refreshStatus();
+      } catch (error) {
+        if (dom.opsSessionFramingStatus) {
+          dom.opsSessionFramingStatus.textContent = error.message || "Could not clear session framing.";
+        }
+      } finally {
+        if (dom.opsClearSessionFraming) {
+          dom.opsClearSessionFraming.disabled = false;
+        }
+      }
+    }
+
     if (dom.opsControlsForm) {
       dom.opsControlsForm.addEventListener("submit", (event) => {
         void saveControls(event);
+      });
+    }
+
+    if (dom.opsClearSessionFraming) {
+      dom.opsClearSessionFraming.addEventListener("click", () => {
+        void clearSessionFraming();
+      });
+    }
+
+    function applyArchiveCommandFromInput() {
+      const command = buildArchiveCommand(dom.opsArchiveUsbPath?.value || "");
+      renderArchiveCommand(dom, command);
+      return command;
+    }
+
+    if (dom.opsArchiveCommandBuild) {
+      dom.opsArchiveCommandBuild.addEventListener("click", () => {
+        applyArchiveCommandFromInput();
+      });
+    }
+
+    if (dom.opsArchiveUsbPath) {
+      dom.opsArchiveUsbPath.addEventListener("input", () => {
+        applyArchiveCommandFromInput();
+      });
+    }
+
+    if (dom.opsArchiveCommandCopy) {
+      dom.opsArchiveCommandCopy.addEventListener("click", async () => {
+        const command = applyArchiveCommandFromInput();
+        if (!globalObjectRef.navigator?.clipboard?.writeText) {
+          if (dom.opsArchiveReadiness) {
+            dom.opsArchiveReadiness.textContent = "Clipboard API unavailable. Copy the command manually.";
+          }
+          return;
+        }
+        try {
+          await globalObjectRef.navigator.clipboard.writeText(command);
+          if (dom.opsArchiveReadiness) {
+            dom.opsArchiveReadiness.textContent = `${archiveReadinessLine(latestStatusPayload)} Command copied.`;
+          }
+        } catch (error) {
+          if (dom.opsArchiveReadiness) {
+            dom.opsArchiveReadiness.textContent = "Could not copy archive command. Copy manually instead.";
+          }
+        }
       });
     }
 
@@ -1213,6 +1396,8 @@
 
   return {
     actionCards,
+    archiveReadinessLine,
+    buildArchiveCommand,
     classifyState,
     componentCards,
     createAudioMonitorController,

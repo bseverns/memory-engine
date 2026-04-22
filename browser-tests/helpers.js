@@ -83,14 +83,19 @@ async function mockHealthyOpsStatus(page, overrides = {}) {
   });
 }
 
-async function signIntoOps(page) {
+async function signIntoOps(page, { surface = "bench" } = {}) {
   await page.goto("/ops/");
   const loginHeading = page.getByRole("heading", { name: "Steward sign-in" });
   if (await loginHeading.isVisible().catch(() => false)) {
     await page.getByLabel("Shared steward secret").fill(PLAYWRIGHT_OPS_SECRET);
     await page.getByRole("button", { name: "Open dashboard" }).click();
   }
-  await expect(page.getByRole("heading", { name: "Room Memory Status" })).toBeVisible();
+  if (surface === "bench") {
+    await page.goto("/ops/bench/");
+    await expect(page.getByRole("heading", { name: "Room Memory Status" })).toBeVisible();
+    return;
+  }
+  await expect(page.getByRole("heading", { name: "Room Memory Steward Surface" })).toBeVisible();
 }
 
 function fossilDataUrl(label = "Fossil Drift") {
@@ -157,7 +162,7 @@ async function applyStewardControls(page, {
   kioskReducedMotion = false,
   kioskMaxRecordingSeconds = 120,
 } = {}) {
-  await signIntoOps(page);
+  await signIntoOps(page, { surface: "bench" });
   await expect(page.locator("#opsControlStatus")).not.toContainText("Controls are loading.");
   await setCheckboxState(page.locator("#opsIntakePaused"), intakePaused);
   await setCheckboxState(page.locator("#opsPlaybackPaused"), playbackPaused);

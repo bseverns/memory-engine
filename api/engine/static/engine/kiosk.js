@@ -216,74 +216,8 @@ function currentLanguageCode() {
   return kioskCopyApi.resolveLanguageCode(surfaceState.kiosk_language_code, DEFAULT_LANGUAGE_CODE);
 }
 
-function activeSessionTheme() {
-  const title = String(surfaceState.session_theme_title || "").trim().slice(0, 64);
-  const prompt = String(surfaceState.session_theme_prompt || "").trim().slice(0, 180);
-  const label = title || prompt;
-  return {
-    active: Boolean(label),
-    title,
-    prompt,
-    label,
-  };
-}
-
-function appendCopyLine(base, addon) {
-  const baseText = String(base || "").trim();
-  const addonText = String(addon || "").trim();
-  if (!addonText) return baseText;
-  if (!baseText) return addonText;
-  return `${baseText} ${addonText}`;
-}
-
 function withSessionThemeFraming(basePack) {
-  const theme = activeSessionTheme();
-  if (!theme.active) return basePack;
-
-  const promptSuffix = theme.title && theme.prompt ? ` ${theme.prompt}` : "";
-  const values = {
-    title: theme.label,
-    prompt: theme.prompt,
-    prompt_suffix: promptSuffix,
-  };
-  const format = kioskCopyApi.formatMessage;
-
-  const themedPack = { ...basePack };
-  themedPack.stageIdleCopy = appendCopyLine(
-    basePack.stageIdleCopy,
-    format(basePack.sessionThemeIdleAddon, values),
-  );
-  themedPack.stageReviewCopy = appendCopyLine(
-    basePack.stageReviewCopy,
-    format(basePack.sessionThemeReviewAddon, values),
-  );
-  themedPack.promptPackLead = appendCopyLine(
-    basePack.promptPackLead,
-    format(basePack.sessionThemePromptLeadAddon, values),
-  );
-
-  const themeLine = String(format(basePack.sessionThemePromptLine, values) || "").trim();
-  const promptLines = Array.isArray(basePack.promptPackLines) ? [...basePack.promptPackLines] : [];
-  if (themeLine) {
-    promptLines.unshift(themeLine);
-  }
-  themedPack.promptPackLines = promptLines;
-  if (!String(themedPack.promptPackKicker || "").trim()) {
-    themedPack.promptPackKicker = String(basePack.sessionThemePromptKicker || "").trim();
-  }
-
-  const modes = basePack.modes || {};
-  themedPack.modes = Object.fromEntries(
-    Object.entries(modes).map(([modeCode, modePack]) => {
-      const nextModePack = { ...(modePack || {}) };
-      nextModePack.reviewCopy = appendCopyLine(
-        modePack?.reviewCopy,
-        format(basePack.sessionThemeSubmissionAddon, values),
-      );
-      return [modeCode, nextModePack];
-    }),
-  );
-  return themedPack;
+  return kioskCopyApi.applySessionThemeFraming(basePack, surfaceState);
 }
 
 function currentCopy() {

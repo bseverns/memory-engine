@@ -48,3 +48,33 @@ test("memory, question, prompt, and repair deployments expose prompt-pack copy",
     assert.equal(pack.promptPackLines.length, 3);
   }
 });
+
+test("applySessionThemeFraming augments kiosk idle/review/prompt and mode copy", () => {
+  const copy = loadCopyApi();
+  const base = copy.getDeploymentPack("en", "memory");
+
+  const themed = copy.applySessionThemeFraming(base, {
+    session_theme_title: "Arrival and thresholds",
+    session_theme_prompt: "Offer one small sound about crossing into this room.",
+  });
+
+  assert.notEqual(themed.stageIdleCopy, base.stageIdleCopy);
+  assert.match(themed.stageIdleCopy, /Session theme: Arrival and thresholds/);
+  assert.notEqual(themed.stageReviewCopy, base.stageReviewCopy);
+  assert.match(themed.promptPackLead, /Current theme: Arrival and thresholds/);
+  assert.equal(Array.isArray(themed.promptPackLines), true);
+  assert.ok(themed.promptPackLines.length >= 1);
+  assert.match(themed.promptPackLines[0], /Session theme cue: Arrival and thresholds/);
+  assert.match(themed.modes.ROOM.reviewCopy, /Session theme: Arrival and thresholds/);
+});
+
+test("applySessionThemeFraming is a no-op when theme fields are empty", () => {
+  const copy = loadCopyApi();
+  const base = copy.getDeploymentPack("en", "memory");
+  const themed = copy.applySessionThemeFraming(base, {
+    session_theme_title: "",
+    session_theme_prompt: "",
+  });
+
+  assert.equal(themed, base);
+});

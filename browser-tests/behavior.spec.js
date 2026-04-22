@@ -179,7 +179,7 @@ async function mockOperatorAudio(page) {
 
 test.describe("browser behavior contracts", () => {
   test("operator dashboard renders the real node status payload", async ({ page }) => {
-    await signIntoOps(page);
+    await signIntoOps(page, { surface: "bench" });
 
     await expect(page.locator("#opsStateLabel")).not.toHaveText("Checking...");
     await expect(page.locator("#opsComponents")).toContainText("database");
@@ -188,6 +188,36 @@ test.describe("browser behavior contracts", () => {
     await expect(page.locator("#opsComponents")).toContainText("worker");
     await expect(page.locator("#opsComponents")).not.toContainText("Unable to reach /api/v1/node/status");
     await expect(page.locator("#opsIngestRate")).toContainText("180/hour");
+  });
+
+  test("session framing clears cleanly and lite archive card builds deterministic commands", async ({ page }) => {
+    await signIntoOps(page, { surface: "bench" });
+
+    await page.locator("#opsSessionThemeTitle").fill("Arrival and thresholds");
+    await page.locator("#opsSessionThemePrompt").fill("Offer one small sound about crossing into this room.");
+    await page.locator("#opsDeploymentFocusTopic").fill("entry_gate");
+    await page.locator("#opsDeploymentFocusStatus").selectOption("open");
+    await page.locator("#opsControlsSave").click();
+    await expect(page.locator("#opsControlStatus")).toContainText("theme: Arrival and thresholds");
+
+    const kioskPage = await page.context().newPage();
+    await kioskPage.goto("/kiosk/");
+    await expect(kioskPage.locator("#stageCopy")).toContainText("Session theme: Arrival and thresholds");
+    await kioskPage.close();
+
+    await page.locator("#opsClearSessionFraming").click();
+    await expect(page.locator("#opsSessionFramingStatus")).toContainText("No session framing/focus overrides are active.");
+    await expect(page.locator("#opsSessionThemeTitle")).toHaveValue("");
+    await expect(page.locator("#opsSessionThemePrompt")).toHaveValue("");
+    await expect(page.locator("#opsDeploymentFocusTopic")).toHaveValue("");
+    await expect(page.locator("#opsDeploymentFocusStatus")).toHaveValue("");
+
+    await page.goto("/ops/");
+    await expect(page.getByRole("heading", { name: "Room Memory Steward Surface" })).toBeVisible();
+    await expect(page.locator("#opsLiteArchiveCommand")).toContainText("./scripts/session_close_archive.sh");
+    await page.locator("#opsLiteArchiveUsbPath").fill("/media/steward/SESSION_ARCHIVE");
+    await page.locator("#opsLiteArchiveCommandBuild").click();
+    await expect(page.locator("#opsLiteArchiveCommand")).toContainText("--to-usb \"/media/steward/SESSION_ARCHIVE\"");
   });
 
   test("playback info lightbox opens and closes cleanly", async ({ page }) => {

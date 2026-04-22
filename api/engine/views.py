@@ -107,14 +107,16 @@ def revocation_view(request):
     })
 
 
-def operator_dashboard_view(request):
+def _operator_dashboard_auth_gate(request, *, success_redirect_name: str):
     allowlist_enabled = bool(operator_allowed_networks())
+    login_action = request.path or "/ops/"
 
     if not operator_request_allowed(request):
         return render(request, "engine/operator_login.html", {
             "error": "This network is not allowed to access steward controls.",
             "operator_configured": operator_secret_configured(),
             "allowlist_enabled": allowlist_enabled,
+            "login_action": login_action,
         }, status=403)
 
     if request.method == "POST":
@@ -123,12 +125,13 @@ def operator_dashboard_view(request):
                 "error": "Too many failed sign-in attempts. Wait before trying again.",
                 "operator_configured": operator_secret_configured(),
                 "allowlist_enabled": allowlist_enabled,
+                "login_action": login_action,
             }, status=429)
         secret = request.POST.get("secret", "")
         if authenticate_operator_secret(secret):
             clear_failed_operator_logins(request)
             start_operator_session(request)
-            return redirect("operator-dashboard")
+            return redirect(success_redirect_name)
         note_failed_operator_login(request)
         status_code = 429 if operator_login_locked_out(request) else 403
         return render(request, "engine/operator_login.html", {
@@ -136,6 +139,7 @@ def operator_dashboard_view(request):
             if status_code == 429 else "The steward secret did not match.",
             "operator_configured": operator_secret_configured(),
             "allowlist_enabled": allowlist_enabled,
+            "login_action": login_action,
         }, status=status_code)
 
     if not operator_session_active(request):
@@ -143,11 +147,15 @@ def operator_dashboard_view(request):
             "error": "",
             "operator_configured": operator_secret_configured(),
             "allowlist_enabled": allowlist_enabled,
+            "login_action": login_action,
         }, status=503 if not operator_secret_configured() else 200)
+    return None
 
+
+def _operator_dashboard_context() -> dict:
     active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
     deployment_profile = playback_profile(active_deployment.code)
-    return render(request, "engine/operator_dashboard.html", {
+    return {
         "operator_state": steward_state_payload(),
         "engine_deployment": {
             "code": active_deployment.code,
@@ -160,7 +168,21 @@ def operator_dashboard_view(request):
             "tuning_source": deployment_profile.tuning_source,
             "room_loop_policy": deployment_room_loop_policy(active_deployment.code),
         },
-    })
+    }
+
+
+def operator_dashboard_view(request):
+    auth_response = _operator_dashboard_auth_gate(request, success_redirect_name="operator-dashboard")
+    if auth_response is not None:
+        return auth_response
+    return render(request, "engine/operator_dashboard_lite.html", _operator_dashboard_context())
+
+
+def operator_bench_view(request):
+    auth_response = _operator_dashboard_auth_gate(request, success_redirect_name="operator-bench")
+    if auth_response is not None:
+        return auth_response
+    return render(request, "engine/operator_dashboard.html", _operator_dashboard_context())
 
 
 def operator_logout_view(request):

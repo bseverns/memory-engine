@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Room Memory - Operator Lite</title>
+  <link rel="stylesheet" href="/static/engine/kiosk.css"/>
+  <style>
+    .lite-grid {
+      display: grid;
+      gap: 0.8rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .lite-stage-card {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .lite-stage-card.active {
+      border-color: rgba(142, 230, 196, 0.9);
+      box-shadow: 0 0 0 1px rgba(142, 230, 196, 0.3) inset;
+    }
+    .lite-stage-card strong {
+      display: block;
+      margin-bottom: 0.35rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell dashboard-shell">
+    <header class="hero">
+      <p class="eyebrow">Operator lite</p>
+      <h1>Room Memory Steward Surface</h1>
+      <p class="sub">A calmer operations view for open, live, incident, and close posture. Use full bench for deep diagnostics and artifact tools.</p>
+      <p class="hint">Active deployment: <strong>{{ engine_deployment.label }}</strong> ({{ engine_deployment.code }}). {{ engine_deployment.behavior_summary }}</p>
+    </header>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">Machine posture</p>
+          <h3 id="opsLiteStateTitle">Checking...</h3>
+        </div>
+        <span id="opsLiteStateBadge" class="ops-state degraded">checking</span>
+      </div>
+      <p id="opsLiteNextAction" class="stage-copy">Waiting for current node status.</p>
+      <div class="shortcut-row">
+        <span id="opsLiteRefreshed" class="shortcut">Waiting for first refresh</span>
+        <a class="btn secondary link-btn" href="/ops/bench/">Open full bench</a>
+        <a class="btn secondary link-btn" href="/kiosk/">Open kiosk</a>
+        <a class="btn secondary link-btn" href="/room/">Open room</a>
+      </div>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">Primary controls</p>
+          <h3>Pause and maintenance only</h3>
+        </div>
+      </div>
+      <form id="opsLiteControlsForm" class="ops-controls-form">
+        <label class="ops-toggle">
+          <input id="opsLiteMaintenanceMode" type="checkbox" name="maintenance_mode"/>
+          <span>
+            <strong>Maintenance mode</strong>
+            <span>Suspends intake and playback so service work can happen cleanly.</span>
+          </span>
+        </label>
+        <label class="ops-toggle">
+          <input id="opsLiteIntakePaused" type="checkbox" name="intake_paused"/>
+          <span>
+            <strong>Pause intake</strong>
+            <span>Stops new recordings from being saved.</span>
+          </span>
+        </label>
+        <label class="ops-toggle">
+          <input id="opsLitePlaybackPaused" type="checkbox" name="playback_paused"/>
+          <span>
+            <strong>Pause playback</strong>
+            <span>Keeps the room silent without shutting the stack down.</span>
+          </span>
+        </label>
+        <label class="ops-toggle">
+          <input id="opsLiteQuieterMode" type="checkbox" name="quieter_mode"/>
+          <span>
+            <strong>Quieter mode</strong>
+            <span>Softens room playback posture while leaving behavior intact.</span>
+          </span>
+        </label>
+        <div class="shortcut-row">
+          <button id="opsLiteControlsSave" type="submit" class="btn">Apply controls</button>
+          <button id="opsLiteClearSessionFraming" type="button" class="btn secondary">Clear session framing</button>
+          <button id="opsLiteAudioTone" type="button" class="btn secondary">Run output tone</button>
+          <span id="opsLiteControlStatus" class="shortcut">Controls are loading.</span>
+        </div>
+      </form>
+      <p id="opsLiteSessionFramingStatus" class="shortcut">Session framing and deployment focus are loading.</p>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">Session close archive</p>
+          <h3>Guided host command</h3>
+        </div>
+      </div>
+      <p class="stage-copy">This page does not run host scripts. It prepares the exact shell command for a steward to run: consistent backup, then export bundle, with optional USB copy.</p>
+      <p id="opsLiteArchiveReadiness" class="shortcut">Checking archive readiness cues.</p>
+      <label class="ops-login-field" for="opsLiteArchiveUsbPath">
+        <span>
+          <strong>USB mount path (optional)</strong>
+          <span>Leave empty for local export only. Use an absolute mounted path to copy/checksum to USB.</span>
+        </span>
+        <input id="opsLiteArchiveUsbPath" type="text" placeholder="/media/steward/SESSION_ARCHIVE"/>
+      </label>
+      <div class="shortcut-row">
+        <button id="opsLiteArchiveCommandBuild" type="button" class="btn secondary">Build archive command</button>
+        <button id="opsLiteArchiveCommandCopy" type="button" class="btn secondary">Copy command</button>
+      </div>
+      <pre id="opsLiteArchiveCommand" class="shortcut">./scripts/session_close_archive.sh</pre>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">Quick evidence</p>
+          <h3>What matters first</h3>
+        </div>
+      </div>
+      <div class="status-grid">
+        <article class="status-card">
+          <p class="section-kicker">Playable</p>
+          <div id="opsLitePlayable" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Warnings</p>
+          <div id="opsLiteWarningCount" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Free storage</p>
+          <div id="opsLiteStorage" class="status-number">-</div>
+        </article>
+        <article class="status-card">
+          <p class="section-kicker">Last steward action</p>
+          <div id="opsLiteLastAction" class="status-number ops-status-copy">-</div>
+        </article>
+      </div>
+      <div id="opsLiteWarnings" class="component-list"></div>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">Guided playbook</p>
+          <h3 id="opsLiteRecommendedStage">Recommended stage: open</h3>
+        </div>
+      </div>
+      <div class="lite-grid">
+        <article id="opsLiteStageOpen" class="component-card ready lite-stage-card">
+          <strong>Open</strong>
+          <span>1. Check state is not broken. 2. Run output tone. 3. Open `/kiosk/` and `/room/`. 4. Confirm intake/playback are not paused.</span>
+        </article>
+        <article id="opsLiteStageLive" class="component-card ready lite-stage-card">
+          <strong>Live</strong>
+          <span>Watch warnings, storage, and latest actions. Keep this page visible. Use full bench only when a specific deeper tool is needed.</span>
+        </article>
+        <article id="opsLiteStageIncident" class="component-card degraded lite-stage-card">
+          <strong>Incident</strong>
+          <span>Pause intake if needed, stabilize playback posture, then open full bench to inspect dependencies and deeper diagnostics.</span>
+        </article>
+        <article id="opsLiteStageClose" class="component-card ready lite-stage-card">
+          <strong>Close</strong>
+          <span>Confirm no active recording, check warnings, create backup/export as needed, then leave explicit maintenance posture only if intended.</span>
+        </article>
+      </div>
+      <div class="shortcut-row">
+        <a class="btn secondary link-btn" href="/ops/bench/">Open full bench</a>
+        <a class="btn secondary link-btn" href="/api/v1/operator/artifact-summary">Download artifact summary</a>
+        <a class="btn secondary link-btn" href="/readyz">Readiness JSON</a>
+        <form action="/ops/logout/" method="post" class="inline-form">
+          {% csrf_token %}
+          <button class="btn secondary" type="submit">Log out</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  {{ operator_state|json_script:"ops-operator-state" }}
+  <script src="/static/engine/operator-dashboard-lite.js"></script>
+  <script>
+    window.MemoryEngineOperatorDashboardLite.start();
+  </script>
+</body>
+</html>

@@ -192,6 +192,8 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Public participant-facing `/revoke/` page so receipt codes can remove saved recordings on the local node without exposing steward controls
 - Deployment-owned prompt packs on `/kiosk/` so `memory`, `question`, `prompt`, and `repair` can offer distinct ways to begin without branching the kiosk flow
 - Optional steward-authored session theme controls on `/ops/` that influence kiosk idle copy and submission framing without widening public routes
+- Manual close-reset posture for session framing/focus, with bounded `Clear session framing` action in both `/ops/` and `/ops/bench/`
+- Guided end-session archive command card in `/ops/` surfaces plus `scripts/session_close_archive.sh` for consistent backup + export (+ optional USB copy)
 - Operator-only live monitor utility on `/ops/` for local output-tone and live mic verification without touching the archive
 - Stronger focus and reboot recovery guidance for unattended kiosk HID use
 - Sharper `/ops/` hierarchy so live controls, routing ritual, and recovery notes stay ahead of passive summary panels

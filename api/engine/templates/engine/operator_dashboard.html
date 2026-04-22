@@ -43,6 +43,7 @@
         </article>
       </div>
       <div class="shortcut-row">
+        <a class="btn secondary link-btn" href="/ops/">Open operator lite</a>
         <a class="btn secondary link-btn" href="/kiosk/">Open kiosk</a>
         <a class="btn secondary link-btn" href="/room/">Open room playback</a>
         <a class="btn secondary link-btn" href="/revoke/">Open participant revoke page</a>
@@ -321,9 +322,17 @@
         </label>
         <div class="shortcut-row">
           <button id="opsControlsSave" type="submit" class="btn">Apply controls</button>
+          <button id="opsClearSessionFraming" type="button" class="btn secondary">Clear session framing</button>
           <span id="opsControlStatus" class="shortcut">Controls are loading.</span>
         </div>
       </form>
+      <p id="opsSessionFramingStatus" class="shortcut">Session framing and deployment focus are loading.</p>
+      <div class="component-list">
+        <article class="component-card ready">
+          <strong>Bounded effect</strong>
+          <span>Theme and deployment focus only adjust kiosk framing copy and advisory thread hints. They do not change routes, consent rules, retention windows, or playback safety controls.</span>
+        </article>
+      </div>
       <div class="panel-head">
         <div>
           <p class="section-kicker">Recent operator events</p>
@@ -331,6 +340,29 @@
         </div>
       </div>
       <div id="opsRecentActions" class="component-list"></div>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="panel-head">
+        <div>
+          <p class="section-kicker">Session close archive</p>
+          <h3>Guided host command</h3>
+        </div>
+      </div>
+      <p class="stage-copy">This card does not execute host scripts from the browser. It prepares the exact command for a steward shell: consistent backup first, then export bundle, with optional USB copy.</p>
+      <p id="opsArchiveReadiness" class="shortcut">Checking archive readiness cues.</p>
+      <label class="ops-login-field" for="opsArchiveUsbPath">
+        <span>
+          <strong>USB mount path (optional)</strong>
+          <span>Leave empty to keep export local under `exports/`. Provide an absolute mounted path to copy and checksum to USB.</span>
+        </span>
+        <input id="opsArchiveUsbPath" type="text" placeholder="/media/steward/SESSION_ARCHIVE"/>
+      </label>
+      <div class="shortcut-row">
+        <button id="opsArchiveCommandBuild" type="button" class="btn secondary">Build archive command</button>
+        <button id="opsArchiveCommandCopy" type="button" class="btn secondary">Copy command</button>
+      </div>
+      <pre id="opsArchiveCommand" class="shortcut">./scripts/session_close_archive.sh</pre>
     </section>
 
     <section class="panel dashboard-panel">

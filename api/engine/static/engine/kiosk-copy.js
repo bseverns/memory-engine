@@ -766,8 +766,70 @@
     });
   }
 
+  function appendCopyLine(base, addon) {
+    const baseText = String(base || "").trim();
+    const addonText = String(addon || "").trim();
+    if (!addonText) return baseText;
+    if (!baseText) return addonText;
+    return `${baseText} ${addonText}`;
+  }
+
+  function applySessionThemeFraming(basePack = {}, operatorState = {}) {
+    const title = String(operatorState.session_theme_title || "").trim().slice(0, 64);
+    const prompt = String(operatorState.session_theme_prompt || "").trim().slice(0, 180);
+    const label = title || prompt;
+    if (!label) {
+      return basePack;
+    }
+
+    const promptSuffix = title && prompt ? ` ${prompt}` : "";
+    const values = {
+      title: label,
+      prompt,
+      prompt_suffix: promptSuffix,
+    };
+
+    const themedPack = { ...basePack };
+    themedPack.stageIdleCopy = appendCopyLine(
+      basePack.stageIdleCopy,
+      formatMessage(basePack.sessionThemeIdleAddon, values),
+    );
+    themedPack.stageReviewCopy = appendCopyLine(
+      basePack.stageReviewCopy,
+      formatMessage(basePack.sessionThemeReviewAddon, values),
+    );
+    themedPack.promptPackLead = appendCopyLine(
+      basePack.promptPackLead,
+      formatMessage(basePack.sessionThemePromptLeadAddon, values),
+    );
+
+    const themeLine = String(formatMessage(basePack.sessionThemePromptLine, values) || "").trim();
+    const promptLines = Array.isArray(basePack.promptPackLines) ? [...basePack.promptPackLines] : [];
+    if (themeLine) {
+      promptLines.unshift(themeLine);
+    }
+    themedPack.promptPackLines = promptLines;
+    if (!String(themedPack.promptPackKicker || "").trim()) {
+      themedPack.promptPackKicker = String(basePack.sessionThemePromptKicker || "").trim();
+    }
+
+    const modes = basePack.modes || {};
+    themedPack.modes = Object.fromEntries(
+      Object.entries(modes).map(([modeCode, modePack]) => {
+        const nextModePack = { ...(modePack || {}) };
+        nextModePack.reviewCopy = appendCopyLine(
+          modePack?.reviewCopy,
+          formatMessage(basePack.sessionThemeSubmissionAddon, values),
+        );
+        return [modeCode, nextModePack];
+      }),
+    );
+    return themedPack;
+  }
+
   global.MemoryEngineKioskCopy = {
     PACKS,
+    applySessionThemeFraming,
     formatMessage,
     getPack,
     getDeploymentPack,

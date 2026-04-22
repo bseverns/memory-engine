@@ -66,6 +66,7 @@ If you are stewarding a live node:
 
 - use [OPERATOR_DRILL_CARD.md](./OPERATOR_DRILL_CARD.md) for the shortest recovery ritual
 - use [maintenance.md](./maintenance.md) for the full runbook
+- use [SESSION_AND_FOCUS_CONTROLS.md](./SESSION_AND_FOCUS_CONTROLS.md) for bounded theme/focus behavior and close-of-day reset posture
 - use [PRESENCE_SENSING.md](./PRESENCE_SENSING.md) before enabling camera-adjacent presence sensing
 - use [participant-prompt-card.md](./participant-prompt-card.md) for the public handoff language
 
@@ -125,6 +126,7 @@ If you are teaching, training stewards, or running bounded evaluations:
 - [memory-lifecycle.md](./memory-lifecycle.md): ingest, playback, wear, expiry, and revoke diagrams
 - [experimental-proofs.md](./experimental-proofs.md): proof board for current and next validation passes
 - [maintenance.md](./maintenance.md): deploy, backup, restore, and repair commands
+- [SESSION_AND_FOCUS_CONTROLS.md](./SESSION_AND_FOCUS_CONTROLS.md): bounded steward framing controls, reset policy, and end-session archive ritual
 - [PRESENCE_SENSING.md](./PRESENCE_SENSING.md): ethics/install boundary for optional audience-presence sensing
 - [UBUNTU_APPLIANCE.md](./UBUNTU_APPLIANCE.md): firewall and restart-on-boot host recipe
 - [machine-branch.md](./machine-branch.md): navigation hub for architecture and behavior docs

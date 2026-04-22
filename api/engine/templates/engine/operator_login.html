@@ -16,7 +16,7 @@
 
     <section class="panel login-panel">
       {% if operator_configured %}
-        <form action="/ops/" method="post" class="ops-login-form">
+        <form action="{{ login_action|default:'/ops/' }}" method="post" class="ops-login-form">
           {% csrf_token %}
           <label class="ops-login-field" for="secret">
             <span class="section-kicker">Shared steward secret</span>

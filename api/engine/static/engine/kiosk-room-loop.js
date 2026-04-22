@@ -125,6 +125,71 @@
     };
   }
 
+  function normalizedLifecycleStatusValue(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function normalizedTopicTagValue(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function operatorDeploymentFocusHintForState(deploymentCode, surfaceState = {}) {
+    // Keep steward focus hints intentionally bounded to thread-oriented
+    // deployments so `/ops/` can bias recurrence without becoming live
+    // composition control.
+    if (!["question", "repair"].includes(String(deploymentCode || "").toLowerCase())) {
+      return null;
+    }
+    const preferredTopic = normalizedTopicTagValue(surfaceState.deployment_focus_topic);
+    const preferredLifecycleStatus = normalizedLifecycleStatusValue(surfaceState.deployment_focus_status);
+    if (!preferredTopic && !preferredLifecycleStatus) {
+      return null;
+    }
+    return {
+      preferredTopic,
+      preferredLifecycleStatus,
+    };
+  }
+
+  function applyOperatorFocusHintToThreadHint({
+    baseHint = {},
+    deploymentCode = "",
+    surfaceState = {},
+    loopHistory = [],
+  } = {}) {
+    const focusHint = operatorDeploymentFocusHintForState(deploymentCode, surfaceState);
+    if (!focusHint) {
+      return {
+        preferredTopic: String(baseHint.preferredTopic || ""),
+        preferredLifecycleStatus: String(baseHint.preferredLifecycleStatus || ""),
+        threadLength: Number(baseHint.threadLength || 0),
+      };
+    }
+
+    const nextHint = {
+      preferredTopic: String(baseHint.preferredTopic || ""),
+      preferredLifecycleStatus: String(baseHint.preferredLifecycleStatus || ""),
+      threadLength: Number(baseHint.threadLength || 0),
+    };
+    if (focusHint.preferredTopic) {
+      const topicChanged = normalizedTopicTagValue(nextHint.preferredTopic) !== focusHint.preferredTopic;
+      nextHint.preferredTopic = focusHint.preferredTopic;
+      nextHint.threadLength = loopHistory
+        .slice(-8)
+        .filter((entry) => normalizedTopicTagValue(entry.topic) === focusHint.preferredTopic)
+        .length;
+      if (focusHint.preferredLifecycleStatus) {
+        nextHint.preferredLifecycleStatus = focusHint.preferredLifecycleStatus;
+      } else if (topicChanged) {
+        nextHint.preferredLifecycleStatus = "";
+      }
+    } else if (focusHint.preferredLifecycleStatus) {
+      nextHint.preferredLifecycleStatus = focusHint.preferredLifecycleStatus;
+    }
+
+    return nextHint;
+  }
+
   function readKioskConfig() {
     const el = document.getElementById("kiosk-config");
     const fallback = {
@@ -232,52 +297,13 @@
       return ["clear", "hushed", "suspended", "weathered", "gathering"].includes(value) ? value : "";
     }
 
-    function operatorDeploymentFocusHint(deploymentCode) {
-      // Keep steward focus hints intentionally bounded to thread-oriented
-      // deployments so `/ops/` can bias recurrence without becoming live
-      // composition control.
-      if (!["question", "repair"].includes(String(deploymentCode || "").toLowerCase())) {
-        return null;
-      }
-      const preferredTopic = normalizedTopicTag(surfaceState.deployment_focus_topic);
-      const preferredLifecycleStatus = normalizedLifecycleStatus(surfaceState.deployment_focus_status);
-      if (!preferredTopic && !preferredLifecycleStatus) {
-        return null;
-      }
-      return {
-        preferredTopic,
-        preferredLifecycleStatus,
-      };
-    }
-
     function applyOperatorFocusHint(baseHint, deploymentCode) {
-      const focusHint = operatorDeploymentFocusHint(deploymentCode);
-      if (!focusHint) {
-        return baseHint;
-      }
-
-      const nextHint = {
-        preferredTopic: String(baseHint.preferredTopic || ""),
-        preferredLifecycleStatus: String(baseHint.preferredLifecycleStatus || ""),
-        threadLength: Number(baseHint.threadLength || 0),
-      };
-      if (focusHint.preferredTopic) {
-        const topicChanged = normalizedTopicTag(nextHint.preferredTopic) !== focusHint.preferredTopic;
-        nextHint.preferredTopic = focusHint.preferredTopic;
-        nextHint.threadLength = loopHistory
-          .slice(-8)
-          .filter((entry) => normalizedTopicTag(entry.topic) === focusHint.preferredTopic)
-          .length;
-        if (focusHint.preferredLifecycleStatus) {
-          nextHint.preferredLifecycleStatus = focusHint.preferredLifecycleStatus;
-        } else if (topicChanged) {
-          nextHint.preferredLifecycleStatus = "";
-        }
-      } else if (focusHint.preferredLifecycleStatus) {
-        nextHint.preferredLifecycleStatus = focusHint.preferredLifecycleStatus;
-      }
-
-      return nextHint;
+      return applyOperatorFocusHintToThreadHint({
+        baseHint,
+        deploymentCode,
+        surfaceState,
+        loopHistory,
+      });
     }
 
     function updateButtons() {
@@ -872,5 +898,9 @@
 
   global.MemoryEngineRoomLoop = {
     createController,
+    __test: {
+      operatorDeploymentFocusHintForState,
+      applyOperatorFocusHintToThreadHint,
+    },
   };
 }(window));

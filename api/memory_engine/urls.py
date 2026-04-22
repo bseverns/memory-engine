@@ -1,7 +1,14 @@
 from django.contrib import admin
 from django.urls import path, include
 from engine.api_views import healthz, readyz
-from engine.views import kiosk_view, operator_dashboard_view, operator_logout_view, playback_view, revocation_view
+from engine.views import (
+    kiosk_view,
+    operator_bench_view,
+    operator_dashboard_view,
+    operator_logout_view,
+    playback_view,
+    revocation_view,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -12,5 +19,6 @@ urlpatterns = [
     path("room/", playback_view, name="room-playback"),
     path("revoke/", revocation_view, name="revocation"),
     path("ops/", operator_dashboard_view, name="operator-dashboard"),
+    path("ops/bench/", operator_bench_view, name="operator-bench"),
     path("ops/logout/", operator_logout_view, name="operator-logout"),
 ]

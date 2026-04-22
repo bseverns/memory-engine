@@ -90,6 +90,36 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Steward sign-in")
 
+    def test_operator_bench_requires_secret_entry(self):
+        response = self.client.get("/ops/bench/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Steward sign-in")
+        self.assertContains(response, 'action="/ops/bench/"', html=False)
+
+    def test_operator_dashboard_lite_and_bench_render_after_session_login(self):
+        self.login_operator()
+
+        lite = self.client.get("/ops/")
+        bench = self.client.get("/ops/bench/")
+
+        self.assertEqual(lite.status_code, 200)
+        self.assertContains(lite, "Operator lite")
+        self.assertContains(lite, "Open full bench")
+        self.assertContains(lite, "Clear session framing")
+        self.assertContains(lite, "Session close archive")
+        self.assertEqual(bench.status_code, 200)
+        self.assertContains(bench, "Operator dashboard")
+        self.assertContains(bench, "Open operator lite")
+        self.assertContains(bench, "Clear session framing")
+        self.assertContains(bench, "Session close archive")
+
+    def test_operator_bench_login_redirects_back_to_bench(self):
+        response = self.client.post("/ops/bench/", {"secret": "test-ops-secret"}, REMOTE_ADDR="127.0.0.1")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/ops/bench/")
+
     def test_public_revocation_page_is_available_without_operator_auth(self):
         response = self.client.get("/revoke/?token=node-keep-1234")
 
@@ -280,6 +310,49 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertEqual(payload["operator_state"]["session_theme_title"], "Arrival and thresholds")
         self.assertEqual(payload["operator_state"]["session_theme_prompt"], "Offer one small sound about crossing into this room.")
         self.assertEqual(len(payload["changes"]), 2)
+
+    def test_operator_controls_can_clear_session_framing_without_touching_other_controls(self):
+        self.login_operator()
+        state = StewardState.load()
+        state.maintenance_mode = True
+        state.intake_paused = True
+        state.mood_bias = "weathered"
+        state.session_theme_title = "Arrival and thresholds"
+        state.session_theme_prompt = "Offer one small sound about crossing into this room."
+        state.deployment_focus_topic = "entry_gate"
+        state.deployment_focus_status = "open"
+        state.save(update_fields=[
+            "maintenance_mode",
+            "intake_paused",
+            "mood_bias",
+            "session_theme_title",
+            "session_theme_prompt",
+            "deployment_focus_topic",
+            "deployment_focus_status",
+        ])
+
+        response = self.client.post(
+            "/api/v1/operator/controls",
+            data={
+                "session_theme_title": "",
+                "session_theme_prompt": "",
+                "deployment_focus_topic": "",
+                "deployment_focus_status": "",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        state.refresh_from_db()
+        self.assertTrue(state.maintenance_mode)
+        self.assertTrue(state.intake_paused)
+        self.assertEqual(state.mood_bias, "weathered")
+        self.assertEqual(state.session_theme_title, "")
+        self.assertEqual(state.session_theme_prompt, "")
+        self.assertEqual(state.deployment_focus_topic, "")
+        self.assertEqual(state.deployment_focus_status, "")
+        payload = response.json()
+        self.assertEqual(len(payload["changes"]), 4)
 
     def test_surface_state_exposes_session_theme_for_kiosk_framing(self):
         state = StewardState.load()
