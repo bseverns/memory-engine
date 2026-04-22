@@ -111,7 +111,9 @@ DATABASES = {
     }
 }
 
-CACHE_URL = os.getenv("CACHE_URL", os.getenv("REDIS_URL", "")).strip()
+_CACHE_URL_RAW = os.getenv("CACHE_URL")
+_REDIS_URL_RAW = os.getenv("REDIS_URL", "")
+CACHE_URL = (_CACHE_URL_RAW or "").strip() or _REDIS_URL_RAW.strip()
 if CACHE_URL:
     CACHES = {
         "default": {

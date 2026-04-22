@@ -79,8 +79,8 @@ fi
 
 log_operator_event "restore.started" "restore-script" "Restoring backup ${BACKUP_DIR}"
 
-info "Stopping worker services during restore"
-sh -c "${COMPOSE_BIN} stop worker beat proxy"
+info "Stopping API and worker services during restore"
+sh -c "${COMPOSE_BIN} stop proxy worker beat api"
 
 info "Restoring Postgres from ${BACKUP_DIR}/postgres.sql.gz"
 sh -c "${COMPOSE_BIN} exec -T db psql -U \"${POSTGRES_USER}\" -d postgres -c \"DROP DATABASE IF EXISTS ${POSTGRES_DB};\""
@@ -88,7 +88,13 @@ sh -c "${COMPOSE_BIN} exec -T db psql -U \"${POSTGRES_USER}\" -d postgres -c \"C
 gunzip -c "${BACKUP_DIR}/postgres.sql.gz" | sh -c "${COMPOSE_BIN} exec -T db psql -U \"${POSTGRES_USER}\" -d \"${POSTGRES_DB}\""
 
 info "Restoring MinIO object data from ${BACKUP_DIR}/minio-data.tgz"
-sh -c "${COMPOSE_BIN} exec -T minio sh -c 'rm -rf /data/* && tar -C /data -xzf -'" < "${BACKUP_DIR}/minio-data.tgz"
+MINIO_CONTAINER_ID=$(sh -c "${COMPOSE_BIN} ps -q minio" | head -n 1)
+[ -n "${MINIO_CONTAINER_ID}" ] || fail "could not determine minio container id"
+MINIO_STAGE_DIR=$(mktemp -d "${REPO_ROOT}/.restore-minio.XXXXXX")
+tar -C "${MINIO_STAGE_DIR}" -xzf "${BACKUP_DIR}/minio-data.tgz"
+docker exec "${MINIO_CONTAINER_ID}" sh -c 'rm -rf /data/*'
+docker cp "${MINIO_STAGE_DIR}/." "${MINIO_CONTAINER_ID}:/data/"
+rm -rf "${MINIO_STAGE_DIR}"
 
 info "Restarting services"
 sh -c "${COMPOSE_BIN} up -d"

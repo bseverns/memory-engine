@@ -15,8 +15,26 @@ until python -c "import os, redis; redis.Redis.from_url(os.getenv('REDIS_URL')).
   sleep 1
 done
 
-# Wait for MinIO endpoint
-until python -c "import os, urllib.request; urllib.request.urlopen(os.getenv('MINIO_ENDPOINT')).read(1)" 2>/dev/null; do
+# Wait for MinIO endpoint.
+# Some S3-compatible endpoints (including MinIO root `/`) return auth errors
+# like 403 for unauthenticated GET requests; treat those as reachable.
+until python - <<'PY' 2>/dev/null
+import os
+import urllib.error
+import urllib.request
+
+url = os.getenv("MINIO_ENDPOINT")
+ok = False
+
+try:
+    urllib.request.urlopen(url).read(1)
+    ok = True
+except urllib.error.HTTPError as exc:
+    ok = exc.code in (400, 401, 403, 405)
+
+raise SystemExit(0 if ok else 1)
+PY
+do
   echo "Waiting for MinIO..."
   sleep 1
 done

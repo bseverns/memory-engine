@@ -3,5 +3,16 @@
 
   {$APP_TLS_DIRECTIVE}
 
+  request_body {
+    max_size {$INGEST_PROXY_MAX_BODY_BYTES:34603008}
+  }
+
+  header {
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "same-origin"
+    X-Frame-Options "DENY"
+    Permissions-Policy "microphone=(self)"
+  }
+
   reverse_proxy api:8000
 }

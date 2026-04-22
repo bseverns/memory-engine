@@ -90,6 +90,12 @@ Create a backup:
 ./scripts/backup.sh
 ```
 
+Create a consistency-first backup for research snapshots:
+
+```bash
+./scripts/backup.sh --consistent
+```
+
 Create a portable export bundle from the latest backup:
 
 ```bash
@@ -116,13 +122,14 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/update.sh` is the normal existing-server path: fast-forward pull, checks, doctor, backup, deploy, and final status.
 - `scripts/check.sh` is the quick sanity pass for browser JavaScript syntax, frontend unit tests with Node coverage thresholds, the default Playwright browser subset, Python, the Django behavior suite with Python coverage thresholds and reports, shell syntax, and `git diff --check`.
 - `scripts/release_smoke.sh` is the disposable compose-backed appliance proof: it boots an isolated smoke stack on `127.0.0.1:18080`, waits for `/healthz` and `/readyz`, then runs the live Playwright ritual for kiosk submit, room playback, and ops visibility.
+- `scripts/research_smoke.sh` is the evaluation-focused disposable proof: it runs a deeper submit/revoke/remove flow, verifies audit trail visibility, and creates backup/export artifacts (plus optional disposable restore rehearsal).
 - `scripts/clean_local.sh` removes regenerable local caches such as `api/.test-cache`, `__pycache__`, and Playwright output. Pass `--include-screenshots` if you also want to clear generated screenshots.
 - `.github/workflows/check.yml` runs that same `scripts/check.sh` gate in GitHub Actions using a repo-local `.venv`, so CI stays aligned with the local check path.
 - `scripts/doctor.sh` checks `.env`, compose state, narrow API health through `/healthz`, broader cluster readiness through `/readyz`, and browser/TLS constraints that affect recording.
 - `scripts/browser_kiosk.sh` launches Chromium into `/kiosk/`, `/room/`, or `/ops/` with a repeatable kiosk-safe flag set. The `/room/` role adds autoplay-hardening flags automatically.
 - `/ops/` also now includes an operator-only monitor panel for output-tone checks and local live mic play-through. Use that surface, not `/kiosk/`, when you need to verify the current steward machine's local routing. Do not overread it as proof of the separate kiosk recorder or room playback machine.
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` and `/readyz` from inside the API container.
-- `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`.
+- `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`, includes checksums/provenance metadata, and supports `--consistent` mode for short write-path pauses during capture.
 - `scripts/restore.sh` restores one of those snapshots into the current stack and now asks for explicit confirmation plus a fresh pre-restore snapshot by default.
 - `scripts/export_bundle.sh` packages one backup snapshot into a portable `.tgz` with a manifest, checksums, explicit import instructions, and an artifact summary when the API container is running.
 - `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, `/readyz`, compose status, doctor output, recent logs, and an artifact summary into a single handoff archive.

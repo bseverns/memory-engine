@@ -1,6 +1,6 @@
 services:
   proxy:
-    image: caddy:2
+    image: ${CADDY_IMAGE:-caddy:2.8.4}
     env_file: .env
     depends_on:
       api:
@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:16
+    image: ${POSTGRES_IMAGE:-postgres:16.4}
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -31,7 +31,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7
+    image: ${REDIS_IMAGE:-redis:7.4.1}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -51,12 +51,19 @@ services:
       - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   minio_init:
     image: ${MINIO_MC_IMAGE:-minio/mc:RELEASE.2025-04-16T18-13-26Z}
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     entrypoint: >
       /bin/sh -c "
       until (/usr/bin/mc alias set local ${MINIO_ENDPOINT} ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}) do sleep 1; done;
@@ -75,7 +82,7 @@ services:
       redis:
         condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
       minio_init:
         condition: service_completed_successfully
     expose:
@@ -102,8 +109,14 @@ services:
       db:
         condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
     command: celery -A memory_engine worker -l info
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A memory_engine inspect ping -d \"celery@$$HOSTNAME\" --timeout=5 | grep -q 'pong'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
     restart: unless-stopped
 
   beat:
@@ -118,8 +131,14 @@ services:
       db:
         condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
     command: celery -A memory_engine beat -l info
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check_beat_heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     restart: unless-stopped
 
 volumes:
