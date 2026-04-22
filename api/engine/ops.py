@@ -1,3 +1,4 @@
+import json
 import shutil
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
@@ -13,6 +14,8 @@ from .storage import s3_client
 
 WORKER_HEARTBEAT_CACHE_KEY = "memory_engine_worker_heartbeat"
 BEAT_HEARTBEAT_CACHE_KEY = "memory_engine_beat_heartbeat"
+PRESENCE_HEARTBEAT_CACHE_KEY = "memory_engine_presence_heartbeat"
+PRESENCE_STATE_CACHE_KEY = "memory_engine_presence_state"
 TASK_STATUS_CACHE_PREFIX = "memory_engine_task_status"
 TRACKED_TASKS = {
     "generate_spectrogram": {"label": "spectrogram generation", "scheduled": False},
@@ -41,6 +44,21 @@ def parse_cached_datetime(raw_value):
     if timezone.is_naive(parsed):
         parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
     return parsed
+
+
+def decode_redis_value(raw_value) -> str:
+    if raw_value is None:
+        return ""
+    if isinstance(raw_value, bytes):
+        return raw_value.decode("utf-8", errors="ignore")
+    return str(raw_value)
+
+
+def safe_float(value, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
 
 
 def record_worker_heartbeat(*, at=None) -> None:
@@ -82,6 +100,66 @@ def heartbeat_component(name: str, cache_key: str, max_age_seconds: int, *, now=
         "last_seen_at": seen_at,
         "stale_seconds": round(age_seconds, 1),
     }
+
+
+def presence_component(*, now=None) -> dict:
+    if not bool(getattr(settings, "PRESENCE_SENSING_ENABLED", False)):
+        return {
+            "ok": True,
+            "enabled": False,
+            "detail": "Audience presence sensing is disabled.",
+        }
+    if not broker_uses_external_redis():
+        return {
+            "ok": False,
+            "enabled": True,
+            "error": "Audience presence sensing requires a Redis-backed runtime.",
+        }
+
+    now = now or timezone.now()
+    max_age_seconds = int(getattr(settings, "OPS_PRESENCE_HEARTBEAT_MAX_AGE_SECONDS", 20))
+    client = broker_redis_client()
+
+    raw_seen_at = decode_redis_value(client.get(PRESENCE_HEARTBEAT_CACHE_KEY))
+    seen_at = parse_cached_datetime(raw_seen_at)
+    raw_state = decode_redis_value(client.get(PRESENCE_STATE_CACHE_KEY))
+    state_payload = {}
+    if raw_state:
+        try:
+            state_payload = json.loads(raw_state)
+        except ValueError:
+            state_payload = {}
+
+    response = {
+        "enabled": True,
+        "source": state_payload.get("source") or "opencv-motion",
+        "present": bool(state_payload.get("present", False)),
+        "confidence": safe_float(state_payload.get("confidence", 0.0), 0.0),
+        "motion_score": safe_float(state_payload.get("motion_score", 0.0), 0.0),
+    }
+    sensor_error = str(state_payload.get("sensor_error") or "").strip()
+    if sensor_error:
+        response["sensor_error"] = sensor_error
+
+    if not seen_at:
+        response["ok"] = False
+        response["error"] = "No recent audience-presence heartbeat."
+        return response
+
+    age_seconds = max(0.0, (now - seen_at).total_seconds())
+    response["last_seen_at"] = seen_at
+    response["stale_seconds"] = round(age_seconds, 1)
+    if age_seconds > max_age_seconds:
+        response["ok"] = False
+        response["error"] = "Audience-presence heartbeat is stale."
+        return response
+    if sensor_error:
+        response["ok"] = False
+        response["error"] = sensor_error
+        return response
+
+    response["ok"] = True
+    return response
 
 
 def task_status_cache_key(task_name: str) -> str:
@@ -258,6 +336,16 @@ def component_health_warnings(components: dict) -> list[dict]:
             "title": "Beat heartbeat is stale",
             "detail": "Scheduled expiry and pruning tasks may no longer be advancing on time.",
         })
+    presence_component_state = components.get("presence", {})
+    if presence_component_state.get("enabled") and not presence_component_state.get("ok", True):
+        warnings.append({
+            "level": "warning",
+            "title": "Audience presence signal is stale",
+            "detail": (
+                presence_component_state.get("error")
+                or "The audience-presence sensor heartbeat is missing or stale."
+            ),
+        })
     queue_component = components.get("queue", {})
     if queue_component.get("state") == "critical":
         warnings.append({
@@ -344,6 +432,10 @@ def health_component_status() -> tuple[bool, dict]:
             BEAT_HEARTBEAT_CACHE_KEY,
             int(getattr(settings, "OPS_BEAT_HEARTBEAT_MAX_AGE_SECONDS", 180)),
         )
+    try:
+        components["presence"] = presence_component()
+    except Exception as exc:
+        components["presence"] = {"ok": False, "enabled": True, "error": str(exc)}
     try:
         components["queue"] = queue_depth_component()
     except Exception as exc:

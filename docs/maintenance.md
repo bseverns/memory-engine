@@ -398,6 +398,16 @@ USB handoff ritual (fossils + anonymized stats):
    - macOS: `shasum -a 256 /absolute/mount/path/memory-engine-export-*.tgz`
 5. Eject the USB drive only after the checksum step succeeds.
 
+Audience presence sensing (optional):
+
+- Presence sensing is off by default.
+- To enable it, set `PRESENCE_SENSING_ENABLED=1` in `.env`.
+- Start the sensor service with the compose profile:
+  `docker compose --profile presence up -d presence_sensor`
+- The default camera path is `PRESENCE_CAMERA_DEVICE=/dev/video0`. Override that path if your host maps the webcam differently.
+- When enabled, `/readyz` and `/ops/` include a `presence` component. If the webcam feed or sensor loop goes stale, readiness drops to `degraded`.
+- This phase is motion-only (`opencv` frame differencing). It stores no video frames and only publishes aggregate presence state plus heartbeat timing.
+
 Support bundle notes:
 
 - `scripts/support_bundle.sh` writes into `support-bundles/`.

@@ -287,20 +287,24 @@ check_compose_services() {
     printf '%s\n' "${ready_payload}"
 
     heartbeat_report=$(sh -c "${compose_bin} exec -T api python -c \"import json,urllib.request; data=json.load(urllib.request.urlopen('http://localhost:8000/readyz')); comps=data.get('components',{});\
-for name in ('worker','beat'):\
+for name in ('worker','beat','presence'):\
  c=comps.get(name,{}) or {};\
- print(name + '|' + ('ok' if c.get('ok') else 'bad') + '|' + str(c.get('stale_seconds','')) + '|' + str(c.get('error','')).replace('\\n',' '))\"" 2>/dev/null || true)
+ print(name + '|' + ('ok' if c.get('ok') else 'bad') + '|' + str(c.get('enabled','')) + '|' + str(c.get('stale_seconds','')) + '|' + str(c.get('error','')).replace('\\n',' '))\"" 2>/dev/null || true)
 
     if [ -z "${heartbeat_report}" ]; then
-      warn "Could not parse worker/beat heartbeat details from /readyz"
+      warn "Could not parse worker/beat/presence heartbeat details from /readyz"
     else
       old_ifs=$IFS
       IFS='
 '
       for report_line in ${heartbeat_report}; do
-        IFS='|' read -r component_name component_state stale_seconds component_error <<EOF
+        IFS='|' read -r component_name component_state component_enabled stale_seconds component_error <<EOF
 ${report_line}
 EOF
+        if [ "${component_name}" = "presence" ] && [ "${component_enabled}" != "True" ] && [ "${component_enabled}" != "true" ] && [ "${component_enabled}" != "1" ]; then
+          info "OK: presence sensing is disabled"
+          continue
+        fi
         if [ "${component_state}" = "ok" ]; then
           if [ -n "${stale_seconds}" ] && [ "${stale_seconds}" != "None" ]; then
             info "OK: ${component_name} heartbeat fresh (${stale_seconds}s old)"

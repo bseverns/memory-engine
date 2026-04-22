@@ -135,6 +135,14 @@ class RuntimeConfigValidationTests(EngineTestCase):
 
         self.assertIn("OPS_LOGIN_LOCKOUT_SCOPE", str(ctx.exception))
 
+    def test_runtime_config_validation_requires_camera_device_when_presence_enabled(self):
+        config = default_runtime_config(PRESENCE_SENSING_ENABLED=True, PRESENCE_CAMERA_DEVICE="")
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_runtime_settings(config)
+
+        self.assertIn("PRESENCE_CAMERA_DEVICE", str(ctx.exception))
+
 
     def test_engine_deployment_catalog_includes_planned_modes(self):
         self.assertEqual(DEFAULT_ENGINE_DEPLOYMENT, "memory")

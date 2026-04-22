@@ -166,6 +166,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 - MinIO deployment notes covering root-backed vs separate app credentials
 - Documented migration path from compose-managed MinIO to an external S3-compatible backend
 - Decision notes for MinIO bucket versioning and object locking posture
+- Optional audience-presence sensing seam (`opencv` motion via webcam) with `/readyz` + `/ops/` heartbeat visibility when the `presence` compose profile is enabled
 
 ### Recording experience
 - Split the browser experience into a dedicated recording station at `/kiosk/` and a separate playback surface at `/room/`

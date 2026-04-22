@@ -12,6 +12,8 @@ from django.utils import timezone
 from .base import EngineTestCase, make_test_wav_bytes
 from ..ops import (
     BEAT_HEARTBEAT_CACHE_KEY,
+    PRESENCE_HEARTBEAT_CACHE_KEY,
+    PRESENCE_STATE_CACHE_KEY,
     WORKER_HEARTBEAT_CACHE_KEY,
     api_health_component_status,
     health_component_status,
@@ -710,6 +712,76 @@ class OperatorBehaviorTests(EngineTestCase):
     @patch("engine.ops.s3_client")
     @patch("engine.ops.redis.Redis.from_url")
     @patch("engine.ops.connection.cursor")
+    @patch("engine.ops.broker_uses_external_redis", return_value=True)
+    @override_settings(PRESENCE_SENSING_ENABLED=True, CELERY_BROKER_URL="redis://redis:6379/0")
+    def test_health_component_status_reports_missing_presence_heartbeat_when_enabled(
+        self,
+        broker_uses_external_redis_mock,
+        cursor_mock,
+        redis_from_url_mock,
+        s3_client_mock,
+    ):
+        cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
+        redis_client = redis_from_url_mock.return_value
+        redis_client.ping.return_value = True
+        redis_client.llen.return_value = 0
+        redis_client.get.return_value = None
+        s3_client_mock.return_value.head_bucket.return_value = {}
+        record_worker_heartbeat()
+        record_beat_heartbeat()
+
+        ok, components = health_component_status()
+
+        self.assertFalse(ok)
+        self.assertFalse(components["presence"]["ok"])
+        self.assertTrue(components["presence"]["enabled"])
+
+    @patch("engine.ops.s3_client")
+    @patch("engine.ops.redis.Redis.from_url")
+    @patch("engine.ops.connection.cursor")
+    @patch("engine.ops.broker_uses_external_redis", return_value=True)
+    @override_settings(PRESENCE_SENSING_ENABLED=True, CELERY_BROKER_URL="redis://redis:6379/0")
+    def test_health_component_status_is_ok_with_fresh_presence_heartbeat(
+        self,
+        broker_uses_external_redis_mock,
+        cursor_mock,
+        redis_from_url_mock,
+        s3_client_mock,
+    ):
+        cursor_mock.return_value.__enter__.return_value.fetchone.return_value = (1,)
+        redis_client = redis_from_url_mock.return_value
+        redis_client.ping.return_value = True
+        redis_client.llen.return_value = 0
+        now_iso = timezone.now().isoformat()
+        state_payload = json.dumps({
+            "present": True,
+            "confidence": 0.81,
+            "motion_score": 0.02,
+            "source": "opencv-motion",
+        })
+
+        def get_side_effect(key):
+            if key == PRESENCE_HEARTBEAT_CACHE_KEY:
+                return now_iso
+            if key == PRESENCE_STATE_CACHE_KEY:
+                return state_payload
+            return None
+
+        redis_client.get.side_effect = get_side_effect
+        s3_client_mock.return_value.head_bucket.return_value = {}
+        record_worker_heartbeat()
+        record_beat_heartbeat()
+
+        ok, components = health_component_status()
+
+        self.assertTrue(components["presence"]["ok"])
+        self.assertTrue(components["presence"]["enabled"])
+        self.assertTrue(components["presence"]["present"])
+        self.assertEqual(components["presence"]["source"], "opencv-motion")
+
+    @patch("engine.ops.s3_client")
+    @patch("engine.ops.redis.Redis.from_url")
+    @patch("engine.ops.connection.cursor")
     def test_health_component_status_is_ok_with_fresh_worker_and_beat_heartbeats(
         self,
         cursor_mock,
@@ -838,6 +910,7 @@ class OperatorBehaviorTests(EngineTestCase):
                 "storage": {"ok": True},
                 "worker": {"ok": False, "error": "stale"},
                 "beat": {"ok": False, "error": "stale"},
+                "presence": {"ok": False, "enabled": True, "error": "stale"},
             },
         )
         self.login_operator()
@@ -848,6 +921,7 @@ class OperatorBehaviorTests(EngineTestCase):
         titles = {warning["title"] for warning in response.json()["warnings"]}
         self.assertIn("Worker heartbeat is stale", titles)
         self.assertIn("Beat heartbeat is stale", titles)
+        self.assertIn("Audience presence signal is stale", titles)
 
     def test_public_throttle_snapshots_track_recent_denials(self):
         record_throttle_denial("public_ingest")

@@ -113,10 +113,24 @@ def validate_runtime_settings(settings_obj) -> None:
     ensure_positive(errors, settings_obj, "OPS_LOGIN_LOCKOUT_SECONDS")
     ensure_positive(errors, settings_obj, "OPS_WORKER_HEARTBEAT_MAX_AGE_SECONDS")
     ensure_positive(errors, settings_obj, "OPS_BEAT_HEARTBEAT_MAX_AGE_SECONDS")
+    ensure_positive(errors, settings_obj, "OPS_PRESENCE_HEARTBEAT_MAX_AGE_SECONDS")
     ensure_positive(errors, settings_obj, "OPS_THROTTLE_EVENT_WINDOW_SECONDS")
     ensure_non_negative(errors, settings_obj, "OPS_QUEUE_DEPTH_WARNING")
     ensure_non_negative(errors, settings_obj, "OPS_QUEUE_DEPTH_CRITICAL")
     ensure_positive(errors, settings_obj, "OPS_TASK_FAILURE_WINDOW_SECONDS")
+    ensure_positive(errors, settings_obj, "PRESENCE_FRAME_WIDTH")
+    ensure_positive(errors, settings_obj, "PRESENCE_FRAME_HEIGHT")
+    ensure_positive(errors, settings_obj, "PRESENCE_FRAME_INTERVAL_MS")
+    ensure_between(
+        errors,
+        settings_obj,
+        "PRESENCE_MOTION_PIXEL_RATIO_THRESHOLD",
+        0.0,
+        1.0,
+        inclusive_min=False,
+        inclusive_max=True,
+    )
+    ensure_non_negative(errors, settings_obj, "PRESENCE_MOTION_MIN_CONTOUR_AREA")
     ensure_positive(errors, settings_obj, "MEDIA_ACCESS_TOKEN_TTL_SECONDS")
     ensure_positive(errors, settings_obj, "SURFACE_ACCESS_TOKEN_TTL_SECONDS")
     ensure_positive(errors, settings_obj, "INGEST_MAX_UPLOAD_BYTES")
@@ -142,6 +156,10 @@ def validate_runtime_settings(settings_obj) -> None:
         errors.append("OPS_SESSION_BINDING_MODE must be 'strict', 'user_agent', or 'none'.")
     if ops_login_lockout_scope not in {"ip", "ip_user_agent"}:
         errors.append("OPS_LOGIN_LOCKOUT_SCOPE must be 'ip' or 'ip_user_agent'.")
+    if bool(getattr(settings_obj, "PRESENCE_SENSING_ENABLED", False)):
+        presence_camera_device = str(getattr(settings_obj, "PRESENCE_CAMERA_DEVICE", "") or "").strip()
+        if not presence_camera_device:
+            errors.append("PRESENCE_CAMERA_DEVICE must be set when PRESENCE_SENSING_ENABLED=1.")
     for network in list(getattr(settings_obj, "OPS_ALLOWED_NETWORKS", []) or []):
         try:
             ipaddress.ip_network(str(network), strict=False)

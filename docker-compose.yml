@@ -141,6 +141,24 @@ services:
       start_period: 90s
     restart: unless-stopped
 
+  presence_sensor:
+    profiles: ["presence"]
+    build:
+      context: ./presence_sensor
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    devices:
+      - "${PRESENCE_CAMERA_DEVICE:-/dev/video0}:${PRESENCE_CAMERA_DEVICE:-/dev/video0}"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,sys,time; p='/tmp/presence_sensor.last'; sys.exit(0 if os.path.exists(p) and (time.time()-os.path.getmtime(p)) < 45 else 1)\""]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
 volumes:
   caddy_data:
   caddy_config:
