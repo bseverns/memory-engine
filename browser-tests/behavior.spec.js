@@ -190,7 +190,7 @@ test.describe("browser behavior contracts", () => {
     await expect(page.locator("#opsIngestRate")).toContainText("180/hour");
   });
 
-  test("session framing clears cleanly and lite archive card builds deterministic commands", async ({ page }) => {
+  test("operator lite keeps top controls visible, task tabs usable, and close archive safe", async ({ page }) => {
     await signIntoOps(page, { surface: "bench" });
 
     await page.locator("#opsSessionThemeTitle").fill("Arrival and thresholds");
@@ -214,10 +214,45 @@ test.describe("browser behavior contracts", () => {
 
     await page.goto("/ops/");
     await expect(page.getByRole("heading", { name: "Room Memory Steward Surface" })).toBeVisible();
+    await expect(page.locator("#opsLiteStateTitle")).not.toHaveText("Checking...");
+    await expect(page.locator("#opsLiteMaintenanceMode")).toBeVisible();
+    await expect(page.locator("#opsLiteIntakePaused")).toBeVisible();
+    await expect(page.locator("#opsLitePlaybackPaused")).toBeVisible();
+    await expect(page.locator("#opsLiteQuieterMode")).toBeVisible();
+    await expect(page.locator("#opsLiteClearSessionFraming")).toBeVisible();
+    await expect(page.locator("#opsLiteAudioTone")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open full bench" })).toBeVisible();
+
+    const tabs = page.getByRole("tab");
+    await expect(tabs).toHaveCount(4);
+    await expect(page.getByRole("tab", { name: "Open Room" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Run Room" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Fix Problem" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Close Session" })).toBeVisible();
+
+    await expect(page.locator("#opsLitePanelOpenRoom")).toBeVisible();
+    await page.getByRole("tab", { name: "Run Room" }).click();
+    await expect(page.locator("#opsLitePanelRunRoom")).toBeVisible();
+    await expect(page.locator("#opsLiteRunPosture")).not.toContainText("Waiting for room posture.");
+    await page.reload();
+    await expect(page.locator("#opsLitePanelRunRoom")).toBeVisible();
+    await page.getByRole("tab", { name: "Fix Problem" }).click();
+    await expect(page.locator("#opsLitePanelFixProblem")).toBeVisible();
+    await expect(page.locator("#opsLiteFixReason")).not.toContainText("Waiting for current failure reason.");
+    await page.getByRole("tab", { name: "Close Session" }).click();
+    await expect(page.locator("#opsLitePanelCloseSession")).toBeVisible();
     await expect(page.locator("#opsLiteArchiveCommand")).toContainText("./scripts/session_close_archive.sh");
     await page.locator("#opsLiteArchiveUsbPath").fill("/media/steward/SESSION_ARCHIVE");
     await page.locator("#opsLiteArchiveCommandBuild").click();
-    await expect(page.locator("#opsLiteArchiveCommand")).toContainText("--to-usb \"/media/steward/SESSION_ARCHIVE\"");
+    await expect(page.locator("#opsLiteArchiveCommand")).toContainText("--to-usb '/media/steward/SESSION_ARCHIVE'");
+
+    await page.locator("#opsLiteArchiveUsbPath").fill("SESSION_ARCHIVE");
+    await page.locator("#opsLiteArchiveCommandBuild").click();
+    await expect(page.locator("#opsLiteArchiveReadiness")).toContainText("must be absolute");
+    await expect(page.locator("#opsLiteArchiveCommand")).toHaveText("./scripts/session_close_archive.sh");
+
+    await page.locator("#opsLiteClearSessionFraming").click();
+    await expect(page.locator("#opsLiteSessionFramingStatus")).toContainText("No session framing/focus overrides are active.");
   });
 
   test("playback info lightbox opens and closes cleanly", async ({ page }) => {

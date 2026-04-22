@@ -263,7 +263,7 @@ That is the default conservative path for an existing server. It will:
 6. Run `./scripts/status.sh`.
 
 Then open `/ops/` and confirm the node is `ready` with no critical storage or pool warnings.
-Sign in there with `OPS_SHARED_SECRET`; the dashboard now protects live operator controls behind that shared secret, optional trusted-network rules, login lockout, and browser-bound steward sessions.
+Sign in there with `OPS_SHARED_SECRET`; steward controls stay behind shared-secret auth, optional trusted-network rules, login lockout, and browser-bound sessions.
 
 That sequence is deliberately conservative. The extra backup step matters more here than squeezing a few seconds out of deploy time.
 
@@ -277,17 +277,18 @@ If you need to skip one phase intentionally:
 
 ## Health and readiness
 
-There are four practical health surfaces:
+There are five practical health surfaces:
 
 - `docker compose ps` tells you whether the containers are running and whether Docker thinks health checks are passing.
 - `/healthz` is the narrow API/dependency view and is the source used by the API container health check.
 - `/readyz` is the broader cluster readiness view, including worker/beat heartbeat state.
-- `/ops/` is the human-facing dashboard for steward use during install or troubleshooting.
-- `/ops/` is now the authenticated steward surface. It exposes maintenance mode, pause-intake, pause-playback, and quieter-mode controls once the steward secret is accepted.
+- `/ops/` is Operator Lite: compact daily stewardship organized by task moment (`Open Room`, `Run Room`, `Fix Problem`, `Close Session`).
+- `/ops/bench/` is Operator Bench: full diagnostics, artifact stewardship, monitor tools, and deeper troubleshooting.
+- both `/ops/` and `/ops/bench/` are authenticated steward surfaces.
 - `/ops/` can also be narrowed to trusted IPs or CIDR ranges with `OPS_ALLOWED_NETWORKS`.
 - repeated bad sign-in attempts now lock out temporarily based on `OPS_LOGIN_MAX_ATTEMPTS` and `OPS_LOGIN_LOCKOUT_SECONDS`.
-- `/ops/` also reports retention posture: raw audio still held, raw audio expiring soon, fossils retained, and fossils that now exist only as residue.
-- `/ops/` is also the place to run the deeper monitor check: output tone plus live mic pass-through, both local to the steward browser and never archived.
+- `/ops/` keeps state strip, survival controls, evidence chips, and close-session archive guidance visible first.
+- `/ops/bench/` carries the full retention posture and deeper monitor/troubleshooting layers.
 - For unattended listening machines, launch Chromium through `./scripts/browser_kiosk.sh --role room --base-url ...` so the browser picks up the autoplay-safe flags instead of relying on a one-tap recovery after every reboot.
 
 ## Opening posture
@@ -317,6 +318,8 @@ Use this sequence when the session ends:
 4. Run `./scripts/session_close_archive.sh` (or `--to-usb /absolute/mount/path` for USB handoff).
 5. Leave a short steward note with the printed backup/export paths.
 6. Use maintenance mode only if the node should stay explicitly out of service until the next steward returns.
+
+Route hierarchy and design rationale are documented in [OPERATOR_SURFACES.md](./OPERATOR_SURFACES.md).
 
 Expected healthy services:
 

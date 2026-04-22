@@ -6,174 +6,439 @@
   <title>Room Memory - Operator Lite</title>
   <link rel="stylesheet" href="/static/engine/kiosk.css"/>
   <style>
-    .lite-grid {
+    .ops-lite-hero {
+      margin-bottom: 0.8rem;
+    }
+    .ops-lite-hero h1 {
+      font-size: clamp(2.1rem, 5.8vw, 4.3rem);
+      margin-bottom: 0.4rem;
+    }
+    .ops-lite-hero .sub,
+    .ops-lite-hero .hint {
+      max-width: 68ch;
+    }
+    .ops-lite-top-panel {
+      margin-top: 0;
+      padding: 16px 18px;
+    }
+    .ops-lite-state-strip {
       display: grid;
       gap: 0.8rem;
+      grid-template-columns: minmax(260px, 1fr) auto;
+      align-items: start;
+    }
+    .ops-lite-state-strip h2 {
+      margin: 0;
+      font-size: 1.55rem;
+      letter-spacing: -0.02em;
+    }
+    .ops-lite-state-meta {
+      display: grid;
+      gap: 0.45rem;
+      justify-items: end;
+      align-content: start;
+    }
+    .ops-lite-next-action {
+      margin-top: 0.35rem;
+      margin-bottom: 0;
+    }
+    .ops-lite-controls-panel,
+    .ops-lite-evidence-panel,
+    .ops-lite-task-panel {
+      margin-top: 10px;
+      padding: 16px 18px;
+    }
+    .ops-lite-control-form {
+      display: grid;
+      gap: 10px;
+    }
+    .ops-lite-control-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .ops-lite-toggle-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 40px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(84, 58, 28, 0.18);
+      background: #fffdf8;
+      color: var(--text);
+      font-size: 0.95rem;
+      line-height: 1.2;
+      cursor: pointer;
+      user-select: none;
+    }
+    .ops-lite-toggle-chip input {
+      margin: 0;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent-strong);
+    }
+    .ops-lite-evidence-row {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    }
+    .ops-lite-chip {
+      border: 1px solid rgba(84, 58, 28, 0.12);
+      border-radius: var(--radius-pill);
+      background: #fffdf8;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ops-lite-chip strong {
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .ops-lite-chip span {
+      font-size: 1.1rem;
+      line-height: 1.2;
+      color: var(--accent-strong);
+      word-break: break-word;
+    }
+    .ops-lite-tablist {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(4, minmax(130px, 1fr));
+      margin-top: 10px;
+      margin-bottom: 12px;
+    }
+    .ops-lite-tab {
+      min-height: 54px;
+      border: 1px solid rgba(84, 58, 28, 0.22);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fffdf8;
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+    }
+    .ops-lite-tab[aria-selected="true"] {
+      border-color: rgba(68, 129, 118, 0.76);
+      box-shadow: 0 0 0 1px rgba(68, 129, 118, 0.2) inset;
+      background: rgba(216, 242, 238, 0.56);
+    }
+    .ops-lite-tab:focus-visible {
+      outline: 2px solid rgba(68, 129, 118, 0.7);
+      outline-offset: 2px;
+    }
+    .ops-lite-tab:hover {
+      transform: translateY(-1px);
+    }
+    .ops-lite-tab-panel {
+      border: 1px solid rgba(84, 58, 28, 0.12);
+      border-radius: var(--radius-card);
+      background: #fffdf8;
+      padding: 14px;
+    }
+    .ops-lite-panel-grid {
+      display: grid;
+      gap: 12px;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
-    .lite-stage-card {
-      border: 1px solid rgba(255, 255, 255, 0.2);
+    .ops-lite-block {
+      border: 1px solid rgba(84, 58, 28, 0.12);
+      border-radius: var(--radius-card);
+      padding: 12px;
+      background: rgba(255, 253, 248, 0.68);
+      display: grid;
+      gap: 8px;
+      align-content: start;
     }
-    .lite-stage-card.active {
-      border-color: rgba(142, 230, 196, 0.9);
-      box-shadow: 0 0 0 1px rgba(142, 230, 196, 0.3) inset;
+    .ops-lite-block h4 {
+      margin: 0;
+      font-size: 1.05rem;
+      letter-spacing: -0.01em;
     }
-    .lite-stage-card strong {
-      display: block;
-      margin-bottom: 0.35rem;
+    .ops-lite-block p {
+      margin: 0;
+      color: var(--muted);
+    }
+    .ops-lite-checklist {
+      margin: 0;
+      padding-left: 1.1rem;
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+    }
+    .ops-lite-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .ops-lite-archive-command {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      border-radius: 12px;
+      border: 1px solid rgba(84, 58, 28, 0.12);
+      background: #fffdf8;
+      padding: 10px 12px;
+    }
+    .ops-lite-panel-stack {
+      display: grid;
+      gap: 12px;
+    }
+    .ops-lite-warning-list {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    @media (max-width: 980px) {
+      .ops-lite-state-strip {
+        grid-template-columns: 1fr;
+      }
+      .ops-lite-state-meta {
+        justify-items: start;
+      }
+      .ops-lite-tablist {
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+      }
+    }
+    @media (max-width: 620px) {
+      .ops-lite-tablist {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body>
   <div class="shell dashboard-shell">
-    <header class="hero">
+    <header class="hero ops-lite-hero">
       <p class="eyebrow">Operator lite</p>
       <h1>Room Memory Steward Surface</h1>
-      <p class="sub">A calmer operations view for open, live, incident, and close posture. Use full bench for deep diagnostics and artifact tools.</p>
+      <p class="sub">Compact daily stewardship by task moment: open, run, fix, close.</p>
       <p class="hint">Active deployment: <strong>{{ engine_deployment.label }}</strong> ({{ engine_deployment.code }}). {{ engine_deployment.behavior_summary }}</p>
     </header>
 
-    <section class="panel dashboard-panel">
-      <div class="panel-head">
+    <section class="panel dashboard-panel ops-lite-top-panel" aria-live="polite">
+      <div class="ops-lite-state-strip">
         <div>
-          <p class="section-kicker">Machine posture</p>
-          <h3 id="opsLiteStateTitle">Checking...</h3>
+          <p class="section-kicker">Top state</p>
+          <h2 id="opsLiteStateTitle">Checking...</h2>
+          <p id="opsLiteNextAction" class="stage-copy ops-lite-next-action">Waiting for current node status.</p>
         </div>
-        <span id="opsLiteStateBadge" class="ops-state degraded">checking</span>
-      </div>
-      <p id="opsLiteNextAction" class="stage-copy">Waiting for current node status.</p>
-      <div class="shortcut-row">
-        <span id="opsLiteRefreshed" class="shortcut">Waiting for first refresh</span>
-        <a class="btn secondary link-btn" href="/ops/bench/">Open full bench</a>
-        <a class="btn secondary link-btn" href="/kiosk/">Open kiosk</a>
-        <a class="btn secondary link-btn" href="/room/">Open room</a>
+        <div class="ops-lite-state-meta">
+          <span id="opsLiteStateBadge" class="ops-state degraded">checking</span>
+          <span id="opsLiteRefreshed" class="shortcut">Waiting for first refresh</span>
+        </div>
       </div>
     </section>
 
-    <section class="panel dashboard-panel">
+    <section class="panel dashboard-panel ops-lite-controls-panel">
       <div class="panel-head">
         <div>
           <p class="section-kicker">Primary controls</p>
-          <h3>Pause and maintenance only</h3>
+          <h3>Fast safety controls stay visible</h3>
         </div>
       </div>
-      <form id="opsLiteControlsForm" class="ops-controls-form">
-        <label class="ops-toggle">
-          <input id="opsLiteMaintenanceMode" type="checkbox" name="maintenance_mode"/>
-          <span>
-            <strong>Maintenance mode</strong>
-            <span>Suspends intake and playback so service work can happen cleanly.</span>
-          </span>
-        </label>
-        <label class="ops-toggle">
-          <input id="opsLiteIntakePaused" type="checkbox" name="intake_paused"/>
-          <span>
-            <strong>Pause intake</strong>
-            <span>Stops new recordings from being saved.</span>
-          </span>
-        </label>
-        <label class="ops-toggle">
-          <input id="opsLitePlaybackPaused" type="checkbox" name="playback_paused"/>
-          <span>
-            <strong>Pause playback</strong>
-            <span>Keeps the room silent without shutting the stack down.</span>
-          </span>
-        </label>
-        <label class="ops-toggle">
-          <input id="opsLiteQuieterMode" type="checkbox" name="quieter_mode"/>
-          <span>
-            <strong>Quieter mode</strong>
-            <span>Softens room playback posture while leaving behavior intact.</span>
-          </span>
-        </label>
+      <form id="opsLiteControlsForm" class="ops-lite-control-form">
+        <div class="ops-lite-control-row">
+          <label class="ops-lite-toggle-chip" for="opsLiteMaintenanceMode">
+            <input id="opsLiteMaintenanceMode" type="checkbox" name="maintenance_mode"/>
+            <span>Maintenance mode</span>
+          </label>
+          <label class="ops-lite-toggle-chip" for="opsLiteIntakePaused">
+            <input id="opsLiteIntakePaused" type="checkbox" name="intake_paused"/>
+            <span>Pause intake</span>
+          </label>
+          <label class="ops-lite-toggle-chip" for="opsLitePlaybackPaused">
+            <input id="opsLitePlaybackPaused" type="checkbox" name="playback_paused"/>
+            <span>Pause playback</span>
+          </label>
+          <label class="ops-lite-toggle-chip" for="opsLiteQuieterMode">
+            <input id="opsLiteQuieterMode" type="checkbox" name="quieter_mode"/>
+            <span>Quieter mode</span>
+          </label>
+        </div>
         <div class="shortcut-row">
           <button id="opsLiteControlsSave" type="submit" class="btn">Apply controls</button>
           <button id="opsLiteClearSessionFraming" type="button" class="btn secondary">Clear session framing</button>
           <button id="opsLiteAudioTone" type="button" class="btn secondary">Run output tone</button>
+          <a class="btn secondary link-btn" href="/ops/bench/">Open full bench</a>
           <span id="opsLiteControlStatus" class="shortcut">Controls are loading.</span>
         </div>
       </form>
-      <p id="opsLiteSessionFramingStatus" class="shortcut">Session framing and deployment focus are loading.</p>
     </section>
 
-    <section class="panel dashboard-panel">
+    <section class="panel dashboard-panel ops-lite-evidence-panel">
       <div class="panel-head">
         <div>
-          <p class="section-kicker">Session close archive</p>
-          <h3>Guided host command</h3>
+          <p class="section-kicker">Evidence chips</p>
+          <h3>Numbers that matter first</h3>
         </div>
       </div>
-      <p class="stage-copy">This page does not run host scripts. It prepares the exact shell command for a steward to run: consistent backup, then export bundle, with optional USB copy.</p>
-      <p id="opsLiteArchiveReadiness" class="shortcut">Checking archive readiness cues.</p>
-      <label class="ops-login-field" for="opsLiteArchiveUsbPath">
-        <span>
-          <strong>USB mount path (optional)</strong>
-          <span>Leave empty for local export only. Use an absolute mounted path to copy/checksum to USB.</span>
-        </span>
-        <input id="opsLiteArchiveUsbPath" type="text" placeholder="/media/steward/SESSION_ARCHIVE"/>
-      </label>
-      <div class="shortcut-row">
-        <button id="opsLiteArchiveCommandBuild" type="button" class="btn secondary">Build archive command</button>
-        <button id="opsLiteArchiveCommandCopy" type="button" class="btn secondary">Copy command</button>
+      <div class="ops-lite-evidence-row">
+        <article class="ops-lite-chip">
+          <strong>Playable</strong>
+          <span id="opsLitePlayable">-</span>
+        </article>
+        <article class="ops-lite-chip">
+          <strong>Warnings</strong>
+          <span id="opsLiteWarningCount">-</span>
+        </article>
+        <article class="ops-lite-chip">
+          <strong>Storage</strong>
+          <span id="opsLiteStorage">-</span>
+        </article>
+        <article class="ops-lite-chip">
+          <strong>Last action</strong>
+          <span id="opsLiteLastAction">-</span>
+        </article>
       </div>
-      <pre id="opsLiteArchiveCommand" class="shortcut">./scripts/session_close_archive.sh</pre>
     </section>
 
-    <section class="panel dashboard-panel">
+    <section class="panel dashboard-panel ops-lite-task-panel">
       <div class="panel-head">
         <div>
-          <p class="section-kicker">Quick evidence</p>
-          <h3>What matters first</h3>
+          <p class="section-kicker">Task moments</p>
+          <h3 id="opsLiteRecommendedStage">Recommended task: Open Room</h3>
         </div>
       </div>
-      <div class="status-grid">
-        <article class="status-card">
-          <p class="section-kicker">Playable</p>
-          <div id="opsLitePlayable" class="status-number">-</div>
-        </article>
-        <article class="status-card">
-          <p class="section-kicker">Warnings</p>
-          <div id="opsLiteWarningCount" class="status-number">-</div>
-        </article>
-        <article class="status-card">
-          <p class="section-kicker">Free storage</p>
-          <div id="opsLiteStorage" class="status-number">-</div>
-        </article>
-        <article class="status-card">
-          <p class="section-kicker">Last steward action</p>
-          <div id="opsLiteLastAction" class="status-number ops-status-copy">-</div>
-        </article>
+      <div id="opsLiteTaskTabs" class="ops-lite-tablist" role="tablist" aria-label="Operator task moments">
+        <button id="opsLiteTabOpenRoom" class="ops-lite-tab" role="tab" aria-selected="true" aria-controls="opsLitePanelOpenRoom" data-tab="open-room" tabindex="0">Open Room</button>
+        <button id="opsLiteTabRunRoom" class="ops-lite-tab" role="tab" aria-selected="false" aria-controls="opsLitePanelRunRoom" data-tab="run-room" tabindex="-1">Run Room</button>
+        <button id="opsLiteTabFixProblem" class="ops-lite-tab" role="tab" aria-selected="false" aria-controls="opsLitePanelFixProblem" data-tab="fix-problem" tabindex="-1">Fix Problem</button>
+        <button id="opsLiteTabCloseSession" class="ops-lite-tab" role="tab" aria-selected="false" aria-controls="opsLitePanelCloseSession" data-tab="close-session" tabindex="-1">Close Session</button>
       </div>
-      <div id="opsLiteWarnings" class="component-list"></div>
-    </section>
 
-    <section class="panel dashboard-panel">
-      <div class="panel-head">
-        <div>
-          <p class="section-kicker">Guided playbook</p>
-          <h3 id="opsLiteRecommendedStage">Recommended stage: open</h3>
+      <section id="opsLitePanelOpenRoom" class="ops-lite-tab-panel" role="tabpanel" aria-labelledby="opsLiteTabOpenRoom" data-tab-panel="open-room">
+        <div class="ops-lite-panel-grid">
+          <article class="ops-lite-block">
+            <h4>Opening checklist</h4>
+            <ol class="ops-lite-checklist">
+              <li>Confirm top state is ready or understood degraded.</li>
+              <li>Run output tone and verify routing.</li>
+              <li>Open kiosk and room surfaces before arrival.</li>
+              <li>Confirm intake/playback are not paused by mistake.</li>
+            </ol>
+          </article>
+          <article class="ops-lite-block">
+            <h4>Surfaces</h4>
+            <div class="ops-lite-links">
+              <a class="btn secondary link-btn" href="/kiosk/">Open kiosk</a>
+              <a class="btn secondary link-btn" href="/room/">Open room</a>
+              <a class="btn secondary link-btn" href="/revoke/">Open revoke page</a>
+            </div>
+            <button id="opsLiteAudioToneOpenRoom" type="button" class="btn secondary">Run output tone again</button>
+          </article>
+          <article class="ops-lite-block">
+            <h4>Deployment and framing</h4>
+            <p><strong>Deployment:</strong> {{ engine_deployment.label }} ({{ engine_deployment.code }})</p>
+            <p><strong>Behavior:</strong> {{ engine_deployment.behavior_summary }}</p>
+            <p id="opsLiteSessionFramingStatus" class="shortcut">Session framing and deployment focus are loading.</p>
+          </article>
+          <article class="ops-lite-block">
+            <h4>Ready to open?</h4>
+            <p id="opsLiteReadyCue">Checking room-open cues.</p>
+          </article>
         </div>
-      </div>
-      <div class="lite-grid">
-        <article id="opsLiteStageOpen" class="component-card ready lite-stage-card">
-          <strong>Open</strong>
-          <span>1. Check state is not broken. 2. Run output tone. 3. Open `/kiosk/` and `/room/`. 4. Confirm intake/playback are not paused.</span>
-        </article>
-        <article id="opsLiteStageLive" class="component-card ready lite-stage-card">
-          <strong>Live</strong>
-          <span>Watch warnings, storage, and latest actions. Keep this page visible. Use full bench only when a specific deeper tool is needed.</span>
-        </article>
-        <article id="opsLiteStageIncident" class="component-card degraded lite-stage-card">
-          <strong>Incident</strong>
-          <span>Pause intake if needed, stabilize playback posture, then open full bench to inspect dependencies and deeper diagnostics.</span>
-        </article>
-        <article id="opsLiteStageClose" class="component-card ready lite-stage-card">
-          <strong>Close</strong>
-          <span>Confirm no active recording, check warnings, create backup/export as needed, then leave explicit maintenance posture only if intended.</span>
-        </article>
-      </div>
-      <div class="shortcut-row">
-        <a class="btn secondary link-btn" href="/ops/bench/">Open full bench</a>
+      </section>
+
+      <section id="opsLitePanelRunRoom" class="ops-lite-tab-panel" role="tabpanel" aria-labelledby="opsLiteTabRunRoom" data-tab-panel="run-room" hidden>
+        <div class="ops-lite-panel-grid">
+          <article class="ops-lite-block">
+            <h4>Live posture</h4>
+            <p id="opsLiteRunPosture">Waiting for room posture.</p>
+            <p id="opsLiteRunGuidance">Keep this surface visible and intervene only when warnings rise.</p>
+          </article>
+          <article class="ops-lite-block">
+            <h4>Session framing</h4>
+            <p id="opsLiteRunSessionFramingStatus">Session framing and deployment focus are loading.</p>
+          </article>
+          <article class="ops-lite-block">
+            <h4>Active pause/quiet state</h4>
+            <p id="opsLiteRunControlState">Control posture is loading.</p>
+          </article>
+          <article class="ops-lite-block">
+            <h4>Current room evidence</h4>
+            <p id="opsLiteRunSnapshot">Waiting for playback and warning counts.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="opsLitePanelFixProblem" class="ops-lite-tab-panel" role="tabpanel" aria-labelledby="opsLiteTabFixProblem" data-tab-panel="fix-problem" hidden>
+        <div class="ops-lite-panel-stack">
+          <article class="ops-lite-block">
+            <h4>Reason for degraded/broken</h4>
+            <p id="opsLiteFixReason">Waiting for current failure reason.</p>
+          </article>
+          <div id="opsLiteWarnings" class="ops-lite-warning-list"></div>
+          <div class="ops-lite-panel-grid">
+            <article class="ops-lite-block">
+              <h4>If kiosk looks dead</h4>
+              <p>Check browser focus and permission chips first. Test normal keyboard input before assuming HID firmware drift.</p>
+            </article>
+            <article class="ops-lite-block">
+              <h4>If room sounds silent</h4>
+              <p>Confirm playback/maintenance toggles, refresh `/room/`, and only then move to deeper dependency checks.</p>
+            </article>
+            <article class="ops-lite-block">
+              <h4>Revoke and removal</h4>
+              <p>Use `/revoke/` for participant receipts and use remove-from-stack on bench for urgent stewardship actions.</p>
+              <div class="ops-lite-links">
+                <a class="btn secondary link-btn" href="/revoke/">Open revoke</a>
+                <a class="btn secondary link-btn" href="/ops/bench/">Open full bench</a>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="opsLitePanelCloseSession" class="ops-lite-tab-panel" role="tabpanel" aria-labelledby="opsLiteTabCloseSession" data-tab-panel="close-session" hidden>
+        <div class="ops-lite-panel-stack">
+          <article class="ops-lite-block">
+            <h4>Clear stale session framing</h4>
+            <p>Clear session theme and deployment focus before the next steward shift.</p>
+            <div class="ops-lite-links">
+              <button id="opsLiteClearSessionFramingTab" type="button" class="btn secondary">Clear session framing</button>
+            </div>
+          </article>
+          <article class="ops-lite-block">
+            <h4>Session close archive command</h4>
+            <p class="stage-copy">This page does not run host scripts. It prepares the exact host command for consistent backup then export.</p>
+            <p id="opsLiteArchiveReadiness" class="shortcut">Checking archive readiness cues.</p>
+            <label class="ops-login-field" for="opsLiteArchiveUsbPath">
+              <span>
+                <strong>USB mount path (optional)</strong>
+                <span>Leave empty for local export only. Use an absolute mounted path for USB copy.</span>
+              </span>
+              <input id="opsLiteArchiveUsbPath" type="text" placeholder="/media/steward/SESSION_ARCHIVE"/>
+            </label>
+            <div class="shortcut-row">
+              <button id="opsLiteArchiveCommandBuild" type="button" class="btn secondary">Build archive command</button>
+              <button id="opsLiteArchiveCommandCopy" type="button" class="btn secondary">Copy command</button>
+            </div>
+            <pre id="opsLiteArchiveCommand" class="ops-lite-archive-command">./scripts/session_close_archive.sh</pre>
+          </article>
+          <article class="ops-lite-block">
+            <h4>Close-of-day checklist</h4>
+            <ol class="ops-lite-checklist">
+              <li>Confirm no one is still recording.</li>
+              <li>Clear session framing and focus.</li>
+              <li>Run archive command (local or USB handoff).</li>
+              <li>Leave steward notes with backup/export paths.</li>
+              <li>Leave maintenance mode on only if intentionally out of service.</li>
+            </ol>
+          </article>
+        </div>
+      </section>
+
+      <div class="shortcut-row" style="margin-top: 10px;">
         <a class="btn secondary link-btn" href="/api/v1/operator/artifact-summary">Download artifact summary</a>
         <a class="btn secondary link-btn" href="/readyz">Readiness JSON</a>
         <form action="/ops/logout/" method="post" class="inline-form">

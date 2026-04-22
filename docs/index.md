@@ -95,7 +95,8 @@ If you are teaching, training stewards, or running bounded evaluations:
 |---|---|---|
 | `/kiosk/` | Record an offering, review it, choose consent, receive a revoke code | [installation-checklist.md](./installation-checklist.md) |
 | `/room/` | Play the room loop on a dedicated listening machine | [multi-machine-setup.md](./multi-machine-setup.md) |
-| `/ops/` | Check health, pause intake/playback, steward artifacts, run local monitor checks | [maintenance.md](./maintenance.md) |
+| `/ops/` | Operator Lite: compact daily steward surface organized by task moments (`Open Room`, `Run Room`, `Fix Problem`, `Close Session`) | [maintenance.md](./maintenance.md) |
+| `/ops/bench/` | Operator Bench: full diagnostics, artifact stewardship, monitor tools, and deeper status | [maintenance.md](./maintenance.md) |
 | `/revoke/` | Public revocation flow using the participant receipt code | [participant-prompt-card.md](./participant-prompt-card.md) |
 
 ## Current Reference Posture
@@ -126,6 +127,7 @@ If you are teaching, training stewards, or running bounded evaluations:
 - [memory-lifecycle.md](./memory-lifecycle.md): ingest, playback, wear, expiry, and revoke diagrams
 - [experimental-proofs.md](./experimental-proofs.md): proof board for current and next validation passes
 - [maintenance.md](./maintenance.md): deploy, backup, restore, and repair commands
+- [OPERATOR_SURFACES.md](./OPERATOR_SURFACES.md): why `/ops/` is organized by task moments and what belongs in lite vs bench
 - [SESSION_AND_FOCUS_CONTROLS.md](./SESSION_AND_FOCUS_CONTROLS.md): bounded steward framing controls, reset policy, and end-session archive ritual
 - [PRESENCE_SENSING.md](./PRESENCE_SENSING.md): ethics/install boundary for optional audience-presence sensing
 - [UBUNTU_APPLIANCE.md](./UBUNTU_APPLIANCE.md): firewall and restart-on-boot host recipe

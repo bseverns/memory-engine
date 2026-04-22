@@ -48,6 +48,15 @@ test("recommendedStage chooses incident for degraded or maintenance posture", ()
   );
 });
 
+test("recommendedTab maps incident posture to Fix Problem", () => {
+  const tab = operatorLite.recommendedTab(
+    { operator_state: { maintenance_mode: false }, playable: 12 },
+    { state: "degraded" },
+  );
+
+  assert.equal(tab, "fix-problem");
+});
+
 test("nextActionText favors calm live guidance when healthy and unpaused", () => {
   const text = operatorLite.nextActionText(
     {
@@ -65,13 +74,39 @@ test("nextActionText favors calm live guidance when healthy and unpaused", () =>
   assert.match(text, /Open `\/kiosk\/` and `\/room\/`/);
 });
 
-test("buildArchiveCommand keeps local default and adds quoted USB path when provided", () => {
+test("buildArchiveCommand keeps local default and safely quotes USB paths", () => {
   assert.equal(
     operatorLite.buildArchiveCommand(""),
     "./scripts/session_close_archive.sh",
   );
   assert.equal(
-    operatorLite.buildArchiveCommand("/media/steward/SESSION_ARCHIVE"),
-    "./scripts/session_close_archive.sh --to-usb \"/media/steward/SESSION_ARCHIVE\"",
+    operatorLite.buildArchiveCommand("/media/steward/SESSION ARCHIVE"),
+    "./scripts/session_close_archive.sh --to-usb '/media/steward/SESSION ARCHIVE'",
   );
+  assert.equal(
+    operatorLite.buildArchiveCommand("/media/steward/it's-safe"),
+    "./scripts/session_close_archive.sh --to-usb '/media/steward/it'\\''s-safe'",
+  );
+});
+
+test("buildArchiveCommandResult rejects non-absolute USB paths safely", () => {
+  const result = operatorLite.buildArchiveCommandResult("SESSION_ARCHIVE");
+
+  assert.equal(result.command, "./scripts/session_close_archive.sh");
+  assert.match(result.error, /must be absolute/i);
+});
+
+test("validateUsbPath rejects control characters", () => {
+  const result = operatorLite.validateUsbPath("/media/steward/SESSION\nARCHIVE");
+
+  assert.equal(result.ok, false);
+  assert.match(result.error, /unsafe control characters/i);
+});
+
+test("tab helpers normalize and parse persisted tab keys", () => {
+  assert.equal(operatorLite.normalizeTabKey("FIX-PROBLEM"), "fix-problem");
+  assert.equal(operatorLite.tabKeyFromHash("#ops-tab=close-session"), "close-session");
+  assert.equal(operatorLite.tabKeyFromHash("#run-room"), "run-room");
+  assert.equal(operatorLite.tabKeyFromHash("#unknown"), "");
+  assert.deepEqual(operatorLite.TAB_KEYS, ["open-room", "run-room", "fix-problem", "close-session"]);
 });

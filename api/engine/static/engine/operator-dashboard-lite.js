@@ -9,6 +9,16 @@
     ? globalThis
     : (typeof window !== "undefined" ? window : {});
 
+  const DEFAULT_ARCHIVE_COMMAND = "./scripts/session_close_archive.sh";
+  const TAB_STORAGE_KEY = "memory-engine.ops-lite.selected-tab";
+  const TAB_KEYS = ["open-room", "run-room", "fix-problem", "close-session"];
+  const TAB_LABELS = {
+    "open-room": "Open Room",
+    "run-room": "Run Room",
+    "fix-problem": "Fix Problem",
+    "close-session": "Close Session",
+  };
+
   function classifyState(payload) {
     const components = payload.components || {};
     const failedNames = Object.entries(components)
@@ -46,6 +56,14 @@
       return "open";
     }
     return "live";
+  }
+
+  function recommendedTab(payload, state) {
+    const stage = recommendedStage(payload, state);
+    if (stage === "incident") return "fix-problem";
+    if (stage === "live") return "run-room";
+    if (stage === "close") return "close-session";
+    return "open-room";
   }
 
   function nextActionText(payload, state) {
@@ -131,12 +149,45 @@
     return "";
   }
 
+  function validateUsbPath(usbPath = "") {
+    const path = String(usbPath || "").trim();
+    if (!path) {
+      return { ok: true, path: "", error: "" };
+    }
+    if (!path.startsWith("/")) {
+      return { ok: false, path: "", error: "USB path must be absolute (for example /media/steward/SESSION_ARCHIVE)." };
+    }
+    if (/[\0\r\n]/.test(path)) {
+      return { ok: false, path: "", error: "USB path contains unsafe control characters." };
+    }
+    return { ok: true, path, error: "" };
+  }
+
+  function shellQuote(value = "") {
+    const escaped = String(value).replace(/'/g, "'\\''");
+    return `'${escaped}'`;
+  }
+
   function buildArchiveCommand(usbPath = "") {
     const trimmed = String(usbPath || "").trim();
     if (!trimmed) {
-      return "./scripts/session_close_archive.sh";
+      return DEFAULT_ARCHIVE_COMMAND;
     }
-    return `./scripts/session_close_archive.sh --to-usb "${trimmed}"`;
+    return `${DEFAULT_ARCHIVE_COMMAND} --to-usb ${shellQuote(trimmed)}`;
+  }
+
+  function buildArchiveCommandResult(usbPath = "") {
+    const validation = validateUsbPath(usbPath);
+    if (!validation.ok) {
+      return {
+        command: DEFAULT_ARCHIVE_COMMAND,
+        error: validation.error,
+      };
+    }
+    return {
+      command: buildArchiveCommand(validation.path),
+      error: "",
+    };
   }
 
   function hasSessionFraming(state = {}) {
@@ -183,6 +234,51 @@
     }
   }
 
+  function normalizeTabKey(tabKey) {
+    const normalized = String(tabKey || "").trim().toLowerCase();
+    return TAB_KEYS.includes(normalized) ? normalized : "";
+  }
+
+  function tabKeyFromHash(hashValue) {
+    const rawHash = String(hashValue || "").trim();
+    if (!rawHash.startsWith("#")) {
+      return "";
+    }
+    const withoutHash = rawHash.slice(1);
+    if (withoutHash.startsWith("ops-tab=")) {
+      return normalizeTabKey(withoutHash.slice("ops-tab=".length));
+    }
+    return normalizeTabKey(withoutHash);
+  }
+
+  function hashForTab(tabKey) {
+    return `#ops-tab=${tabKey}`;
+  }
+
+  function readStoredTab(globalObject = globalObjectRef) {
+    try {
+      return normalizeTabKey(globalObject.localStorage?.getItem(TAB_STORAGE_KEY) || "");
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function writeStoredTab(tabKey, globalObject = globalObjectRef) {
+    try {
+      if (globalObject.localStorage?.setItem) {
+        globalObject.localStorage.setItem(TAB_STORAGE_KEY, tabKey);
+      }
+    } catch (error) {
+      // Ignore storage errors in restricted browsers.
+    }
+  }
+
+  function setText(el, value) {
+    if (el) {
+      el.textContent = value;
+    }
+  }
+
   function collectDom(doc) {
     return {
       opsLiteStateTitle: doc.getElementById("opsLiteStateTitle"),
@@ -196,24 +292,31 @@
       opsLiteQuieterMode: doc.getElementById("opsLiteQuieterMode"),
       opsLiteControlsSave: doc.getElementById("opsLiteControlsSave"),
       opsLiteClearSessionFraming: doc.getElementById("opsLiteClearSessionFraming"),
+      opsLiteClearSessionFramingTab: doc.getElementById("opsLiteClearSessionFramingTab"),
       opsLiteControlStatus: doc.getElementById("opsLiteControlStatus"),
       opsLiteSessionFramingStatus: doc.getElementById("opsLiteSessionFramingStatus"),
+      opsLiteRunSessionFramingStatus: doc.getElementById("opsLiteRunSessionFramingStatus"),
       opsLiteAudioTone: doc.getElementById("opsLiteAudioTone"),
+      opsLiteAudioToneOpenRoom: doc.getElementById("opsLiteAudioToneOpenRoom"),
       opsLitePlayable: doc.getElementById("opsLitePlayable"),
       opsLiteWarningCount: doc.getElementById("opsLiteWarningCount"),
       opsLiteStorage: doc.getElementById("opsLiteStorage"),
       opsLiteLastAction: doc.getElementById("opsLiteLastAction"),
       opsLiteWarnings: doc.getElementById("opsLiteWarnings"),
       opsLiteRecommendedStage: doc.getElementById("opsLiteRecommendedStage"),
-      opsLiteStageOpen: doc.getElementById("opsLiteStageOpen"),
-      opsLiteStageLive: doc.getElementById("opsLiteStageLive"),
-      opsLiteStageIncident: doc.getElementById("opsLiteStageIncident"),
-      opsLiteStageClose: doc.getElementById("opsLiteStageClose"),
+      opsLiteReadyCue: doc.getElementById("opsLiteReadyCue"),
+      opsLiteRunPosture: doc.getElementById("opsLiteRunPosture"),
+      opsLiteRunGuidance: doc.getElementById("opsLiteRunGuidance"),
+      opsLiteRunControlState: doc.getElementById("opsLiteRunControlState"),
+      opsLiteRunSnapshot: doc.getElementById("opsLiteRunSnapshot"),
+      opsLiteFixReason: doc.getElementById("opsLiteFixReason"),
       opsLiteArchiveReadiness: doc.getElementById("opsLiteArchiveReadiness"),
       opsLiteArchiveUsbPath: doc.getElementById("opsLiteArchiveUsbPath"),
       opsLiteArchiveCommandBuild: doc.getElementById("opsLiteArchiveCommandBuild"),
       opsLiteArchiveCommandCopy: doc.getElementById("opsLiteArchiveCommandCopy"),
       opsLiteArchiveCommand: doc.getElementById("opsLiteArchiveCommand"),
+      opsLiteTabs: Array.from(doc.querySelectorAll("[data-tab]")),
+      opsLiteTabPanels: Array.from(doc.querySelectorAll("[data-tab-panel]")),
     };
   }
 
@@ -224,33 +327,17 @@
     if (dom.opsLiteQuieterMode) dom.opsLiteQuieterMode.checked = Boolean(operatorState.quieter_mode);
   }
 
+  function renderSessionFramingLines(dom, operatorState) {
+    const line = sessionFramingStatusLine(operatorState || {});
+    setText(dom.opsLiteSessionFramingStatus, line);
+    setText(dom.opsLiteRunSessionFramingStatus, line);
+  }
+
   function formatActionLine(action) {
     if (!action) return "No steward action yet";
     const detail = action.detail || action.action || "Steward action";
     const at = action.created_at ? new Date(action.created_at).toLocaleTimeString() : "unknown time";
     return `${detail} (${at})`;
-  }
-
-  function highlightRecommendedStage(dom, stage) {
-    const all = [
-      dom.opsLiteStageOpen,
-      dom.opsLiteStageLive,
-      dom.opsLiteStageIncident,
-      dom.opsLiteStageClose,
-    ];
-    all.forEach((el) => {
-      if (!el) return;
-      el.classList.remove("active");
-    });
-    const lookup = {
-      open: dom.opsLiteStageOpen,
-      live: dom.opsLiteStageLive,
-      incident: dom.opsLiteStageIncident,
-      close: dom.opsLiteStageClose,
-    };
-    if (lookup[stage]) {
-      lookup[stage].classList.add("active");
-    }
   }
 
   function summarizeActiveControls(operatorState) {
@@ -262,43 +349,115 @@
     return labels.length ? `Active controls: ${labels.join(", ")}.` : "No live control overrides are active.";
   }
 
-  function renderStatus(doc, dom, payload, recentActions = []) {
-    const state = classifyState(payload);
-    const stage = recommendedStage(payload, state);
+  function readyCueText(payload, state) {
+    const operatorState = payload.operator_state || {};
+    const warningCount = Array.isArray(payload.warnings) ? payload.warnings.length : 0;
+    if (state.state === "broken") {
+      return "Not ready to open. Resolve blockers in Fix Problem before welcoming participants.";
+    }
+    if (state.state === "degraded") {
+      return "Possible to open only if this warning is understood. Stabilize first when in doubt.";
+    }
+    if (operatorState.maintenance_mode || operatorState.intake_paused || operatorState.playback_paused) {
+      return "Machine is healthy but paused. Clear intentional pause/maintenance controls before opening.";
+    }
+    if (warningCount > 0) {
+      return "Open with caution. Watch warning chips closely during first minutes.";
+    }
+    return "Ready to open. Surfaces and controls look clear for normal operation.";
+  }
 
-    if (dom.opsLiteStateTitle) dom.opsLiteStateTitle.textContent = state.title;
+  function runGuidanceText(payload, state) {
+    const warningCount = Array.isArray(payload.warnings) ? payload.warnings.length : 0;
+    if (state.state === "broken") {
+      return "Move to Fix Problem now. Keep participant promises conservative until state returns from broken.";
+    }
+    if (state.state === "degraded") {
+      return "Stay in observation mode and resolve warnings in order. Avoid changing many controls at once.";
+    }
+    if (warningCount > 0) {
+      return "Room is running with warnings. Keep this page visible and document interventions.";
+    }
+    return "Room posture is stable. Keep interventions minimal and legible.";
+  }
+
+  function setActiveTab(dom, tabKey, {
+    persist = true,
+    focus = false,
+    globalObject = globalObjectRef,
+  } = {}) {
+    const normalized = normalizeTabKey(tabKey) || "open-room";
+    dom.opsLiteTabs.forEach((tabButton) => {
+      const isActive = tabButton.dataset.tab === normalized;
+      tabButton.setAttribute("aria-selected", isActive ? "true" : "false");
+      tabButton.tabIndex = isActive ? 0 : -1;
+      if (focus && isActive) {
+        tabButton.focus();
+      }
+    });
+    dom.opsLiteTabPanels.forEach((panel) => {
+      panel.hidden = panel.dataset.tabPanel !== normalized;
+    });
+
+    if (persist) {
+      const hash = hashForTab(normalized);
+      try {
+        if (globalObject.history?.replaceState) {
+          globalObject.history.replaceState(null, "", hash);
+        } else if (globalObject.location) {
+          globalObject.location.hash = hash;
+        }
+      } catch (error) {
+        if (globalObject.location) {
+          globalObject.location.hash = hash;
+        }
+      }
+      writeStoredTab(normalized, globalObject);
+    }
+
+    return normalized;
+  }
+
+  function renderStatus(doc, dom, payload, recentActions = [], runtimeState = null) {
+    const state = classifyState(payload);
+    const suggestedTab = recommendedTab(payload, state);
+    const warningCount = Array.isArray(payload.warnings) ? payload.warnings.length : 0;
+    const operatorState = payload.operator_state || {};
+    const lastActionLine = formatActionLine(recentActions[0]);
+
+    setText(dom.opsLiteStateTitle, state.title);
     if (dom.opsLiteStateBadge) {
       dom.opsLiteStateBadge.textContent = state.state;
       dom.opsLiteStateBadge.className = `ops-state ${state.state}`;
     }
-    if (dom.opsLiteNextAction) {
-      dom.opsLiteNextAction.textContent = nextActionText(payload, state);
-    }
-    if (dom.opsLitePlayable) {
-      dom.opsLitePlayable.textContent = String(payload.playable ?? "-");
-    }
-    if (dom.opsLiteWarningCount) {
-      dom.opsLiteWarningCount.textContent = String((payload.warnings || []).length);
-    }
-    if (dom.opsLiteStorage) {
-      dom.opsLiteStorage.textContent = payload.storage ? `${payload.storage.free_gb} GB` : "-";
-    }
-    if (dom.opsLiteLastAction) {
-      dom.opsLiteLastAction.textContent = formatActionLine(recentActions[0]);
-    }
-    if (dom.opsLiteRefreshed) {
-      dom.opsLiteRefreshed.textContent = `Last refreshed ${new Date().toLocaleTimeString()}`;
-    }
-    if (dom.opsLiteRecommendedStage) {
-      dom.opsLiteRecommendedStage.textContent = `Recommended stage: ${stage}`;
-    }
-    if (dom.opsLiteArchiveReadiness) {
-      dom.opsLiteArchiveReadiness.textContent = archiveReadinessLine(payload);
-    }
+    setText(dom.opsLiteNextAction, nextActionText(payload, state));
+    setText(dom.opsLitePlayable, String(payload.playable ?? "-"));
+    setText(dom.opsLiteWarningCount, String(warningCount));
+    setText(dom.opsLiteStorage, payload.storage
+      ? `${payload.storage.state || "unknown"} · ${payload.storage.free_gb} GB free`
+      : "-");
+    setText(dom.opsLiteLastAction, lastActionLine);
+    setText(dom.opsLiteRefreshed, `Last refreshed ${new Date().toLocaleTimeString()}`);
+    setText(dom.opsLiteRecommendedStage, `Recommended task: ${TAB_LABELS[suggestedTab] || TAB_LABELS["open-room"]}`);
+    setText(dom.opsLiteArchiveReadiness, archiveReadinessLine(payload));
+    setText(dom.opsLiteReadyCue, readyCueText(payload, state));
+    setText(dom.opsLiteRunPosture, `${state.title} posture with ${payload.playable ?? 0} playable and ${warningCount} warning${warningCount === 1 ? "" : "s"}.`);
+    setText(dom.opsLiteRunGuidance, runGuidanceText(payload, state));
+    setText(dom.opsLiteRunControlState, summarizeActiveControls(operatorState));
+    setText(dom.opsLiteRunSnapshot, `Playable ${payload.playable ?? 0} · warnings ${warningCount} · last action: ${lastActionLine}.`);
+    setText(dom.opsLiteFixReason, nextActionText(payload, state));
 
-    highlightRecommendedStage(dom, stage);
+    renderControls(dom, operatorState);
+    renderSessionFramingLines(dom, operatorState);
     replaceCardList(doc, dom.opsLiteWarnings, warningCards(payload.warnings || []));
-    renderControls(dom, payload.operator_state || {});
+
+    if (runtimeState && !runtimeState.userSelectedTab && (state.state === "broken" || state.state === "degraded")) {
+      runtimeState.selectedTab = setActiveTab(dom, "fix-problem", {
+        persist: false,
+        focus: false,
+        globalObject: runtimeState.globalObject,
+      });
+    }
   }
 
   async function fetchJson(fetchImpl, url, options = {}) {
@@ -347,24 +506,107 @@
     }
   }
 
+  function resolveInitialTab(globalObject = globalObjectRef) {
+    const hashTab = tabKeyFromHash(globalObject.location?.hash || "");
+    if (hashTab) {
+      return { tab: hashTab, userSelected: true };
+    }
+    const stored = readStoredTab(globalObject);
+    if (stored) {
+      return { tab: stored, userSelected: true };
+    }
+    return { tab: "open-room", userSelected: false };
+  }
+
   function start({ doc = document, fetchImpl = fetch, intervalMs = 10000 } = {}) {
     const dom = collectDom(doc);
     const initialOperatorState = readJsonScript(doc, "ops-operator-state", {});
     let latestStatusPayload = { operator_state: initialOperatorState, warnings: [] };
     let latestRecentActions = [];
+
+    const initialTab = resolveInitialTab(globalObjectRef);
+    const runtimeState = {
+      selectedTab: setActiveTab(dom, initialTab.tab, {
+        persist: true,
+        focus: false,
+        globalObject: globalObjectRef,
+      }),
+      userSelectedTab: initialTab.userSelected,
+      globalObject: globalObjectRef,
+    };
+
+    function selectTab(tabKey, { userInitiated = true, focus = false } = {}) {
+      runtimeState.selectedTab = setActiveTab(dom, tabKey, {
+        persist: true,
+        focus,
+        globalObject: runtimeState.globalObject,
+      });
+      if (userInitiated) {
+        runtimeState.userSelectedTab = true;
+      }
+      return runtimeState.selectedTab;
+    }
+
+    dom.opsLiteTabs.forEach((tabButton) => {
+      tabButton.addEventListener("click", () => {
+        selectTab(tabButton.dataset.tab, { userInitiated: true, focus: false });
+      });
+
+      tabButton.addEventListener("keydown", (event) => {
+        const currentTab = normalizeTabKey(tabButton.dataset.tab);
+        const currentIndex = TAB_KEYS.indexOf(currentTab);
+        if (currentIndex < 0) {
+          return;
+        }
+
+        let targetIndex = currentIndex;
+        if (event.key === "ArrowRight") {
+          targetIndex = (currentIndex + 1) % TAB_KEYS.length;
+        } else if (event.key === "ArrowLeft") {
+          targetIndex = (currentIndex - 1 + TAB_KEYS.length) % TAB_KEYS.length;
+        } else if (event.key === "Home") {
+          targetIndex = 0;
+        } else if (event.key === "End") {
+          targetIndex = TAB_KEYS.length - 1;
+        } else if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          selectTab(currentTab, { userInitiated: true, focus: true });
+          return;
+        } else {
+          return;
+        }
+
+        event.preventDefault();
+        selectTab(TAB_KEYS[targetIndex], { userInitiated: true, focus: true });
+      });
+    });
+
+    function syncHashSelection() {
+      const hashTab = tabKeyFromHash(globalObjectRef.location?.hash || "");
+      if (!hashTab) {
+        return;
+      }
+      runtimeState.userSelectedTab = true;
+      runtimeState.selectedTab = setActiveTab(dom, hashTab, {
+        persist: true,
+        focus: false,
+        globalObject: runtimeState.globalObject,
+      });
+    }
+
+    if (globalObjectRef.addEventListener) {
+      globalObjectRef.addEventListener("hashchange", syncHashSelection);
+    }
+
     renderControls(dom, initialOperatorState);
-    if (dom.opsLiteSessionFramingStatus) {
-      dom.opsLiteSessionFramingStatus.textContent = sessionFramingStatusLine(initialOperatorState);
-    }
+    renderSessionFramingLines(dom, initialOperatorState);
     renderArchiveCommand(dom, buildArchiveCommand(""));
-    if (dom.opsLiteControlStatus) {
-      dom.opsLiteControlStatus.textContent = summarizeActiveControls(initialOperatorState);
-    }
+    setText(dom.opsLiteControlStatus, summarizeActiveControls(initialOperatorState));
 
     async function refreshStatus() {
       const payload = await fetchJson(fetchImpl, "/api/v1/node/status", { cache: "no-store" });
       latestStatusPayload = payload;
-      renderStatus(doc, dom, latestStatusPayload, latestRecentActions);
+      renderStatus(doc, dom, latestStatusPayload, latestRecentActions, runtimeState);
     }
 
     async function refreshControls() {
@@ -375,13 +617,9 @@
         operator_state: payload.operator_state || {},
       };
       renderControls(dom, payload.operator_state || {});
-      if (dom.opsLiteSessionFramingStatus) {
-        dom.opsLiteSessionFramingStatus.textContent = sessionFramingStatusLine(payload.operator_state || {});
-      }
-      if (dom.opsLiteControlStatus) {
-        dom.opsLiteControlStatus.textContent = summarizeActiveControls(payload.operator_state || {});
-      }
-      renderStatus(doc, dom, latestStatusPayload, latestRecentActions);
+      renderSessionFramingLines(dom, payload.operator_state || {});
+      setText(dom.opsLiteControlStatus, summarizeActiveControls(payload.operator_state || {}));
+      renderStatus(doc, dom, latestStatusPayload, latestRecentActions, runtimeState);
     }
 
     async function saveControls(event) {
@@ -389,9 +627,7 @@
       if (dom.opsLiteControlsSave) {
         dom.opsLiteControlsSave.disabled = true;
       }
-      if (dom.opsLiteControlStatus) {
-        dom.opsLiteControlStatus.textContent = "Applying controls...";
-      }
+      setText(dom.opsLiteControlStatus, "Applying controls...");
 
       try {
         const payload = await fetchJson(fetchImpl, "/api/v1/operator/controls", {
@@ -413,17 +649,11 @@
           operator_state: payload.operator_state || {},
         };
         renderControls(dom, payload.operator_state || {});
-        if (dom.opsLiteSessionFramingStatus) {
-          dom.opsLiteSessionFramingStatus.textContent = sessionFramingStatusLine(payload.operator_state || {});
-        }
-        if (dom.opsLiteControlStatus) {
-          dom.opsLiteControlStatus.textContent = summarizeActiveControls(payload.operator_state || {});
-        }
+        renderSessionFramingLines(dom, payload.operator_state || {});
+        setText(dom.opsLiteControlStatus, summarizeActiveControls(payload.operator_state || {}));
         await refreshStatus();
       } catch (error) {
-        if (dom.opsLiteControlStatus) {
-          dom.opsLiteControlStatus.textContent = error.message || "Control update failed.";
-        }
+        setText(dom.opsLiteControlStatus, error.message || "Control update failed.");
       } finally {
         if (dom.opsLiteControlsSave) {
           dom.opsLiteControlsSave.disabled = false;
@@ -435,9 +665,17 @@
       if (dom.opsLiteClearSessionFraming) {
         dom.opsLiteClearSessionFraming.disabled = true;
       }
-      if (dom.opsLiteSessionFramingStatus) {
-        dom.opsLiteSessionFramingStatus.textContent = "Clearing session framing and deployment focus...";
+      if (dom.opsLiteClearSessionFramingTab) {
+        dom.opsLiteClearSessionFramingTab.disabled = true;
       }
+      renderSessionFramingLines(dom, {
+        session_theme_title: "",
+        session_theme_prompt: "",
+        deployment_focus_topic: "",
+        deployment_focus_status: "",
+      });
+      setText(dom.opsLiteSessionFramingStatus, "Clearing session framing and deployment focus...");
+
       try {
         const payload = await fetchJson(fetchImpl, "/api/v1/operator/controls", {
           method: "POST",
@@ -458,17 +696,17 @@
           operator_state: payload.operator_state || {},
         };
         renderControls(dom, payload.operator_state || {});
-        if (dom.opsLiteSessionFramingStatus) {
-          dom.opsLiteSessionFramingStatus.textContent = sessionFramingStatusLine(payload.operator_state || {});
-        }
+        renderSessionFramingLines(dom, payload.operator_state || {});
         await refreshStatus();
       } catch (error) {
-        if (dom.opsLiteSessionFramingStatus) {
-          dom.opsLiteSessionFramingStatus.textContent = error.message || "Could not clear session framing.";
-        }
+        setText(dom.opsLiteSessionFramingStatus, error.message || "Could not clear session framing.");
+        setText(dom.opsLiteRunSessionFramingStatus, error.message || "Could not clear session framing.");
       } finally {
         if (dom.opsLiteClearSessionFraming) {
           dom.opsLiteClearSessionFraming.disabled = false;
+        }
+        if (dom.opsLiteClearSessionFramingTab) {
+          dom.opsLiteClearSessionFramingTab.disabled = false;
         }
       }
     }
@@ -485,70 +723,92 @@
       });
     }
 
-    function applyArchiveCommandFromInput() {
-      const command = buildArchiveCommand(dom.opsLiteArchiveUsbPath?.value || "");
-      renderArchiveCommand(dom, command);
-      return command;
+    if (dom.opsLiteClearSessionFramingTab) {
+      dom.opsLiteClearSessionFramingTab.addEventListener("click", () => {
+        void clearSessionFraming();
+      });
+    }
+
+    function applyArchiveCommandFromInput({ announce = false } = {}) {
+      const result = buildArchiveCommandResult(dom.opsLiteArchiveUsbPath?.value || "");
+      renderArchiveCommand(dom, result.command);
+      if (result.error) {
+        setText(dom.opsLiteArchiveReadiness, result.error);
+      } else if (announce) {
+        setText(dom.opsLiteArchiveReadiness, archiveReadinessLine(latestStatusPayload));
+      }
+      return result;
     }
 
     if (dom.opsLiteArchiveCommandBuild) {
       dom.opsLiteArchiveCommandBuild.addEventListener("click", () => {
-        applyArchiveCommandFromInput();
+        applyArchiveCommandFromInput({ announce: true });
       });
     }
 
     if (dom.opsLiteArchiveUsbPath) {
       dom.opsLiteArchiveUsbPath.addEventListener("input", () => {
-        applyArchiveCommandFromInput();
+        applyArchiveCommandFromInput({ announce: false });
       });
     }
 
     if (dom.opsLiteArchiveCommandCopy) {
       dom.opsLiteArchiveCommandCopy.addEventListener("click", async () => {
-        const command = applyArchiveCommandFromInput();
+        const result = applyArchiveCommandFromInput({ announce: true });
+        if (result.error) {
+          return;
+        }
         if (!globalObjectRef.navigator?.clipboard?.writeText) {
-          if (dom.opsLiteArchiveReadiness) {
-            dom.opsLiteArchiveReadiness.textContent = "Clipboard API unavailable. Copy the command manually.";
-          }
+          setText(dom.opsLiteArchiveReadiness, "Clipboard API unavailable. Copy the command manually.");
           return;
         }
         try {
-          await globalObjectRef.navigator.clipboard.writeText(command);
-          if (dom.opsLiteArchiveReadiness) {
-            dom.opsLiteArchiveReadiness.textContent = `${archiveReadinessLine(latestStatusPayload)} Command copied.`;
-          }
+          await globalObjectRef.navigator.clipboard.writeText(result.command);
+          setText(dom.opsLiteArchiveReadiness, `${archiveReadinessLine(latestStatusPayload)} Command copied.`);
         } catch (error) {
-          if (dom.opsLiteArchiveReadiness) {
-            dom.opsLiteArchiveReadiness.textContent = "Could not copy archive command. Copy manually instead.";
-          }
+          setText(dom.opsLiteArchiveReadiness, "Could not copy archive command. Copy manually instead.");
         }
       });
     }
 
-    if (dom.opsLiteAudioTone) {
-      dom.opsLiteAudioTone.addEventListener("click", async () => {
+    async function runOutputToneFromControl() {
+      if (dom.opsLiteAudioTone) {
         dom.opsLiteAudioTone.disabled = true;
-        const previous = dom.opsLiteControlStatus ? dom.opsLiteControlStatus.textContent : "";
-        if (dom.opsLiteControlStatus) {
-          dom.opsLiteControlStatus.textContent = "Playing output tone...";
-        }
-        try {
-          await playOutputTone(globalObjectRef);
-          if (dom.opsLiteControlStatus) {
-            dom.opsLiteControlStatus.textContent = "Output tone complete.";
-          }
-        } catch (error) {
-          if (dom.opsLiteControlStatus) {
-            dom.opsLiteControlStatus.textContent = error.message || "Output tone failed.";
-          }
-        } finally {
+      }
+      if (dom.opsLiteAudioToneOpenRoom) {
+        dom.opsLiteAudioToneOpenRoom.disabled = true;
+      }
+      const previous = dom.opsLiteControlStatus ? dom.opsLiteControlStatus.textContent : "";
+      setText(dom.opsLiteControlStatus, "Playing output tone...");
+      try {
+        await playOutputTone(globalObjectRef);
+        setText(dom.opsLiteControlStatus, "Output tone complete.");
+      } catch (error) {
+        setText(dom.opsLiteControlStatus, error.message || "Output tone failed.");
+      } finally {
+        if (dom.opsLiteAudioTone) {
           dom.opsLiteAudioTone.disabled = false;
-          if (dom.opsLiteControlStatus && previous && dom.opsLiteControlStatus.textContent === "Output tone complete.") {
-            globalObjectRef.setTimeout(() => {
-              dom.opsLiteControlStatus.textContent = previous;
-            }, 1800);
-          }
         }
+        if (dom.opsLiteAudioToneOpenRoom) {
+          dom.opsLiteAudioToneOpenRoom.disabled = false;
+        }
+        if (dom.opsLiteControlStatus && previous && dom.opsLiteControlStatus.textContent === "Output tone complete.") {
+          globalObjectRef.setTimeout(() => {
+            setText(dom.opsLiteControlStatus, previous);
+          }, 1800);
+        }
+      }
+    }
+
+    if (dom.opsLiteAudioTone) {
+      dom.opsLiteAudioTone.addEventListener("click", () => {
+        void runOutputToneFromControl();
+      });
+    }
+
+    if (dom.opsLiteAudioToneOpenRoom) {
+      dom.opsLiteAudioToneOpenRoom.addEventListener("click", () => {
+        void runOutputToneFromControl();
       });
     }
 
@@ -556,14 +816,12 @@
       try {
         await Promise.all([refreshStatus(), refreshControls()]);
       } catch (error) {
-        if (dom.opsLiteStateTitle) dom.opsLiteStateTitle.textContent = "Broken";
+        setText(dom.opsLiteStateTitle, "Broken");
         if (dom.opsLiteStateBadge) {
           dom.opsLiteStateBadge.textContent = "broken";
           dom.opsLiteStateBadge.className = "ops-state broken";
         }
-        if (dom.opsLiteNextAction) {
-          dom.opsLiteNextAction.textContent = error.message || "Unable to refresh operator lite status.";
-        }
+        setText(dom.opsLiteNextAction, error.message || "Unable to refresh operator lite status.");
       }
     }
 
@@ -576,15 +834,24 @@
       refresh: refreshAll,
       stop() {
         globalObjectRef.clearInterval(intervalId);
+        if (globalObjectRef.removeEventListener) {
+          globalObjectRef.removeEventListener("hashchange", syncHashSelection);
+        }
       },
     };
   }
 
   return {
+    TAB_KEYS,
     buildArchiveCommand,
+    buildArchiveCommandResult,
     classifyState,
     nextActionText,
+    normalizeTabKey,
     recommendedStage,
+    recommendedTab,
     start,
+    tabKeyFromHash,
+    validateUsbPath,
   };
 }));

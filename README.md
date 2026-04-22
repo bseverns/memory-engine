@@ -94,10 +94,16 @@ docker compose up --build
 - Kiosk: http://localhost/kiosk/
 - Room playback: http://localhost/room/
 - Admin: http://localhost/admin/  (creates a default superuser in dev; see logs)
-- Ops: http://localhost/ops/
+- Ops Lite (daily): http://localhost/ops/
+- Ops Bench (full): http://localhost/ops/bench/
 
 `/ops/` now requires the shared steward secret from `OPS_SHARED_SECRET`, and it
 can also be restricted to trusted networks with `OPS_ALLOWED_NETWORKS`.
+
+Operator route hierarchy:
+
+- `/ops/`: compact Operator Lite for daily stewardship by task moment (`Open Room`, `Run Room`, `Fix Problem`, `Close Session`)
+- `/ops/bench/`: full diagnostic and stewardship bench (artifact stack editing, deeper status cards, monitor tools, extended diagnostics)
 
 For a real multi-machine install, the intended role split is:
 - recording machine opens `/kiosk/`

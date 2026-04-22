@@ -179,6 +179,123 @@ test.describe("visual stack walkthrough", () => {
     await saveScreenshot(page, "ops-ready.png");
   });
 
+  test("captures operator lite compact ready view", async ({ page }) => {
+    await mockHealthyOpsStatus(page, {
+      playable: 11,
+      warnings: [],
+      storage: {
+        path: "/",
+        state: "ready",
+        total_gb: 256,
+        free_gb: 152.2,
+        used_percent: 40.5,
+        free_percent: 59.5,
+      },
+      operator_state: {
+        maintenance_mode: false,
+        intake_paused: false,
+        playback_paused: false,
+        quieter_mode: false,
+        mood_bias: "",
+        kiosk_language_code: "",
+        kiosk_accessibility_mode: "",
+        kiosk_force_reduced_motion: false,
+        kiosk_max_recording_seconds: 120,
+        session_theme_title: "Arrival and thresholds",
+        session_theme_prompt: "Offer one small sound about crossing into this room.",
+        deployment_focus_topic: "entry_gate",
+        deployment_focus_status: "open",
+      },
+    });
+
+    await mockOperatorDashboardFeeds(page, {
+      operatorState: {
+        maintenance_mode: false,
+        intake_paused: false,
+        playback_paused: false,
+        quieter_mode: false,
+        mood_bias: "",
+        kiosk_language_code: "",
+        kiosk_accessibility_mode: "",
+        kiosk_force_reduced_motion: false,
+        kiosk_max_recording_seconds: 120,
+        session_theme_title: "Arrival and thresholds",
+        session_theme_prompt: "Offer one small sound about crossing into this room.",
+        deployment_focus_topic: "entry_gate",
+        deployment_focus_status: "open",
+      },
+      recentActions: [{
+        action: "session_theme_title.updated",
+        actor: "operator@test",
+        detail: "session framing updated",
+        created_at: "2026-03-20T10:04:00Z",
+      }],
+    });
+
+    await signIntoOps(page, { surface: "lite" });
+    await expect(page.getByRole("heading", { name: "Room Memory Steward Surface" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Open Room" })).toHaveAttribute("aria-selected", "true");
+    await saveScreenshot(page, "ops-lite-compact.png");
+  });
+
+  test("captures operator lite close session tab", async ({ page }) => {
+    await mockHealthyOpsStatus(page, {
+      playable: 9,
+      warnings: [
+        {
+          level: "warning",
+          title: "Storage pressure is rising",
+          detail: "8.1 GB free (12.4%).",
+        },
+      ],
+      storage: {
+        path: "/",
+        state: "warning",
+        total_gb: 64,
+        free_gb: 8.1,
+        used_percent: 87.6,
+        free_percent: 12.4,
+      },
+      operator_state: {
+        maintenance_mode: false,
+        intake_paused: true,
+        playback_paused: false,
+        quieter_mode: true,
+        mood_bias: "weathered",
+        kiosk_language_code: "",
+        kiosk_accessibility_mode: "",
+        kiosk_force_reduced_motion: false,
+        kiosk_max_recording_seconds: 120,
+      },
+    });
+    await mockOperatorDashboardFeeds(page, {
+      operatorState: {
+        maintenance_mode: false,
+        intake_paused: true,
+        playback_paused: false,
+        quieter_mode: true,
+        mood_bias: "weathered",
+        kiosk_language_code: "",
+        kiosk_accessibility_mode: "",
+        kiosk_force_reduced_motion: false,
+        kiosk_max_recording_seconds: 120,
+      },
+      recentActions: [{
+        action: "intake_paused.enabled",
+        actor: "operator@test",
+        detail: "intake paused enabled",
+        created_at: "2026-03-20T18:14:00Z",
+      }],
+    });
+
+    await signIntoOps(page, { surface: "lite" });
+    await page.getByRole("tab", { name: "Close Session" }).click();
+    await expect(page.locator("#opsLitePanelCloseSession")).toBeVisible();
+    await page.locator("#opsLiteArchiveUsbPath").fill("/media/steward/SESSION_ARCHIVE");
+    await page.locator("#opsLiteArchiveCommandBuild").click();
+    await saveScreenshot(page, "ops-lite-close-session.png");
+  });
+
   test("captures the operator dashboard in a degraded state", async ({ page }) => {
     await mockHealthyOpsStatus(page, {
       active: 4,
