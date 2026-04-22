@@ -11,6 +11,7 @@ Use it when the question is less about architecture and more about what a stewar
 | a participant needs plain-language guidance before or after recording | [participant-prompt-card.md](./participant-prompt-card.md) | [start-here.md](./start-here.md) |
 | a steward needs the shortest recovery ritual | [OPERATOR_DRILL_CARD.md](./OPERATOR_DRILL_CARD.md) | [maintenance.md](./maintenance.md) |
 | a steward needs the fuller operational context | [maintenance.md](./maintenance.md) | [AT_A_GLANCE.md](./AT_A_GLANCE.md) |
+| a cohort needs steward training and evaluation scaffolds | [teaching/modules/ops-stewardship-recovery.md](./teaching/modules/ops-stewardship-recovery.md) | [teaching/labs/ops-recovery-drill.md](./teaching/labs/ops-recovery-drill.md) |
 
 ## Pages In This Branch
 

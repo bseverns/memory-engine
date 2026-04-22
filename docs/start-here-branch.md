@@ -12,6 +12,7 @@ Use it when you need to get oriented quickly, bring up a machine, rehearse the c
 | role-based orientation | [start-here.md](./start-here.md) | [installation-checklist.md](./installation-checklist.md) |
 | the actual current artifact path | [memory-lifecycle.md](./memory-lifecycle.md) | [how-the-stack-works.md](./how-the-stack-works.md) |
 | the current proof board and validation TODOs | [experimental-proofs.md](./experimental-proofs.md) | [roadmap.md](./roadmap.md) |
+| a teaching/evaluation path built on these same docs | [teaching/index.md](./teaching/index.md) | [teaching/instructor-guide.md](./teaching/instructor-guide.md) |
 | install-day setup steps | [installation-checklist.md](./installation-checklist.md) | [UBUNTU_APPLIANCE.md](./UBUNTU_APPLIANCE.md) |
 | opening, recovery, or repair steps | [maintenance.md](./maintenance.md) | [OPERATOR_DRILL_CARD.md](./OPERATOR_DRILL_CARD.md) |
 

@@ -51,6 +51,7 @@ Use the manual by branch, not by filename.
 | Start Here | install-day orientation, lifecycle overview, and practical operating entry points | [start-here-branch.md](./start-here-branch.md) |
 | Machine | architecture, browser/API boundaries, deployment behavior, and control seams | [machine-branch.md](./machine-branch.md) |
 | Steward & Participant Materials | the light public/steward handoff layer around the machine | [stewardship-branch.md](./stewardship-branch.md) |
+| Teaching & Evaluation | instructor-ready modules, labs, templates, and bounded research-evaluation scaffolds | [teaching/index.md](./teaching/index.md) |
 | Project Direction | mission boundary, open work, and strategic posture | [project-direction-branch.md](./project-direction-branch.md) |
 
 ## Start With The Right Path
@@ -79,6 +80,11 @@ If you are deciding what still needs to be proven:
 
 - use [experimental-proofs.md](./experimental-proofs.md)
 - then cross-check [roadmap.md](./roadmap.md)
+
+If you are teaching, training stewards, or running bounded evaluations:
+
+- start with [teaching/index.md](./teaching/index.md)
+- then use [teaching/instructor-guide.md](./teaching/instructor-guide.md) and [teaching/learning-objectives.md](./teaching/learning-objectives.md)
 
 ## Surface Map
 
@@ -119,6 +125,7 @@ If you are deciding what still needs to be proven:
 - [machine-branch.md](./machine-branch.md): navigation hub for architecture and behavior docs
 - [how-the-stack-works.md](./how-the-stack-works.md): architecture and request flow
 - [stewardship-branch.md](./stewardship-branch.md): navigation hub for steward and participant handoff material
+- [teaching/index.md](./teaching/index.md): navigation hub for teaching modules, labs, prompts, rubric, and evaluation templates
 - [project-direction-branch.md](./project-direction-branch.md): navigation hub for mission and roadmap docs
 - [MISSION_EXPANSION.md](./MISSION_EXPANSION.md): strategic boundary for the project
 - [roadmap.md](./roadmap.md): what is still open and why
