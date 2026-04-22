@@ -113,6 +113,10 @@ class StewardState(models.Model):
     kiosk_accessibility_mode = models.CharField(max_length=32, blank=True, default="")
     kiosk_force_reduced_motion = models.BooleanField(default=False)
     kiosk_max_recording_seconds = models.PositiveIntegerField(default=120)
+    session_theme_title = models.CharField(max_length=64, blank=True, default="")
+    session_theme_prompt = models.CharField(max_length=180, blank=True, default="")
+    deployment_focus_topic = models.CharField(max_length=64, blank=True, default="")
+    deployment_focus_status = models.CharField(max_length=32, blank=True, default="")
     updated_at = models.DateTimeField(auto_now=True)
 
     @classmethod

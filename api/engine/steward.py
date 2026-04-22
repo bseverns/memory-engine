@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.db import transaction
+from memory_engine.deployments import deployment_spec
 
 from .models import StewardAction, StewardState
 
@@ -30,8 +31,27 @@ def steward_state_payload(state: StewardState | None = None) -> dict:
         "kiosk_accessibility_mode": str(state.kiosk_accessibility_mode or ""),
         "kiosk_force_reduced_motion": bool(state.kiosk_force_reduced_motion),
         "kiosk_max_recording_seconds": int(state.kiosk_max_recording_seconds or 120),
+        "session_theme_title": str(state.session_theme_title or ""),
+        "session_theme_prompt": str(state.session_theme_prompt or ""),
+        "deployment_focus_topic": str(state.deployment_focus_topic or ""),
+        "deployment_focus_status": str(state.deployment_focus_status or ""),
         "updated_at": state.updated_at,
     }
+
+
+def deployment_focus_status_suggestions(deployment_code: str) -> tuple[str, ...]:
+    code = deployment_spec(deployment_code).code
+    if code == "question":
+        return ("open", "pending", "answered", "resolved")
+    if code == "repair":
+        return ("pending", "needs_part", "fixed", "obsolete")
+    if code == "prompt":
+        return ("seed", "echo", "spent")
+    if code == "witness":
+        return ("observed", "verified", "contextual")
+    if code == "oracle":
+        return ("held", "spent")
+    return ("open", "resolved")
 
 
 def recent_steward_actions(limit: int = 8) -> list[dict]:
@@ -59,6 +79,11 @@ def update_steward_state(
     kiosk_accessibility_mode: str,
     kiosk_force_reduced_motion: bool,
     kiosk_max_recording_seconds: int,
+    session_theme_title: str,
+    session_theme_prompt: str,
+    deployment_focus_topic: str,
+    deployment_focus_status: str,
+    deployment_code: str,
     actor: str,
 ) -> tuple[StewardState, list[dict]]:
     state = StewardState.objects.select_for_update().get_or_create(singleton_key="default")[0]
@@ -80,6 +105,13 @@ def update_steward_state(
     if normalized_accessibility_mode not in {"", "large_high_contrast"}:
         normalized_accessibility_mode = ""
     normalized_max_recording_seconds = max(30, min(300, int(kiosk_max_recording_seconds or 120)))
+    normalized_session_theme_title = str(session_theme_title or "").strip()[:64]
+    normalized_session_theme_prompt = str(session_theme_prompt or "").strip()[:180]
+    normalized_deployment_focus_topic = str(deployment_focus_topic or "").strip()[:64]
+    normalized_deployment_focus_status = str(deployment_focus_status or "").strip().lower()[:32]
+    allowed_focus_statuses = set(deployment_focus_status_suggestions(deployment_code))
+    if normalized_deployment_focus_status and normalized_deployment_focus_status not in allowed_focus_statuses:
+        normalized_deployment_focus_status = ""
 
     for field_name, next_value in next_values.items():
         previous_value = bool(getattr(state, field_name))
@@ -185,6 +217,74 @@ def update_steward_state(
             payload={"field": "kiosk_max_recording_seconds", "value": normalized_max_recording_seconds},
         )
 
+    previous_theme_title = str(state.session_theme_title or "")
+    if previous_theme_title != normalized_session_theme_title:
+        state.session_theme_title = normalized_session_theme_title
+        theme_title_detail = normalized_session_theme_title or "cleared"
+        changes.append({
+            "field": "session_theme_title",
+            "value": normalized_session_theme_title,
+            "action": "session_theme_title.updated",
+            "detail": f"session theme title set to {theme_title_detail}",
+        })
+        record_steward_action(
+            action="session_theme_title.updated",
+            actor=actor or "operator",
+            detail=f"session theme title set to {theme_title_detail}",
+            payload={"field": "session_theme_title", "value": normalized_session_theme_title},
+        )
+
+    previous_theme_prompt = str(state.session_theme_prompt or "")
+    if previous_theme_prompt != normalized_session_theme_prompt:
+        state.session_theme_prompt = normalized_session_theme_prompt
+        theme_prompt_detail = normalized_session_theme_prompt or "cleared"
+        changes.append({
+            "field": "session_theme_prompt",
+            "value": normalized_session_theme_prompt,
+            "action": "session_theme_prompt.updated",
+            "detail": f"session theme framing set to {theme_prompt_detail}",
+        })
+        record_steward_action(
+            action="session_theme_prompt.updated",
+            actor=actor or "operator",
+            detail=f"session theme framing set to {theme_prompt_detail}",
+            payload={"field": "session_theme_prompt", "value": normalized_session_theme_prompt},
+        )
+
+    previous_focus_topic = str(state.deployment_focus_topic or "")
+    if previous_focus_topic != normalized_deployment_focus_topic:
+        state.deployment_focus_topic = normalized_deployment_focus_topic
+        focus_topic_detail = normalized_deployment_focus_topic or "cleared"
+        changes.append({
+            "field": "deployment_focus_topic",
+            "value": normalized_deployment_focus_topic,
+            "action": "deployment_focus_topic.updated",
+            "detail": f"deployment focus topic set to {focus_topic_detail}",
+        })
+        record_steward_action(
+            action="deployment_focus_topic.updated",
+            actor=actor or "operator",
+            detail=f"deployment focus topic set to {focus_topic_detail}",
+            payload={"field": "deployment_focus_topic", "value": normalized_deployment_focus_topic},
+        )
+
+    previous_focus_status = str(state.deployment_focus_status or "")
+    if previous_focus_status != normalized_deployment_focus_status:
+        state.deployment_focus_status = normalized_deployment_focus_status
+        focus_status_detail = normalized_deployment_focus_status or "cleared"
+        changes.append({
+            "field": "deployment_focus_status",
+            "value": normalized_deployment_focus_status,
+            "action": "deployment_focus_status.updated",
+            "detail": f"deployment focus status set to {focus_status_detail}",
+        })
+        record_steward_action(
+            action="deployment_focus_status.updated",
+            actor=actor or "operator",
+            detail=f"deployment focus status set to {focus_status_detail}",
+            payload={"field": "deployment_focus_status", "value": normalized_deployment_focus_status},
+        )
+
     if changes:
         state.save(update_fields=[
             "intake_paused",
@@ -196,6 +296,10 @@ def update_steward_state(
             "kiosk_accessibility_mode",
             "kiosk_force_reduced_motion",
             "kiosk_max_recording_seconds",
+            "session_theme_title",
+            "session_theme_prompt",
+            "deployment_focus_topic",
+            "deployment_focus_status",
             "updated_at",
         ])
 

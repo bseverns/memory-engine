@@ -169,6 +169,29 @@ def deployment_topic_placeholder(deployment_code: str) -> str:
     return "memory_thread"
 
 
+def deployment_focus_controls(deployment_code: str) -> dict[str, object]:
+    spec = deployment_spec(deployment_code)
+    code = spec.code
+    return {
+        "deployment": {
+            "code": code,
+            "label": spec.label,
+        },
+        "topic": {
+            "label": "Deployment focus topic",
+            "placeholder": deployment_topic_placeholder(code),
+            "max_length": 64,
+            "help": "Optional steward hint for the current deployment. Used as a bias only; it never forces selection.",
+        },
+        "status": {
+            **deployment_lifecycle_field(code),
+            "label": "Deployment focus status",
+            "max_length": 32,
+            "help": "Optional deployment-scoped status hint for thread follow-on behavior.",
+        },
+    }
+
+
 def deployment_status_quick_actions(deployment_code: str, current_status: str) -> list[dict[str, str]]:
     code = deployment_spec(deployment_code).code
     current = resolved_lifecycle_status(current_status)
@@ -845,11 +868,13 @@ def surface_state(request):
 def operator_controls(request):
     if not operator_session_active(request):
         return operator_api_denied()
+    active_deployment = deployment_spec(getattr(settings, "ENGINE_DEPLOYMENT", "memory"))
 
     if request.method == "GET":
         return Response({
             "operator_state": steward_state_payload(),
             "recent_actions": recent_steward_actions(),
+            "deployment_controls": deployment_focus_controls(active_deployment.code),
         })
 
     state = load_steward_state()
@@ -868,12 +893,18 @@ def operator_controls(request):
             request.data.get("kiosk_max_recording_seconds", state.kiosk_max_recording_seconds or 120),
             state.kiosk_max_recording_seconds or 120,
         ),
+        session_theme_title=request.data.get("session_theme_title", state.session_theme_title),
+        session_theme_prompt=request.data.get("session_theme_prompt", state.session_theme_prompt),
+        deployment_focus_topic=request.data.get("deployment_focus_topic", state.deployment_focus_topic),
+        deployment_focus_status=request.data.get("deployment_focus_status", state.deployment_focus_status),
+        deployment_code=active_deployment.code,
         actor=request_operator_label(request),
     )
     return Response({
         "operator_state": steward_state_payload(state),
         "changes": changes,
         "recent_actions": recent_steward_actions(),
+        "deployment_controls": deployment_focus_controls(active_deployment.code),
     })
 
 

@@ -615,6 +615,10 @@
       opsPlaybackPaused: doc.getElementById("opsPlaybackPaused"),
       opsQuieterMode: doc.getElementById("opsQuieterMode"),
       opsMoodBias: doc.getElementById("opsMoodBias"),
+      opsSessionThemeTitle: doc.getElementById("opsSessionThemeTitle"),
+      opsSessionThemePrompt: doc.getElementById("opsSessionThemePrompt"),
+      opsDeploymentFocusTopic: doc.getElementById("opsDeploymentFocusTopic"),
+      opsDeploymentFocusStatus: doc.getElementById("opsDeploymentFocusStatus"),
       opsKioskLanguageCode: doc.getElementById("opsKioskLanguageCode"),
       opsKioskAccessibilityMode: doc.getElementById("opsKioskAccessibilityMode"),
       opsKioskReducedMotion: doc.getElementById("opsKioskReducedMotion"),
@@ -634,7 +638,7 @@
     };
   }
 
-  function renderOperatorState(dom, operatorState) {
+  function renderOperatorState(dom, operatorState, deploymentControls = null) {
     if (!dom.opsMaintenanceMode || !dom.opsIntakePaused || !dom.opsPlaybackPaused || !dom.opsQuieterMode) {
       return;
     }
@@ -644,6 +648,43 @@
     dom.opsQuieterMode.checked = Boolean(operatorState.quieter_mode);
     if (dom.opsMoodBias) {
       dom.opsMoodBias.value = String(operatorState.mood_bias || "");
+    }
+    if (dom.opsSessionThemeTitle) {
+      dom.opsSessionThemeTitle.value = String(operatorState.session_theme_title || "");
+    }
+    if (dom.opsSessionThemePrompt) {
+      dom.opsSessionThemePrompt.value = String(operatorState.session_theme_prompt || "");
+    }
+    if (dom.opsDeploymentFocusTopic) {
+      dom.opsDeploymentFocusTopic.value = String(operatorState.deployment_focus_topic || "");
+      const focusPlaceholder = deploymentControls?.topic?.placeholder;
+      if (focusPlaceholder) {
+        dom.opsDeploymentFocusTopic.placeholder = String(focusPlaceholder);
+      }
+    }
+    if (dom.opsDeploymentFocusStatus) {
+      const currentStatus = String(operatorState.deployment_focus_status || "").trim().toLowerCase();
+      const selectDoc = dom.opsDeploymentFocusStatus.ownerDocument || globalObjectRef.document;
+      if (deploymentControls?.status) {
+        const statusValues = lifecycleStatusOptions(deploymentControls.status, currentStatus);
+        dom.opsDeploymentFocusStatus.replaceChildren(
+          ...statusValues.map((value) => {
+            const option = selectDoc.createElement("option");
+            option.value = value;
+            option.textContent = value || "No focus status";
+            return option;
+          }),
+        );
+      } else if (
+        currentStatus
+        && !Array.from(dom.opsDeploymentFocusStatus.options).some((option) => option.value === currentStatus)
+      ) {
+        const option = selectDoc.createElement("option");
+        option.value = currentStatus;
+        option.textContent = currentStatus;
+        dom.opsDeploymentFocusStatus.append(option);
+      }
+      dom.opsDeploymentFocusStatus.value = currentStatus;
     }
     if (dom.opsKioskLanguageCode) {
       dom.opsKioskLanguageCode.value = String(operatorState.kiosk_language_code || "");
@@ -693,16 +734,21 @@
   }
 
   function renderControlPayload(doc, dom, payload) {
-    renderOperatorState(dom, payload.operator_state || {});
+    renderOperatorState(dom, payload.operator_state || {}, payload.deployment_controls || null);
     replaceCardList(doc, dom.opsRecentActions, actionCards(payload.recent_actions || []));
     if (dom.opsControlStatus) {
       const state = payload.operator_state || {};
+      const deploymentLabel = payload?.deployment_controls?.deployment?.label || "deployment";
       const labels = [];
       if (state.maintenance_mode) labels.push("maintenance mode");
       if (state.intake_paused) labels.push("intake paused");
       if (state.playback_paused) labels.push("playback paused");
       if (state.quieter_mode) labels.push("quieter mode");
       if (state.mood_bias) labels.push(`mood bias: ${state.mood_bias}`);
+      if (state.session_theme_title) labels.push(`theme: ${state.session_theme_title}`);
+      if (state.session_theme_prompt) labels.push("theme framing line set");
+      if (state.deployment_focus_topic) labels.push(`focus topic: ${state.deployment_focus_topic}`);
+      if (state.deployment_focus_status) labels.push(`${deploymentLabel} focus status: ${state.deployment_focus_status}`);
       if (state.kiosk_language_code) labels.push(`kiosk language: ${describeKioskLanguage(state.kiosk_language_code)}`);
       if (state.kiosk_accessibility_mode) labels.push("accessible kiosk");
       if (state.kiosk_force_reduced_motion) labels.push("reduced-motion kiosk");
@@ -1052,6 +1098,10 @@
             playback_paused: Boolean(dom.opsPlaybackPaused?.checked),
             quieter_mode: Boolean(dom.opsQuieterMode?.checked),
             mood_bias: String(dom.opsMoodBias?.value || ""),
+            session_theme_title: String(dom.opsSessionThemeTitle?.value || ""),
+            session_theme_prompt: String(dom.opsSessionThemePrompt?.value || ""),
+            deployment_focus_topic: String(dom.opsDeploymentFocusTopic?.value || ""),
+            deployment_focus_status: String(dom.opsDeploymentFocusStatus?.value || ""),
             kiosk_language_code: String(dom.opsKioskLanguageCode?.value || ""),
             kiosk_accessibility_mode: String(dom.opsKioskAccessibilityMode?.value || ""),
             kiosk_force_reduced_motion: Boolean(dom.opsKioskReducedMotion?.checked),

@@ -192,6 +192,8 @@ class OperatorBehaviorTests(EngineTestCase):
                 "kiosk_accessibility_mode": "large_high_contrast",
                 "kiosk_force_reduced_motion": True,
                 "kiosk_max_recording_seconds": 90,
+                "deployment_focus_topic": "entry_gate",
+                "deployment_focus_status": "open",
             },
             content_type="application/json",
         )
@@ -207,7 +209,9 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertEqual(state.kiosk_accessibility_mode, "large_high_contrast")
         self.assertTrue(state.kiosk_force_reduced_motion)
         self.assertEqual(state.kiosk_max_recording_seconds, 90)
-        self.assertEqual(StewardAction.objects.count(), 9)
+        self.assertEqual(state.deployment_focus_topic, "entry_gate")
+        self.assertEqual(state.deployment_focus_status, "open")
+        self.assertEqual(StewardAction.objects.count(), 11)
         payload = response.json()
         self.assertTrue(payload["operator_state"]["maintenance_mode"])
         self.assertEqual(payload["operator_state"]["mood_bias"], "weathered")
@@ -215,8 +219,93 @@ class OperatorBehaviorTests(EngineTestCase):
         self.assertEqual(payload["operator_state"]["kiosk_accessibility_mode"], "large_high_contrast")
         self.assertTrue(payload["operator_state"]["kiosk_force_reduced_motion"])
         self.assertEqual(payload["operator_state"]["kiosk_max_recording_seconds"], 90)
+        self.assertEqual(payload["operator_state"]["deployment_focus_topic"], "entry_gate")
+        self.assertEqual(payload["operator_state"]["deployment_focus_status"], "open")
         self.assertTrue(payload["operator_state"]["intake_paused"])
-        self.assertEqual(len(payload["changes"]), 9)
+        self.assertEqual(len(payload["changes"]), 11)
+
+    @override_settings(ENGINE_DEPLOYMENT="repair")
+    def test_operator_controls_get_includes_deployment_focus_schema(self):
+        self.login_operator()
+
+        response = self.client.get("/api/v1/operator/controls")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        controls = payload["deployment_controls"]
+        self.assertEqual(controls["deployment"]["code"], "repair")
+        self.assertEqual(controls["topic"]["placeholder"], "projector")
+        self.assertEqual(
+            controls["status"]["suggestions"],
+            ["pending", "needs_part", "fixed", "obsolete"],
+        )
+
+    @override_settings(ENGINE_DEPLOYMENT="oracle")
+    def test_operator_controls_rejects_focus_status_not_allowed_for_deployment(self):
+        self.login_operator()
+
+        response = self.client.post(
+            "/api/v1/operator/controls",
+            data={
+                "deployment_focus_topic": "threshold",
+                "deployment_focus_status": "resolved",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        state = StewardState.load()
+        self.assertEqual(state.deployment_focus_topic, "threshold")
+        self.assertEqual(state.deployment_focus_status, "")
+        self.assertEqual(len(response.json()["changes"]), 1)
+
+    def test_operator_controls_can_set_session_theme_framing(self):
+        self.login_operator()
+
+        response = self.client.post(
+            "/api/v1/operator/controls",
+            data={
+                "session_theme_title": "Arrival and thresholds",
+                "session_theme_prompt": "Offer one small sound about crossing into this room.",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        state = StewardState.load()
+        self.assertEqual(state.session_theme_title, "Arrival and thresholds")
+        self.assertEqual(state.session_theme_prompt, "Offer one small sound about crossing into this room.")
+        self.assertEqual(StewardAction.objects.count(), 2)
+        payload = response.json()
+        self.assertEqual(payload["operator_state"]["session_theme_title"], "Arrival and thresholds")
+        self.assertEqual(payload["operator_state"]["session_theme_prompt"], "Offer one small sound about crossing into this room.")
+        self.assertEqual(len(payload["changes"]), 2)
+
+    def test_surface_state_exposes_session_theme_for_kiosk_framing(self):
+        state = StewardState.load()
+        state.session_theme_title = "Threshold"
+        state.session_theme_prompt = "Leave one line about entering."
+        state.save(update_fields=["session_theme_title", "session_theme_prompt"])
+
+        response = self.client.get("/api/v1/surface/state")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["operator_state"]["session_theme_title"], "Threshold")
+        self.assertEqual(payload["operator_state"]["session_theme_prompt"], "Leave one line about entering.")
+
+    def test_surface_state_exposes_deployment_focus_fields(self):
+        state = StewardState.load()
+        state.deployment_focus_topic = "entry_gate"
+        state.deployment_focus_status = "open"
+        state.save(update_fields=["deployment_focus_topic", "deployment_focus_status"])
+
+        response = self.client.get("/api/v1/surface/state")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["operator_state"]["deployment_focus_topic"], "entry_gate")
+        self.assertEqual(payload["operator_state"]["deployment_focus_status"], "open")
 
     @patch("engine.api_views.put_bytes")
     def test_intake_pause_blocks_new_audio_artifact_creation(self, put_bytes_mock):

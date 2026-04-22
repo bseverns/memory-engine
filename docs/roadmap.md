@@ -191,6 +191,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Clearer participant-facing receipt guidance for later revocation on the same node
 - Public participant-facing `/revoke/` page so receipt codes can remove saved recordings on the local node without exposing steward controls
 - Deployment-owned prompt packs on `/kiosk/` so `memory`, `question`, `prompt`, and `repair` can offer distinct ways to begin without branching the kiosk flow
+- Optional steward-authored session theme controls on `/ops/` that influence kiosk idle copy and submission framing without widening public routes
 - Operator-only live monitor utility on `/ops/` for local output-tone and live mic verification without touching the archive
 - Stronger focus and reboot recovery guidance for unattended kiosk HID use
 - Sharper `/ops/` hierarchy so live controls, routing ritual, and recovery notes stay ahead of passive summary panels
@@ -359,6 +360,7 @@ this file is the longer memory of what changed, when, and why it mattered.
 - Add clearer opening and closing posture sections
 - Keep clarifying what the local monitor proves and what it does not
 - Make public-state issues easier to distinguish from steward-browser issues
+- Deployment-aware `/ops/` focus hints for topic/status now landed as soft bias controls (question/repair first), with deployment-specific presets instead of free-form operator tuning
 
 ### 8. Regression closure
 - Keep strengthening the default gate around:
@@ -395,7 +397,7 @@ Open buckets now look like this:
 
 ### User / speaker
 - Add installation-specific speaker prompts or writing prompts that can shift the emotional tone of the room
-- Add optional steward-authored session themes that influence idle copy and submission framing
+- Expand steward-authored session themes beyond first-pass copy framing if live pilots show clear value
 - Add alternate kiosk layouts for seated booths, standing kiosks, and wall-mounted enclosures
 
 ### Audience / room effect
@@ -416,7 +418,7 @@ Open buckets now look like this:
 ### Operator / stewardship
 - Add multi-node stewardship tooling if more than one installation is deployed
 - Add role-based steward access if the installation grows beyond one trusted operator
-- Add deployment-aware operator controls so stewardship UI can expose mode-specific tuning safely, without turning `/ops/` into a giant behavior console
+- Expand deployment-aware operator controls beyond first-pass topic/status focus hints while keeping `/ops/` bounded and non-performative
 - Add long-term retention policy controls that can differ by consent mode, artifact type, or installation
 - Add artifact-type-aware export posture so handoff bundles can preserve deployment semantics
 - Add a fuller external-storage migration story for moving beyond MinIO if scale or policy changes

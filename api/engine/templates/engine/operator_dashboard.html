@@ -256,6 +256,36 @@
         </label>
         <label class="ops-login-field">
           <span>
+            <strong>Session theme title (optional)</strong>
+            <span>Short steward-authored theme shown during intake and review framing on this node.</span>
+          </span>
+          <input id="opsSessionThemeTitle" type="text" maxlength="64" name="session_theme_title" placeholder="Arrival and thresholds"/>
+        </label>
+        <label class="ops-login-field">
+          <span>
+            <strong>Session theme framing line (optional)</strong>
+            <span>One additional line that influences idle copy and submission framing without changing routes or consent behavior.</span>
+          </span>
+          <input id="opsSessionThemePrompt" type="text" maxlength="180" name="session_theme_prompt" placeholder="Offer one small sound about crossing into this room."/>
+        </label>
+        <label class="ops-login-field">
+          <span>
+            <strong>Deployment focus topic (optional)</strong>
+            <span>Deployment-scoped hint for short-horizon thread follow-on behavior. This nudges selection; it does not force playback.</span>
+          </span>
+          <input id="opsDeploymentFocusTopic" type="text" maxlength="64" name="deployment_focus_topic" placeholder="entry_gate"/>
+        </label>
+        <label class="ops-login-field">
+          <span>
+            <strong>Deployment focus status (optional)</strong>
+            <span>Use deployment presets so status hints stay legible across stewards.</span>
+          </span>
+          <select id="opsDeploymentFocusStatus" name="deployment_focus_status">
+            <option value="">No focus status</option>
+          </select>
+        </label>
+        <label class="ops-login-field">
+          <span>
             <strong>Kiosk language</strong>
             <span>Choose the guided recording language for this installation. Leave it on the default to follow the server setting.</span>
           </span>

@@ -162,6 +162,8 @@
         quieter_mode: false,
         maintenance_mode: false,
         mood_bias: "",
+        deployment_focus_topic: "",
+        deployment_focus_status: "",
       },
       roomLoopConfig: defaultRoomLoopConfig(),
     };
@@ -228,6 +230,54 @@
     function currentMoodBias() {
       const value = String(surfaceState.mood_bias || "").toLowerCase();
       return ["clear", "hushed", "suspended", "weathered", "gathering"].includes(value) ? value : "";
+    }
+
+    function operatorDeploymentFocusHint(deploymentCode) {
+      // Keep steward focus hints intentionally bounded to thread-oriented
+      // deployments so `/ops/` can bias recurrence without becoming live
+      // composition control.
+      if (!["question", "repair"].includes(String(deploymentCode || "").toLowerCase())) {
+        return null;
+      }
+      const preferredTopic = normalizedTopicTag(surfaceState.deployment_focus_topic);
+      const preferredLifecycleStatus = normalizedLifecycleStatus(surfaceState.deployment_focus_status);
+      if (!preferredTopic && !preferredLifecycleStatus) {
+        return null;
+      }
+      return {
+        preferredTopic,
+        preferredLifecycleStatus,
+      };
+    }
+
+    function applyOperatorFocusHint(baseHint, deploymentCode) {
+      const focusHint = operatorDeploymentFocusHint(deploymentCode);
+      if (!focusHint) {
+        return baseHint;
+      }
+
+      const nextHint = {
+        preferredTopic: String(baseHint.preferredTopic || ""),
+        preferredLifecycleStatus: String(baseHint.preferredLifecycleStatus || ""),
+        threadLength: Number(baseHint.threadLength || 0),
+      };
+      if (focusHint.preferredTopic) {
+        const topicChanged = normalizedTopicTag(nextHint.preferredTopic) !== focusHint.preferredTopic;
+        nextHint.preferredTopic = focusHint.preferredTopic;
+        nextHint.threadLength = loopHistory
+          .slice(-8)
+          .filter((entry) => normalizedTopicTag(entry.topic) === focusHint.preferredTopic)
+          .length;
+        if (focusHint.preferredLifecycleStatus) {
+          nextHint.preferredLifecycleStatus = focusHint.preferredLifecycleStatus;
+        } else if (topicChanged) {
+          nextHint.preferredLifecycleStatus = "";
+        }
+      } else if (focusHint.preferredLifecycleStatus) {
+        nextHint.preferredLifecycleStatus = focusHint.preferredLifecycleStatus;
+      }
+
+      return nextHint;
     }
 
     function updateButtons() {
@@ -482,10 +532,10 @@
     function preferredThreadHint() {
       const deploymentCode = activeDeploymentCode();
       if (deploymentCode === "question") {
-        return preferredQuestionThread();
+        return applyOperatorFocusHint(preferredQuestionThread(), deploymentCode);
       }
       if (deploymentCode === "repair") {
-        return preferredRepairThread();
+        return applyOperatorFocusHint(preferredRepairThread(), deploymentCode);
       }
       return { preferredTopic: "", preferredLifecycleStatus: "", threadLength: 0 };
     }
