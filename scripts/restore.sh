@@ -73,7 +73,7 @@ fi
 PRE_RESTORE_SNAPSHOT=""
 if [ "${SKIP_SNAPSHOT}" -ne 1 ]; then
   info "Creating a pre-restore snapshot of the current stack"
-  PRE_RESTORE_SNAPSHOT=$("${REPO_ROOT}/scripts/backup.sh" --print-path | tail -n 1)
+  PRE_RESTORE_SNAPSHOT=$("${REPO_ROOT}/scripts/backup.sh" --consistent --print-path | tail -n 1)
   info "Pre-restore snapshot: ${PRE_RESTORE_SNAPSHOT}"
 fi
 

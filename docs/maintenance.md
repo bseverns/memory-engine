@@ -122,7 +122,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/update.sh` is the normal existing-server path: fast-forward pull, checks, doctor, backup, deploy, and final status.
 - `scripts/check.sh` is the quick sanity pass for browser JavaScript syntax, frontend unit tests with Node coverage thresholds, the default Playwright browser subset, Python, the Django behavior suite with Python coverage thresholds and reports, shell syntax, and `git diff --check`.
 - `scripts/release_smoke.sh` is the disposable compose-backed appliance proof: it boots an isolated smoke stack on `127.0.0.1:18080`, waits for `/healthz` and `/readyz`, then runs the live Playwright ritual for kiosk submit, room playback, and ops visibility.
-- `scripts/research_smoke.sh` is the evaluation-focused disposable proof: it runs a deeper submit/revoke/remove flow, verifies audit trail visibility, and creates backup/export artifacts (plus optional disposable restore rehearsal).
+- `scripts/research_smoke.sh` is the evaluation-focused disposable proof: it runs a deeper submit/revoke/remove flow, verifies audit trail visibility, and creates backup/export artifacts (plus optional disposable restore rehearsal). It is intentionally software-scoped and does not prove physical mic/speaker routing or steward comprehension.
 - `scripts/clean_local.sh` removes regenerable local caches such as `api/.test-cache`, `__pycache__`, and Playwright output. Pass `--include-screenshots` if you also want to clear generated screenshots.
 - `.github/workflows/check.yml` runs that same `scripts/check.sh` gate in GitHub Actions using a repo-local `.venv`, so CI stays aligned with the local check path.
 - `scripts/doctor.sh` checks `.env`, compose state, narrow API health through `/healthz`, broader cluster readiness through `/readyz`, and browser/TLS constraints that affect recording.
@@ -130,7 +130,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `/ops/` also now includes an operator-only monitor panel for output-tone checks and local live mic play-through. Use that surface, not `/kiosk/`, when you need to verify the current steward machine's local routing. Do not overread it as proof of the separate kiosk recorder or room playback machine.
 - `scripts/status.sh` prints `docker compose ps` and then fetches `/healthz` and `/readyz` from inside the API container.
 - `scripts/backup.sh` writes timestamped Postgres and MinIO snapshots into `backups/`, includes checksums/provenance metadata, and supports `--consistent` mode for short write-path pauses during capture.
-- `scripts/restore.sh` restores one of those snapshots into the current stack and now asks for explicit confirmation plus a fresh pre-restore snapshot by default.
+- `scripts/restore.sh` restores one of those snapshots into the current stack and now asks for explicit confirmation plus a fresh pre-restore consistent snapshot by default.
 - `scripts/export_bundle.sh` packages one backup snapshot into a portable `.tgz` with a manifest, checksums, explicit import instructions, and an artifact summary when the API container is running.
 - `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, `/readyz`, compose status, doctor output, recent logs, and an artifact summary into a single handoff archive.
 - `/api/v1/operator/artifact-summary` gives stewards the same artifact posture snapshot as a direct JSON download from `/ops/`.
@@ -165,6 +165,22 @@ What that means in practice:
 If `./scripts/check.sh` reports a host Python other than `3.12`, treat that as
 best-effort local maintenance. It may still work, but the repo does not promise
 that every dependency will install or behave identically outside the container.
+
+## Hardening verification quick checks
+
+After deploy, run these once before calling the node install-ready:
+
+```bash
+curl -sSI http://127.0.0.1/ | grep -E 'X-Content-Type-Options|X-Frame-Options|Referrer-Policy|Permissions-Policy'
+docker compose exec -T api sh -lc 'id && touch /var/log/memory_engine/.write-test && rm -f /var/log/memory_engine/.write-test'
+docker compose exec -T api sh -lc 'python - <<\"PY\"\nimport tempfile\nf=tempfile.NamedTemporaryFile(delete=True)\nf.write(b\"ok\")\nf.flush()\nprint(\"tmp-ok\")\nPY'
+```
+
+Interpretation:
+
+- missing expected proxy headers means Caddy hardening config is not active
+- failed write test under `/var/log/memory_engine` means volume ownership/permissions need attention
+- failed tempfile write suggests container runtime permissions are too restrictive for normal app behavior
 
 Current bundled installation profiles:
 
@@ -373,7 +389,7 @@ Restore cautions:
 
 - `scripts/restore.sh` replaces the current database contents.
 - `scripts/restore.sh` replaces the current MinIO object store.
-- `scripts/restore.sh` now takes that fresh pre-restore backup automatically unless you pass `--skip-snapshot`.
+- `scripts/restore.sh` now takes that fresh pre-restore consistent backup automatically unless you pass `--skip-snapshot`.
 - `scripts/restore.sh` also asks you to type `RESTORE` unless you pass `--yes`.
 - Expect active playback and ingest to be interrupted during restore.
 
@@ -404,9 +420,11 @@ Audience presence sensing (optional):
 - To enable it, set `PRESENCE_SENSING_ENABLED=1` in `.env`.
 - Start the sensor service with the compose profile:
   `docker compose --profile presence up -d presence_sensor`
-- The default camera path is `PRESENCE_CAMERA_DEVICE=/dev/video0`. Override that path if your host maps the webcam differently.
+- Keep `PRESENCE_CAMERA_DEVICE` as a host device path (for compose mapping), such as `/dev/video0`.
+- Use `PRESENCE_CAMERA_SOURCE` for OpenCV capture source (`/dev/video0` or `0`).
 - When enabled, `/readyz` and `/ops/` include a `presence` component. If the webcam feed or sensor loop goes stale, readiness drops to `degraded`.
 - This phase is motion-only (`opencv` frame differencing). It stores no video frames and only publishes aggregate presence state plus heartbeat timing.
+- For ethics posture, signage language, Redis key details, and pilot boundary rules, use [PRESENCE_SENSING.md](./PRESENCE_SENSING.md).
 
 Support bundle notes:
 

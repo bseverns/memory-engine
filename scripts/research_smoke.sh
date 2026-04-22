@@ -7,6 +7,11 @@ set -eu
 # - runs the browser research smoke flow
 # - verifies backup + export creation
 # - optionally restores from the fresh backup in the same disposable stack
+#
+# Proof boundary:
+# - proves software submit/revoke/remove/backup/export (and optional restore) flow
+# - does not prove real microphone hardware permission or capture reliability
+# - does not prove room speaker routing, kiosk focus posture, or steward comprehension
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)
@@ -35,6 +40,13 @@ Behavior:
   - creates a backup and export bundle after smoke artifacts exist
   - optionally restores the fresh backup into the same disposable stack
   - tears the disposable project down unless --keep-up is passed
+
+Proof boundary:
+  - Proves software flow: submit/revoke/remove/audit/backup/export (+ optional restore)
+  - Does not prove physical mic permission/capture on kiosk hardware
+  - Does not prove room speaker routing or output-device posture
+  - Does not prove kiosk browser focus persistence across reboot
+  - Does not prove non-author steward comprehension under live pressure
 EOF_USAGE
 }
 
@@ -111,8 +123,20 @@ latest_export_bundle() {
   find "${REPO_ROOT}/exports" -maxdepth 1 -type f -name 'memory-engine-export-*.tgz' 2>/dev/null | sort | tail -n 1
 }
 
+print_proof_boundary() {
+  info "Research smoke proof boundary:"
+  info "  proves: software submit/revoke/remove/audit/backup/export flow"
+  info "  proves: optional restore flow when --with-restore is used"
+  info "  does not prove: real kiosk microphone permission/capture path"
+  info "  does not prove: room speaker routing on dedicated playback hardware"
+  info "  does not prove: kiosk browser focus resilience after reboot"
+  info "  does not prove: non-author steward comprehension in live operation"
+}
+
 info "Resetting disposable research smoke project"
 compose_smoke down -v --remove-orphans >/dev/null 2>&1 || true
+
+print_proof_boundary
 
 info "Starting disposable research smoke stack"
 compose_smoke up -d --build
