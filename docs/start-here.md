@@ -20,6 +20,7 @@ Open these first:
 1. [OPERATOR_DRILL_CARD.md](./OPERATOR_DRILL_CARD.md)
 2. [maintenance.md](./maintenance.md)
 3. [participant-prompt-card.md](./participant-prompt-card.md)
+4. [PRESENCE_SENSING.md](./PRESENCE_SENSING.md) before enabling presence sensing
 
 Use this path when you need to recover the machine quickly, check whether intake or playback is paused, remove something from circulation, or help a participant revoke a recording later.
 

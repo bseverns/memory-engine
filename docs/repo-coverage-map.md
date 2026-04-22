@@ -29,7 +29,7 @@ flowchart LR
 | `browser-tests/` | Playwright end-to-end surface tests and smoke tests | [maintenance.md](./maintenance.md) |
 | `frontend-tests/` | Browser-surface unit tests for kiosk/room/ops JS modules | [AT_A_GLANCE.md](./AT_A_GLANCE.md) |
 | `.github/workflows/` | CI gate (`check.yml`) mirroring local repo check lane | [maintenance.md](./maintenance.md) |
-| `presence_sensor/` | Optional OpenCV audience-presence sidecar service | [maintenance.md](./maintenance.md) |
+| `presence_sensor/` | Optional OpenCV audience-presence sidecar service | [PRESENCE_SENSING.md](./PRESENCE_SENSING.md) |
 | `firmware/` | Optional Leonardo kiosk trigger firmware | [HANDS_FREE_CONTROLS.md](./HANDS_FREE_CONTROLS.md) |
 | `artifacts/` | Documentation/support image assets and screenshots | [index.md](./index.md) |
 | `backups/` | Local backup outputs from `scripts/backup.sh` | [maintenance.md](./maintenance.md) |

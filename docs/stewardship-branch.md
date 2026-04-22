@@ -11,6 +11,7 @@ Use it when the question is less about architecture and more about what a stewar
 | a participant needs plain-language guidance before or after recording | [participant-prompt-card.md](./participant-prompt-card.md) | [start-here.md](./start-here.md) |
 | a steward needs the shortest recovery ritual | [OPERATOR_DRILL_CARD.md](./OPERATOR_DRILL_CARD.md) | [maintenance.md](./maintenance.md) |
 | a steward needs the fuller operational context | [maintenance.md](./maintenance.md) | [AT_A_GLANCE.md](./AT_A_GLANCE.md) |
+| a site is considering optional presence sensing and needs ethics/signage language first | [PRESENCE_SENSING.md](./PRESENCE_SENSING.md) | [participant-prompt-card.md](./participant-prompt-card.md) |
 | a cohort needs steward training and evaluation scaffolds | [teaching/modules/ops-stewardship-recovery.md](./teaching/modules/ops-stewardship-recovery.md) | [teaching/labs/ops-recovery-drill.md](./teaching/labs/ops-recovery-drill.md) |
 
 ## Pages In This Branch
@@ -21,6 +22,7 @@ Use it when the question is less about architecture and more about what a stewar
 - [participant-prompt-card.md](./participant-prompt-card.md): plain-language public handoff copy
 - [OPERATOR_DRILL_CARD.md](./OPERATOR_DRILL_CARD.md): shortest steward recovery ritual
 - [maintenance.md](./maintenance.md): operational runbook and caveats that stewards need when the short card is not enough
+- [PRESENCE_SENSING.md](./PRESENCE_SENSING.md): explicit ethics/install boundary before enabling presence sensing
 
 ## Branch Logic
 

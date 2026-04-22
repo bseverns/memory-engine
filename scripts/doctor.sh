@@ -241,6 +241,39 @@ check_image_posture() {
   [ "${redis_image}" = "redis:7" ] && warn "REDIS_IMAGE is using a broad major tag (redis:7). Prefer a pinned patch tag."
 }
 
+check_presence_sensor_posture() {
+  presence_enabled=$(get_env_value "${ENV_FILE}" "PRESENCE_SENSING_ENABLED" || true)
+  case "$(printf '%s' "${presence_enabled}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on)
+      ;;
+    *)
+      info "OK: presence sensing is disabled in .env"
+      return
+      ;;
+  esac
+
+  camera_device=$(get_env_value "${ENV_FILE}" "PRESENCE_CAMERA_DEVICE" || true)
+  camera_source=$(get_env_value "${ENV_FILE}" "PRESENCE_CAMERA_SOURCE" || true)
+
+  if [ -z "${camera_device}" ]; then
+    record_error "PRESENCE_CAMERA_DEVICE is required when presence sensing is enabled"
+  elif printf '%s' "${camera_device}" | grep -Eq '^[0-9]+$'; then
+    record_error "PRESENCE_CAMERA_DEVICE=${camera_device} looks numeric; compose device mapping expects a host path like /dev/video0"
+  elif printf '%s' "${camera_device}" | grep -Eq '^/'; then
+    info "OK: PRESENCE_CAMERA_DEVICE looks like a host device path (${camera_device})"
+  else
+    warn "PRESENCE_CAMERA_DEVICE=${camera_device} does not look like an absolute device path"
+  fi
+
+  if [ -z "${camera_source}" ]; then
+    warn "PRESENCE_CAMERA_SOURCE is not set; sensor will fall back to PRESENCE_CAMERA_DEVICE"
+  elif printf '%s' "${camera_source}" | grep -Eq '^[0-9]+$'; then
+    info "OK: PRESENCE_CAMERA_SOURCE uses numeric OpenCV index (${camera_source})"
+  else
+    info "OK: PRESENCE_CAMERA_SOURCE is set (${camera_source})"
+  fi
+}
+
 check_compose_services() {
   compose_bin="$1"
 
@@ -376,6 +409,7 @@ engine_deployment=$(get_env_value "${ENV_FILE}" "ENGINE_DEPLOYMENT" || true)
 installation_profile=$(get_env_value "${ENV_FILE}" "INSTALLATION_PROFILE" || true)
 check_known_value "ENGINE_DEPLOYMENT" "${engine_deployment}" "memory question prompt repair witness oracle"
 check_known_value "INSTALLATION_PROFILE" "${installation_profile}" "custom quiet_gallery shared_lab active_exhibit"
+check_presence_sensor_posture
 
 info ""
 info "Browser and HTTPS posture"

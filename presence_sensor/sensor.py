@@ -42,8 +42,8 @@ def touch_health_file() -> None:
         handle.write(now_iso())
 
 
-def resolve_camera_source(raw_device: str):
-    trimmed = str(raw_device or "").strip()
+def resolve_camera_source(raw_source: str):
+    trimmed = str(raw_source or "").strip()
     if not trimmed:
         return 0
     if trimmed.isdigit():
@@ -113,10 +113,13 @@ def run_sensor_loop() -> None:
     frame_interval_seconds = max(0.05, env_int("PRESENCE_FRAME_INTERVAL_MS", 500) / 1000.0)
     motion_ratio_threshold = max(0.0001, env_float("PRESENCE_MOTION_PIXEL_RATIO_THRESHOLD", 0.008))
     min_contour_area = max(0, env_int("PRESENCE_MOTION_MIN_CONTOUR_AREA", 1200))
-    camera_source = resolve_camera_source(os.getenv("PRESENCE_CAMERA_DEVICE", "/dev/video0"))
+    camera_device = str(os.getenv("PRESENCE_CAMERA_DEVICE", "/dev/video0") or "/dev/video0").strip() or "/dev/video0"
+    camera_source_raw = str(os.getenv("PRESENCE_CAMERA_SOURCE", camera_device) or camera_device).strip() or camera_device
+    camera_source = resolve_camera_source(camera_source_raw)
 
     logging.info(
-        "Presence sensor enabled (camera=%s width=%s height=%s threshold=%s interval=%.3fs)",
+        "Presence sensor enabled (device=%s source=%s width=%s height=%s threshold=%s interval=%.3fs)",
+        camera_device,
         camera_source,
         frame_width,
         frame_height,

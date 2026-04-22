@@ -14,6 +14,7 @@ Use it when you need to get oriented quickly, bring up a machine, rehearse the c
 | the actual current artifact path | [memory-lifecycle.md](./memory-lifecycle.md) | [how-the-stack-works.md](./how-the-stack-works.md) |
 | the current proof board and validation TODOs | [experimental-proofs.md](./experimental-proofs.md) | [roadmap.md](./roadmap.md) |
 | a teaching/evaluation path built on these same docs | [teaching/index.md](./teaching/index.md) | [teaching/instructor-guide.md](./teaching/instructor-guide.md) |
+| optional camera-adjacent sensing posture before enablement | [PRESENCE_SENSING.md](./PRESENCE_SENSING.md) | [maintenance.md](./maintenance.md) |
 | install-day setup steps | [installation-checklist.md](./installation-checklist.md) | [UBUNTU_APPLIANCE.md](./UBUNTU_APPLIANCE.md) |
 | opening, recovery, or repair steps | [maintenance.md](./maintenance.md) | [OPERATOR_DRILL_CARD.md](./OPERATOR_DRILL_CARD.md) |
 
@@ -27,6 +28,7 @@ Use it when you need to get oriented quickly, bring up a machine, rehearse the c
 - [installation-checklist.md](./installation-checklist.md): install-day setup checklist
 - [UBUNTU_APPLIANCE.md](./UBUNTU_APPLIANCE.md): host firewall and restart-on-boot recipe
 - [maintenance.md](./maintenance.md): runbook for deploy, backup, restore, and diagnostics
+- [PRESENCE_SENSING.md](./PRESENCE_SENSING.md): ethics and install boundary for optional webcam-based sensing
 - [OPERATOR_DRILL_CARD.md](./OPERATOR_DRILL_CARD.md): shortest steward recovery ritual
 - [multi-machine-setup.md](./multi-machine-setup.md): dedicated kiosk, room, and steward role split
 

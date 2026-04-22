@@ -29,6 +29,7 @@ nav:
       - Installation Checklist: installation-checklist.md
       - Ubuntu Appliance: UBUNTU_APPLIANCE.md
       - Maintenance Runbook: maintenance.md
+      - Presence Sensing: PRESENCE_SENSING.md
       - Operator Drill Card: OPERATOR_DRILL_CARD.md
       - Multi-Machine Setup: multi-machine-setup.md
   - Machine:
