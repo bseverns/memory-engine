@@ -17,6 +17,21 @@ It is not the same thing as the roadmap. The roadmap says what the project may s
 | Stewards clear session framing/focus reliably at close and complete archive flow under time pressure | stale session framing and missed end-of-day archives are soft trust failures | bounded clear action on `/ops/` + `/ops/bench/`, guided archive command card, close-of-day wrapper script | run timed close drill with non-author stewards; record skipped steps, command errors, and note quality | `TODO` |
 | Coverage gate plus default Playwright slice catch common regressions before deploy | The stack now claims a testing-ready posture | CI gate, Python/Node coverage thresholds, browser subset | track the next several regressions and note whether the default gate would have caught them | `PARTIAL` |
 
+## Proof-Run Note Scaffold
+
+Use `scripts/proof_run_note.sh` before a rehearsal so evidence lands in a
+consistent local file instead of disappearing into memory:
+
+```bash
+./scripts/proof_run_note.sh --target "receipt revocation comprehension" --runner "non-author steward"
+./scripts/proof_run_note.sh --target "restore handoff" --deployment memory --profile shared_lab
+```
+
+The script writes a dated Markdown note under `test-results/proof-runs/` with
+the current commit SHA, surface checklist, backup/export path fields, and a
+boundary note that automated tests are not proof of participant or steward
+comprehension.
+
 ## Good Experimental Passes To Run Next
 
 - Run a receipt-to-revocation rehearsal with someone who did not build the stack.
@@ -38,5 +53,4 @@ It is not the same thing as the roadmap. The roadmap says what the project may s
 ## TODO Notes
 
 - Add a small appendix linking each proof item back to the code seams or docs it is exercising.
-- Decide whether proof runs should live only in docs or also in a machine-readable checklist under `scripts/` or `test-results/`.
 - Add one completed proof example here after the first formal rehearsal so future maintainers can see the intended level of specificity.

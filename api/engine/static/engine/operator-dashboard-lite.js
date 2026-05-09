@@ -9,7 +9,7 @@
     ? globalThis
     : (typeof window !== "undefined" ? window : {});
 
-  const DEFAULT_ARCHIVE_COMMAND = "./scripts/session_close_archive.sh";
+  const DEFAULT_ARCHIVE_COMMAND = "./scripts/session_close_archive.sh --print-paths";
   const TAB_STORAGE_KEY = "memory-engine.ops-lite.selected-tab";
   const TAB_KEYS = ["open-room", "run-room", "fix-problem", "close-session"];
   const TAB_LABELS = {

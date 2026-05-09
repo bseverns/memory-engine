@@ -410,7 +410,7 @@
           </article>
           <article class="ops-lite-block">
             <h4>Session close archive command</h4>
-            <p class="stage-copy">This page does not run host scripts. It prepares the exact host command for consistent backup then export.</p>
+            <p class="stage-copy">This page does not run host scripts. It prepares the exact host command for consistent backup then export, with printed path lines for steward notes.</p>
             <p id="opsLiteArchiveReadiness" class="shortcut">Checking archive readiness cues.</p>
             <label class="ops-login-field" for="opsLiteArchiveUsbPath">
               <span>
@@ -423,7 +423,7 @@
               <button id="opsLiteArchiveCommandBuild" type="button" class="btn secondary">Build archive command</button>
               <button id="opsLiteArchiveCommandCopy" type="button" class="btn secondary">Copy command</button>
             </div>
-            <pre id="opsLiteArchiveCommand" class="ops-lite-archive-command">./scripts/session_close_archive.sh</pre>
+            <pre id="opsLiteArchiveCommand" class="ops-lite-archive-command">./scripts/session_close_archive.sh --print-paths</pre>
           </article>
           <article class="ops-lite-block">
             <h4>Close-of-day checklist</h4>

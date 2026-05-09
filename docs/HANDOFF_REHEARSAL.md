@@ -14,6 +14,15 @@ For each rehearsal or pilot:
 - record what actually failed or confused people
 - record what changed afterward
 
+For a one-run note with commit SHA and evidence prompts already filled in, run:
+
+```bash
+./scripts/proof_run_note.sh --target "restore handoff" --runner "non-author steward"
+```
+
+Keep this file as the running summary. Keep generated proof-run notes as the
+detailed evidence packet for each dated rehearsal.
+
 ## 1. Appliance Rehearsal
 
 ### Target path

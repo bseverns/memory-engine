@@ -68,9 +68,15 @@ next to the machine.
 
 ## End-Session Archive (Quick)
 
-1. On the host shell, run `./scripts/session_close_archive.sh`.
-2. For USB handoff, run `./scripts/session_close_archive.sh --to-usb /absolute/mount/path`.
+1. On the host shell, run `./scripts/session_close_archive.sh --print-paths`.
+2. For USB handoff, run `./scripts/session_close_archive.sh --print-paths --to-usb /absolute/mount/path`.
 3. Copy the printed backup/export paths into steward notes.
+
+## Before A Proof Drill
+
+1. Run `./scripts/proof_run_note.sh --target "short target name" --runner "who is running it"`.
+2. Use the created note for screenshots, command output paths, confusion points, and one follow-up.
+3. Do not mark the proof passed unless a real steward or participant actually rehearsed the path.
 
 ## Before Opening To The Public
 

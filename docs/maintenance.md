@@ -105,8 +105,14 @@ Create a portable export bundle from the latest backup:
 Run close-of-day archive flow (consistent backup + export, optional USB copy):
 
 ```bash
-./scripts/session_close_archive.sh
-./scripts/session_close_archive.sh --to-usb /absolute/mount/path
+./scripts/session_close_archive.sh --print-paths
+./scripts/session_close_archive.sh --print-paths --to-usb /absolute/mount/path
+```
+
+Create a dated proof-run note before a real rehearsal:
+
+```bash
+./scripts/proof_run_note.sh --target "close-of-day steward drill" --runner "non-author steward"
 ```
 
 Restore a backup:
@@ -140,6 +146,7 @@ Create a remote-friendly support bundle with logs and health snapshots:
 - `scripts/restore.sh` restores one of those snapshots into the current stack and now asks for explicit confirmation plus a fresh pre-restore consistent snapshot by default.
 - `scripts/export_bundle.sh` packages one backup snapshot into a portable `.tgz` with a manifest, checksums, explicit import instructions, and an artifact summary when the API container is running.
 - `scripts/session_close_archive.sh` is the close-of-day wrapper: consistent backup first, export second, and optional USB copy/checksum in one bounded host command.
+- `scripts/proof_run_note.sh` creates a dated Markdown scaffold under `test-results/proof-runs/` for real steward/participant rehearsals. It records the commit SHA and prompts for proof evidence without pretending the rehearsal has passed.
 - `scripts/support_bundle.sh` gathers a redacted `.env`, `/healthz`, `/readyz`, compose status, doctor output, recent logs, and an artifact summary into a single handoff archive.
 - `/api/v1/operator/artifact-summary` gives stewards the same artifact posture snapshot as a direct JSON download from `/ops/`.
 - `docs/installation-checklist.md` is the install-day checklist for kiosk hardware, browser mode, audio routing, and auto-start verification.
@@ -315,7 +322,7 @@ Use this sequence when the session ends:
 1. Confirm no one is still recording and the room can fall quiet naturally.
 2. Check `/ops/` for critical storage or queue warnings that should be handed off immediately.
 3. Use `Clear session framing` in `/ops/` or `/ops/bench/`.
-4. Run `./scripts/session_close_archive.sh` (or `--to-usb /absolute/mount/path` for USB handoff).
+4. Run `./scripts/session_close_archive.sh --print-paths` (or add `--to-usb /absolute/mount/path` for USB handoff).
 5. Leave a short steward note with the printed backup/export paths.
 6. Use maintenance mode only if the node should stay explicitly out of service until the next steward returns.
 

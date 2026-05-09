@@ -77,22 +77,22 @@ test("nextActionText favors calm live guidance when healthy and unpaused", () =>
 test("buildArchiveCommand keeps local default and safely quotes USB paths", () => {
   assert.equal(
     operatorLite.buildArchiveCommand(""),
-    "./scripts/session_close_archive.sh",
+    "./scripts/session_close_archive.sh --print-paths",
   );
   assert.equal(
     operatorLite.buildArchiveCommand("/media/steward/SESSION ARCHIVE"),
-    "./scripts/session_close_archive.sh --to-usb '/media/steward/SESSION ARCHIVE'",
+    "./scripts/session_close_archive.sh --print-paths --to-usb '/media/steward/SESSION ARCHIVE'",
   );
   assert.equal(
     operatorLite.buildArchiveCommand("/media/steward/it's-safe"),
-    "./scripts/session_close_archive.sh --to-usb '/media/steward/it'\\''s-safe'",
+    "./scripts/session_close_archive.sh --print-paths --to-usb '/media/steward/it'\\''s-safe'",
   );
 });
 
 test("buildArchiveCommandResult rejects non-absolute USB paths safely", () => {
   const result = operatorLite.buildArchiveCommandResult("SESSION_ARCHIVE");
 
-  assert.equal(result.command, "./scripts/session_close_archive.sh");
+  assert.equal(result.command, "./scripts/session_close_archive.sh --print-paths");
   assert.match(result.error, /must be absolute/i);
 });
 
@@ -417,11 +417,11 @@ test("start drives compact operator lite flows: tabs, controls, framing clear, a
     doc.getElementById("opsLiteArchiveUsbPath").value = "relative/path";
     doc.getElementById("opsLiteArchiveCommandBuild").dispatch("click");
     assert.match(doc.getElementById("opsLiteArchiveReadiness").textContent, /must be absolute/i);
-    assert.equal(doc.getElementById("opsLiteArchiveCommand").textContent, "./scripts/session_close_archive.sh");
+    assert.equal(doc.getElementById("opsLiteArchiveCommand").textContent, "./scripts/session_close_archive.sh --print-paths");
 
     doc.getElementById("opsLiteArchiveUsbPath").value = "/media/steward/session archive";
     doc.getElementById("opsLiteArchiveCommandBuild").dispatch("click");
-    assert.match(doc.getElementById("opsLiteArchiveCommand").textContent, /--to-usb '\/media\/steward\/session archive'/);
+    assert.match(doc.getElementById("opsLiteArchiveCommand").textContent, /--print-paths --to-usb '\/media\/steward\/session archive'/);
 
     doc.getElementById("opsLiteMaintenanceMode").checked = true;
     doc.getElementById("opsLiteIntakePaused").checked = true;
