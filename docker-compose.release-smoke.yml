@@ -3,8 +3,6 @@ services:
     environment:
       APP_SITE_ADDRESS: ":80"
       APP_TLS_DIRECTIVE: ""
-    ports:
-      - "127.0.0.1:18080:80"
 
   minio:
     ports:

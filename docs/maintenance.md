@@ -451,6 +451,31 @@ Support bundle notes:
 - It includes redacted environment values, compose status, doctor output, `/healthz`, `/readyz`, recent logs for the main services, and `artifact-summary.json` when the API container is available.
 - It is meant for remote troubleshooting without handing over shell access or the raw `.env`.
 
+## Co-hosted server port setup
+
+If Memory Engine runs on a server that also hosts other compose stacks, do not
+let this stack claim shared public ports or common local service ports. In
+`.env`, bind the compose-managed Caddy proxy to localhost/high ports:
+
+```env
+APP_SITE_ADDRESS=:80
+APP_TLS_DIRECTIVE=
+APP_HTTP_PUBLISH=127.0.0.1:18080
+APP_HTTPS_PUBLISH=127.0.0.1:18443
+```
+
+Then route the public hostname or path from the server's existing reverse proxy
+to `http://127.0.0.1:18080`. Keep the default MinIO compose service private
+unless you need the console briefly for inspection.
+
+If a failed start already left containers or networks in a partial state, clean
+up just this compose project and start it again:
+
+```bash
+docker compose down --remove-orphans
+docker compose up --build -d
+```
+
 ## MinIO setup notes
 
 This stack uses MinIO only as private object storage for raw audio and derivatives. It is not intended to be exposed publicly by default.
@@ -459,7 +484,23 @@ Where each setting lives:
 
 - `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD` are read by the `minio` container itself. These are the bootstrap admin credentials for the MinIO server.
 - `MINIO_ENDPOINT`, `MINIO_BUCKET`, `MINIO_ACCESS_KEY`, and `MINIO_SECRET_KEY` are read by `api`, `worker`, `beat`, and `minio_init`.
-- `docker-compose.yml` binds MinIO to `127.0.0.1:9000` and the MinIO console to `127.0.0.1:9001`, so server-root access or an SSH tunnel is the normal way to inspect it directly.
+- `docker-compose.yml` keeps MinIO private on the compose network. The app,
+  worker, beat, and `minio_init` services reach it with the internal endpoint
+  `http://minio:9000`.
+- If you need direct server-root inspection, add the optional console override
+  when starting the stack:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.minio-console.yml up -d
+```
+
+- That override binds MinIO to `127.0.0.1:9000` and the MinIO console to
+  `127.0.0.1:9001` by default. If either port is already in use, choose another
+  localhost port:
+
+```bash
+MINIO_CONSOLE_PUBLISH=127.0.0.1:19001 docker compose -f docker-compose.yml -f docker-compose.minio-console.yml up -d
+```
 
 What to set before the first deploy:
 
@@ -525,7 +566,9 @@ docker compose exec -T api curl -fsS http://localhost:8000/healthz
 docker compose exec -T api curl -fsS http://localhost:8000/readyz
 ```
 
-If you want to inspect the MinIO console directly on the server, use `http://127.0.0.1:9001` locally on that machine or tunnel it over SSH.
+If you started the optional console override, inspect the MinIO console directly
+on the server with `http://127.0.0.1:9001` locally on that machine, or tunnel the
+chosen localhost port over SSH.
 
 ## Common operator failure modes
 

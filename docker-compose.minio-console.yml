@@ -1,0 +1,5 @@
+services:
+  minio:
+    ports:
+      - "${MINIO_API_PUBLISH:-127.0.0.1:9000}:9000"
+      - "${MINIO_CONSOLE_PUBLISH:-127.0.0.1:9001}:9001"

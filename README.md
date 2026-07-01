@@ -157,9 +157,23 @@ The compose stack is set up for a reverse proxy in front of Django:
 - Django runs behind it via `gunicorn`
 - static files are served through Django/WhiteNoise
 - MinIO is no longer exposed publicly by default
+- MinIO is also not published on host ports by the default compose file; use
+  the optional console override only when you need local server-root inspection
 - MinIO server and `mc` helper images are now pinned to fixed release tags by default instead of `latest`
 - `/healthz` exposes narrow API/dependency health for container health checks
 - `/readyz` exposes broader cluster readiness, including worker/beat heartbeat state
+
+On a host that already runs other public stacks, keep this stack behind the
+existing host ingress instead of binding public ports directly:
+
+```env
+APP_SITE_ADDRESS=:80
+APP_TLS_DIRECTIVE=
+APP_HTTP_PUBLISH=127.0.0.1:18080
+APP_HTTPS_PUBLISH=127.0.0.1:18443
+```
+
+Then point the existing host reverse proxy at `http://127.0.0.1:18080`.
 
 The fastest path on a fresh server is the deploy script:
 
