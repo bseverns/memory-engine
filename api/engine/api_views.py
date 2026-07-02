@@ -526,7 +526,7 @@ def consume_ephemeral(request):
 
     try:
         artifact = Artifact.objects.get(id=int(artifact_id))
-    except Artifact.DoesNotExist:
+    except (TypeError, ValueError, Artifact.DoesNotExist):
         return Response({"error": "not found"}, status=404)
 
     if artifact.status != Artifact.STATUS_EPHEMERAL:

@@ -161,6 +161,16 @@ class ArtifactBehaviorTests(EngineTestCase):
         stream_key_mock.assert_called_once_with(f"ephemeral/{artifact.id}/audio.wav")
         delete_key_mock.assert_called_once_with(f"ephemeral/{artifact.id}/audio.wav")
 
+    def test_ephemeral_consume_rejects_malformed_artifact_id(self):
+        response = self.client.post(
+            "/api/v1/ephemeral/consume",
+            {"artifact_id": "not-an-id", "consume_token": "token"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"error": "not found"})
+
     @patch("engine.api_views.put_bytes")
     def test_room_save_rejects_non_wav_upload(self, put_bytes_mock):
         upload = SimpleUploadedFile("audio.raw", b"not-a-wav", content_type="application/octet-stream")
