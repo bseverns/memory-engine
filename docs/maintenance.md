@@ -468,6 +468,49 @@ Then route the public hostname or path from the server's existing reverse proxy
 to `http://127.0.0.1:18080`. Keep the default MinIO compose service private
 unless you need the console briefly for inspection.
 
+### Containerized ingress on a shared Docker network
+
+When the server's public ingress also runs in Docker, prefer the tracked
+`docker-compose.public-edge.yml` overlay over a host-loopback hop. Create the
+external bridge once:
+
+```bash
+docker network inspect public_edge >/dev/null 2>&1 || docker network create public_edge
+```
+
+Start or recreate the Memory Engine proxy with the overlay:
+
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.public-edge.yml \
+  up -d --build proxy
+```
+
+The overlay keeps `proxy` on the private default network so it can reach
+`api:8000`, and also attaches it to `public_edge` as
+`memory_engine_proxy`. No application or storage service joins the shared
+network. The outer ingress should terminate public TLS and reverse proxy over
+plain HTTP to `memory_engine_proxy:80`; do not expose the API directly or run a
+second public TLS hop between the two proxies.
+
+Verify the network boundary and upstream response before enabling the public
+hostname:
+
+```bash
+docker network inspect public_edge \
+  --format '{{range $id, $container := .Containers}}{{println $container.Name}}{{end}}'
+
+docker exec <outer-ingress-container> getent hosts memory_engine_proxy
+docker exec <outer-ingress-container> \
+  wget -qO- --header='Host: memory.example.com' \
+  http://memory_engine_proxy/healthz
+```
+
+The network membership should include the Memory Engine proxy and the outer
+ingress only. The health request should return the normal Memory Engine JSON
+payload through its own Caddy proxy.
+
 If a failed start already left containers or networks in a partial state, clean
 up just this compose project and start it again:
 

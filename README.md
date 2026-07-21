@@ -175,6 +175,21 @@ APP_HTTPS_PUBLISH=127.0.0.1:18443
 
 Then point the existing host reverse proxy at `http://127.0.0.1:18080`.
 
+If the existing ingress is another Compose-managed container on the same host,
+use the optional shared-edge overlay instead of routing through a published host
+port. Create the external network once, then start Memory Engine with both files:
+
+```bash
+docker network create public_edge
+docker compose -f docker-compose.yml -f docker-compose.public-edge.yml up --build -d
+```
+
+The overlay attaches only the Memory Engine Caddy proxy to `public_edge` with
+the stable alias `memory_engine_proxy`. The API, database, Redis, and MinIO stay
+on the private default network. Configure the outer ingress to proxy the public
+Memory Engine hostname to `memory_engine_proxy:80`; the outer ingress remains
+the sole public TLS terminator.
+
 The fastest path on a fresh server is the deploy script:
 
 ```bash
@@ -497,6 +512,7 @@ If you want faster/stronger change, raise epsilon to `0.005–0.01`.
 
 ## Directory map
 - `docker-compose.yml` — full local node stack
+- `docker-compose.public-edge.yml` — optional shared-network attachment for a co-hosted container ingress
 - `docs/maintenance.md` — deployment, status, backup, restore, and troubleshooting runbook
 - `docs/UBUNTU_APPLIANCE.md` — reference `Ubuntu Server 24.04.4 LTS` host recipe
 - `docs/how-the-stack-works.md` — architecture, request flows, playback model, storage, and testing notes

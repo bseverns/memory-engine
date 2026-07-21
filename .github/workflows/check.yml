@@ -44,5 +44,10 @@ jobs:
       - name: Install API dependencies into .venv
         run: ./.venv/bin/python -m pip install --upgrade pip && ./.venv/bin/pip install -r api/requirements.txt
 
+      - name: Validate shared-edge compose overlay
+        run: |
+          cp .env.example .env
+          docker compose -f docker-compose.yml -f docker-compose.public-edge.yml config --quiet
+
       - name: Run repo checks
         run: ./scripts/check.sh
