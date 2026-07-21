@@ -1,0 +1,12 @@
+services:
+  proxy:
+    networks:
+      default:
+      public_edge:
+        aliases:
+          - memory_engine_proxy
+
+networks:
+  public_edge:
+    name: public_edge
+    external: true
