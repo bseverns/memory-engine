@@ -79,7 +79,7 @@ csv_has_value() {
 
 parse_site_host() {
   site_address="$1"
-  printf '%s' "${site_address}" | sed 's#^[^:]*://##; s#/.*$##; s/:.*$##'
+  printf '%s' "${site_address}" | sed 's#^[^:]*://##; s#/.*$##; s#:.*$##'
 }
 
 infer_tls_mode() {
